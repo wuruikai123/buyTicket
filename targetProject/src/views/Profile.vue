@@ -357,7 +357,7 @@ const ticketOrders = reactive<TicketOrder[]>([
     cursor: pointer;
     transition: all 0.3s ease;
     width: 80%;
-    height: 80px;
+    height: 80pxll;
     max-width: 100%;
     box-sizing: border-box;
 }
