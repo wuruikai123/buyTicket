@@ -28,6 +28,21 @@ const router = createRouter({
           name: 'Profile',
           component: () => import('@/views/Profile.vue'),
         },
+        {
+          path: 'ticket/:id',
+          name: 'TicketPurchase',
+          component: () => import('@/views/TicketPurchase.vue'),
+        },
+        {
+          path: 'date-choose/:id',
+          name: 'DateChoose',
+          component: () => import('@/views/buyTicket/datechoose.vue'),
+        },
+        {
+          path: 'ticket-info/:id',
+          name: 'TicketInfo',
+          component: () => import('@/views/buyTicket/ticketinfo.vue'),
+        },
       ],
     },
   ],
