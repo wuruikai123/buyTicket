@@ -45,7 +45,7 @@
                     </div>
                 </div>
                 <div class="exhibition-action">
-                    <button class="buy-button">购票</button>
+                    <button class="buy-button" @click="goToTicket(exhibition.id)">购票</button>
                 </div>
             </div>
         </div>
@@ -54,6 +54,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
+import { useRouter } from 'vue-router';
 
 // 定义展览数据类型
 interface Exhibition {
@@ -67,6 +68,8 @@ interface Exhibition {
 // 当前激活的标签页
 const activeTab = ref<'ongoing' | 'upcoming'>('ongoing');
 
+const router = useRouter();
+
 // 切换标签页
 const switchTab = (tab: 'ongoing' | 'upcoming') => {
     activeTab.value = tab;
@@ -75,6 +78,11 @@ const switchTab = (tab: 'ongoing' | 'upcoming') => {
 // 计算属性用于类型检查
 const isOngoingActive = computed(() => activeTab.value === 'ongoing');
 const isUpcomingActive = computed(() => activeTab.value === 'upcoming');
+
+// 跳转到购票页面
+const goToTicket = (exhibitionId: number) => {
+    router.push(`/ticket/${exhibitionId}`);
+};
 
 // 展览假数据
 const allExhibitions: Exhibition[] = [
