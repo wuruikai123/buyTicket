@@ -7,12 +7,16 @@
         </div>
 
         <!-- 当前展出区域 -->
-        <div class="current-exhibition">
+        <div 
+            class="current-exhibition"
+            :style="currentExhibition.coverImage ? { backgroundImage: `url(${currentExhibition.coverImage})` } : {}"
+        >
             <div class="exhibition-content">
                 <h2 class="exhibition-title">当前展出</h2>
                 <p class="exhibition-name">{{ currentExhibition.name }}</p>
                 <button class="ticket-button" @click="toBuyTicket">前往购票</button>
             </div>
+            <div class="overlay"></div>
         </div>
 
         <!-- 近期展览区域 -->
@@ -23,7 +27,10 @@
             </div>
             <div class="exhibition-cards">
                 <div v-for="exhibition in upcomingExhibitions" :key="exhibition.id" class="exhibition-card">
-                    <div class="card-image"></div>
+                    <div 
+                        class="card-image"
+                        :style="exhibition.coverImage ? { backgroundImage: `url(${exhibition.coverImage})` } : {}"
+                    ></div>
                     <p class="card-title">{{ exhibition.name }}</p>
                     <p class="card-date">{{ exhibition.date }}</p>
                 </div>
@@ -33,49 +40,46 @@
 </template>
 
 <script setup lang="ts">
-import { reactive } from 'vue';
+import { reactive, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { Expand } from '@element-plus/icons-vue';
-
-// 定义展览数据类型
-interface Exhibition {
-    id: number;
-    name: string;
-    date: string;
-}
+import { exhibitionApi, type Exhibition } from '@/api/exhibition';
 
 const router = useRouter();
 
-// 当前展出假数据
-const currentExhibition = reactive<Exhibition>({
-    id: 1,
-    name: '2025年当代艺术双年展',
-    date: '2025/01/01 - 2025/12/31'
-});
+// 当前展出
+const currentExhibition = reactive<Partial<Exhibition>>({});
 
-// 近期展览假数据列表
-const upcomingExhibitions = reactive<Exhibition[]>([
-    {
-        id: 2,
-        name: '印象派大师作品展',
-        date: '2025/09/30'
-    },
-    {
-        id: 3,
-        name: '现代雕塑艺术展',
-        date: '2025/10/12'
-    },
-    {
-        id: 4,
-        name: '数字艺术未来展',
-        date: '2025/10/25'
-    },
-    {
-        id: 5,
-        name: '传统工艺文化展',
-        date: '2025/11/08'
+// 近期展览列表
+const upcomingExhibitions = reactive<Exhibition[]>([]);
+
+// 获取数据
+onMounted(async () => {
+    try {
+        // 1. 获取当前展出
+        const current = await exhibitionApi.getCurrent();
+        if (current) {
+            Object.assign(currentExhibition, current);
+            // 后端可能返回 startDate/endDate，前端展示需要拼接
+            if (current.startDate && current.endDate) {
+                currentExhibition.date = `${current.startDate} - ${current.endDate}`;
+            }
+        }
+
+        // 2. 获取近期展览 (假设我们获取待开始的)
+        const list = await exhibitionApi.getList();
+        if (list) {
+            // 格式化日期
+            const formattedList = list.map(item => ({
+                ...item,
+                date: item.startDate ? item.startDate : '待定'
+            }));
+            upcomingExhibitions.push(...formattedList);
+        }
+    } catch (error) {
+        console.error('获取展览数据失败', error);
     }
-]);
+});
 
 const toBuyTicket = () => {
     router.push('/mall')
@@ -107,6 +111,8 @@ const toBuyTicket = () => {
 .current-exhibition {
     flex: 2;
     background-color: #e0e0e0;
+    background-size: cover;
+    background-position: center;
     position: relative;
     display: flex;
     align-items: flex-end;
@@ -114,37 +120,53 @@ const toBuyTicket = () => {
     min-height: 60vh;
 }
 
+.overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.6) 100%);
+    z-index: 1;
+}
+
 .exhibition-content {
     width: 100%;
+    position: relative;
+    z-index: 2;
 }
 
 .exhibition-title {
     font-size: 32px;
     font-weight: bold;
-    color: #333;
+    color: white;
     margin-bottom: 16px;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.3);
 }
 
 .exhibition-name {
     font-size: 18px;
-    color: #666;
+    color: rgba(255, 255, 255, 0.9);
     margin-bottom: 24px;
     line-height: 1.5;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
 }
 
 .ticket-button {
-    background-color: #666;
-    color: white;
+    background-color: white;
+    color: #333;
     border: none;
     padding: 12px 32px;
     border-radius: 8px;
     font-size: 16px;
+    font-weight: bold;
     cursor: pointer;
-    transition: background-color 0.3s ease;
+    transition: all 0.3s ease;
 }
 
 .ticket-button:hover {
-    background-color: #66b1ff;
+    background-color: #f0f0f0;
+    transform: translateY(-2px);
 }
 
 /* 近期展览区域 */
@@ -206,6 +228,8 @@ const toBuyTicket = () => {
     height: 180px;
     background-color: #d0d0d0;
     margin-bottom: 12px;
+    background-size: cover;
+    background-position: center;
 }
 
 .card-title {

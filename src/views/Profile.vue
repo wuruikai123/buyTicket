@@ -3,10 +3,10 @@
         <!-- 用户信息头部 -->
         <div class="profile-header">
             <div class="user-info">
-                <div class="avatar"></div>
+                <div class="avatar" :style="{ backgroundImage: userInfo.avatar ? `url(${userInfo.avatar})` : '', backgroundSize: 'cover' }"></div>
                 <div class="user-details">
-                    <h2 class="username">张三</h2>
-                    <p class="uid">UID: 2453363688</p>
+                    <h2 class="username">{{ userInfo.username }}</h2>
+                    <p class="uid">UID: {{ userInfo.uid }}</p>
                 </div>
             </div>
             <div class="action-buttons">
@@ -57,19 +57,19 @@
         <!-- 订单列表 -->
         <div class="order-list">
             <div 
-                v-for="order in ticketOrders" 
+                v-for="order in currentOrders" 
                 :key="order.id" 
                 class="order-card"
             >
                 <div class="order-image"></div>
                 <div class="order-content">
-                    <h3 class="order-title">{{ order.exhibitionName }}</h3>
-                    <p class="order-time">预定时间: {{ order.bookingTime }}</p>
+                    <h3 class="order-title">{{ order.title }}</h3>
+                    <p class="order-time">时间: {{ order.time }}</p>
                     <p class="order-price">¥{{ order.price }}元</p>
                 </div>
                 <div class="ticket-edge"></div>
                 <div class="order-action">
-                    <button class="use-button">使用</button>
+                    <button class="use-button">{{ order.statusText }}</button>
                 </div>
             </div>
         </div>
@@ -77,16 +77,30 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
 import { Location, EditPen } from '@element-plus/icons-vue';
+import { userApi, type User } from '@/api/user';
+import { ticketApi } from '@/api/ticket';
+import { mallApi } from '@/api/mall';
 
 // 定义订单数据类型
-interface TicketOrder {
+interface Order {
     id: number;
-    exhibitionName: string;
-    bookingTime: string;
+    title: string;
+    time: string;
     price: number;
+    status: number;
+    statusText: string;
 }
+
+// 用户信息
+const userInfo = reactive<User>({
+    id: 0,
+    username: '张三',
+    uid: '---',
+    avatar: '',
+    balance: 0
+});
 
 // 当前激活的标签页
 const activeTab = ref<'tickets' | 'mall'>('tickets');
@@ -100,27 +114,61 @@ const switchTab = (tab: 'tickets' | 'mall') => {
 const isTicketsActive = computed(() => activeTab.value === 'tickets');
 const isMallActive = computed(() => activeTab.value === 'mall');
 
-// 门票订单假数据
-const ticketOrders = reactive<TicketOrder[]>([
-    {
-        id: 1,
-        exhibitionName: 'XXXXXXXXXXXXXXXX展',
-        bookingTime: '2025/10/11 12:00-14:00',
-        price: 150
-    },
-    {
-        id: 2,
-        exhibitionName: 'XXXXXXXXXXXXXXXX展',
-        bookingTime: '2025/10/11 12:00-14:00',
-        price: 150
-    },
-    {
-        id: 3,
-        exhibitionName: 'XXXXXXXXXXXXXXXX展',
-        bookingTime: '2025/10/12 08:00-10:00',
-        price: 150
+// 订单列表
+const ticketOrders = ref<Order[]>([]);
+const mallOrders = ref<Order[]>([]);
+
+// 当前显示的列表
+const currentOrders = computed(() => isTicketsActive.value ? ticketOrders.value : mallOrders.value);
+
+// 获取用户信息和订单
+onMounted(async () => {
+    try {
+        // 用户信息
+        const user = await userApi.getUserInfo();
+        if (user) {
+            Object.assign(userInfo, user);
+        }
+
+        // 门票订单
+        const tOrders = await ticketApi.getOrderList();
+        if (tOrders) {
+            ticketOrders.value = tOrders.map((o: any) => ({
+                id: o.id,
+                title: o.contactName ? `${o.contactName}的门票订单` : '门票订单', // 暂时无法获取展览名，用联系人代替
+                time: o.createTime,
+                price: o.totalAmount,
+                status: o.status,
+                statusText: getStatusText(o.status)
+            }));
+        }
+
+        // 商城订单
+        const mOrders = await mallApi.getOrderList();
+        if (mOrders) {
+            mallOrders.value = mOrders.map((o: any) => ({
+                id: o.id,
+                title: '商城购物订单',
+                time: o.createTime,
+                price: o.totalAmount,
+                status: o.status,
+                statusText: getStatusText(o.status)
+            }));
+        }
+    } catch (e) {
+        console.error('获取数据失败', e);
     }
-]);
+});
+
+const getStatusText = (status: number) => {
+    const map: Record<number, string> = {
+        0: '待支付',
+        1: '已支付',
+        2: '已完成',
+        3: '已取消'
+    };
+    return map[status] || '未知';
+};
 </script>
 
 <style scoped>

@@ -48,16 +48,7 @@
 import { ref, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { ArrowLeft } from '@element-plus/icons-vue';
-
-// 定义展览数据类型
-interface Exhibition {
-    id: number;
-    name: string;
-    shortDescription: string;
-    description: string;
-    dateRange: string;
-    price: number;
-}
+import { exhibitionApi, type Exhibition } from '@/api/exhibition';
 
 const router = useRouter();
 const route = useRoute();
@@ -65,12 +56,10 @@ const route = useRoute();
 // 展览数据
 const exhibition = ref<Exhibition>({
     id: 0,
-    name: 'XXXXXXXXXX展',
-    shortDescription: 'XXXXXXXXXXXXXXXX XXXX',
-    description: 'XXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXXXXXXXXX',
-    dateRange: '2025/10/11 — 2025/10/12',
-    price: 150
-});
+    name: '',
+    description: '',
+    price: 0
+} as Exhibition);
 
 // 返回上一页
 const goBack = () => {
@@ -83,50 +72,30 @@ const handlePurchase = () => {
     router.push(`/date-choose/${exhibition.value.id}`);
 };
 
+// 加载展览数据
+const loadExhibitionData = async (id: number) => {
+    try {
+        const data = await exhibitionApi.getDetail(id);
+        if (data) {
+            exhibition.value = {
+                ...data,
+                // 兼容前端字段名
+                shortDescription: data.shortDesc || '',
+                dateRange: data.startDate && data.endDate ? `${data.startDate} — ${data.endDate}` : '待定'
+            };
+        }
+    } catch (e) {
+        console.error(e);
+    }
+};
+
 // 从路由参数获取展览ID，加载对应数据
 onMounted(() => {
     const exhibitionId = route.params.id as string;
     if (exhibitionId) {
-        // TODO: 根据ID从API加载展览数据
-        // 这里使用假数据
         loadExhibitionData(parseInt(exhibitionId));
     }
 });
-
-// 加载展览数据（假数据示例）
-const loadExhibitionData = (id: number) => {
-    // 这里应该从API获取数据，现在使用假数据
-    const mockData: Record<number, Exhibition> = {
-        1: {
-            id: 1,
-            name: 'XXXXXXXXXX展',
-            shortDescription: 'XXXXXXXXXXXXXXXX XXXX',
-            description: 'XXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXXXXXXXXX',
-            dateRange: '2025/10/11 — 2025/10/12',
-            price: 150
-        },
-        2: {
-            id: 2,
-            name: '印象派大师作品展',
-            shortDescription: '经典印象派艺术作品展示',
-            description: '本次展览将展出多位印象派大师的经典作品，包括莫奈、雷诺阿、德加等艺术家的珍贵画作。展览涵盖了印象派发展的各个重要阶段，为观众呈现一场视觉盛宴。',
-            dateRange: '2025/09/30 — 2025/10/15',
-            price: 120
-        },
-        3: {
-            id: 3,
-            name: '现代雕塑艺术展',
-            shortDescription: '当代雕塑艺术精品展示',
-            description: '汇集了国内外知名雕塑家的优秀作品，展现现代雕塑艺术的多样性和创新性。展览将传统与现代相结合，为观众带来全新的艺术体验。',
-            dateRange: '2025/10/12 — 2025/10/25',
-            price: 100
-        }
-    };
-    
-    if (mockData[id]) {
-        exhibition.value = mockData[id];
-    }
-};
 </script>
 
 <style scoped>
