@@ -35,7 +35,10 @@
                 :key="exhibition.id" 
                 class="exhibition-card"
             >
-                <div class="exhibition-image"></div>
+                <div 
+                    class="exhibition-image"
+                    :style="exhibition.coverImage ? { backgroundImage: `url(${exhibition.coverImage})` } : {}"
+                ></div>
                 <div class="exhibition-content">
                     <h3 class="exhibition-title">{{ exhibition.name }}</h3>
                     <p class="exhibition-description">{{ exhibition.description }}</p>
@@ -53,22 +56,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-
-// 定义展览数据类型
-interface Exhibition {
-    id: number;
-    name: string;
-    description: string;
-    dateRange: string;
-    status: 'ongoing' | 'upcoming';
-}
+import { exhibitionApi, type Exhibition } from '@/api/exhibition';
 
 // 当前激活的标签页
 const activeTab = ref<'ongoing' | 'upcoming'>('ongoing');
 
 const router = useRouter();
+
+// 展览列表数据
+const exhibitions = ref<any[]>([]);
 
 // 切换标签页
 const switchTab = (tab: 'ongoing' | 'upcoming') => {
@@ -84,51 +82,32 @@ const goToTicket = (exhibitionId: number) => {
     router.push(`/ticket/${exhibitionId}`);
 };
 
-// 展览假数据
-const allExhibitions: Exhibition[] = [
-    {
-        id: 1,
-        name: 'XXXXXXXXXXXXXXXX展',
-        description: 'XXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXXXXXXXXXX',
-        dateRange: '2025/10/11 - 2025/10/12',
-        status: 'ongoing'
-    },
-    {
-        id: 2,
-        name: 'XXXXXXXXXXXXXXXX展',
-        description: 'XXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXXXXXXXXXX',
-        dateRange: '2025/10/11 - 2025/10/12',
-        status: 'ongoing'
-    },
-    {
-        id: 3,
-        name: 'XXXXXXXXXXXXXXXX展',
-        description: 'XXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXXXXXXXXXX',
-        dateRange: '2025/10/11 - 2025/10/12',
-        status: 'ongoing'
-    },
-    {
-        id: 4,
-        name: 'XXXXXXXXXXXXXXXX展',
-        description: 'XXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXXXXXXXXXX',
-        dateRange: '2025/10/11 - 2025/10/12',
-        status: 'ongoing'
-    },
-    {
-        id: 5,
-        name: 'XXXXXXXXXXXXXXXX展',
-        description: 'XXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXXXXXXXXXX',
-        dateRange: '2025/10/11 - 2025/10/12',
-        status: 'ongoing'
+// 加载数据
+const loadExhibitions = async () => {
+    try {
+        const list = await exhibitionApi.getList(activeTab.value);
+        if (list) {
+            exhibitions.value = list.map(item => ({
+                ...item,
+                dateRange: item.startDate && item.endDate ? `${item.startDate} - ${item.endDate}` : '待定'
+            }));
+        } else {
+            exhibitions.value = [];
+        }
+    } catch (e) {
+        console.error(e);
+        exhibitions.value = [];
     }
-];
+};
 
-// 根据当前标签页过滤展览
-const exhibitions = ref<Exhibition[]>(allExhibitions.filter(ex => ex.status === activeTab.value));
+// 初始加载
+onMounted(() => {
+    loadExhibitions();
+});
 
 // 监听标签页变化，更新展览列表
-watch(activeTab, (newTab) => {
-    exhibitions.value = allExhibitions.filter(ex => ex.status === newTab);
+watch(activeTab, () => {
+    loadExhibitions();
 });
 </script>
 
@@ -234,6 +213,8 @@ watch(activeTab, (newTab) => {
     background-color: #d0d0d0;
     border-radius: 8px;
     flex-shrink: 0;
+    background-size: cover;
+    background-position: center;
 }
 
 .exhibition-content {
