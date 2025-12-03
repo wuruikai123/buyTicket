@@ -76,9 +76,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { ArrowLeft, ArrowUp, ArrowDown } from '@element-plus/icons-vue';
+import { exhibitionApi } from '@/api/exhibition';
+import { ticketApi } from '@/api/ticket';
 
 interface CalendarDate {
     key: string;
@@ -95,42 +97,37 @@ const route = useRoute();
 // 展览信息
 const exhibition = ref({
     id: 0,
-    name: 'XXXXXXXXXX展'
+    name: ''
 });
 
 // 选中的日期和时间
-const selectedYear = ref(2025);
-const selectedMonth = ref(10);
-const selectedDate = ref<Date | null>(new Date(2025, 9, 11)); // 10月11日（月份从0开始）
-const selectedTimeSlot = ref('12:00 - 14:00');
-const remainingTickets = ref(55);
+const now = new Date();
+const selectedYear = ref(now.getFullYear());
+const selectedMonth = ref(now.getMonth() + 1);
+const selectedDate = ref<Date | null>(now);
+const selectedTimeSlot = ref('12:00-14:00'); // 注意格式需与数据库一致
+const remainingTickets = ref(0);
 
 // 星期标签
 const weekdays = ['一', '二', '三', '四', '五', '六', '日'];
 
-// 时间段选项
+// 时间段选项 (需与数据库一致)
 const timeSlots = [
-    '08:00 - 10:00',
-    '10:00 - 12:00',
-    '12:00 - 14:00',
-    '14:00 - 16:00',
-    '16:00 - 18:00'
+    '09:00-12:00',
+    '12:00-14:00',
+    '14:00-16:00'
 ];
 
-// 计算日历日期
+// 计算日历日期 (保持原有逻辑，略微调整)
 const calendarDates = computed(() => {
     const dates: CalendarDate[] = [];
     const year = selectedYear.value;
-    const month = selectedMonth.value - 1; // JavaScript月份从0开始
+    const month = selectedMonth.value - 1;
     
-    // 获取当月第一天和最后一天
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
-    
-    // 获取第一天是星期几（转换为周一为0）
     const firstDayWeek = (firstDay.getDay() + 6) % 7;
     
-    // 第一周前面的空格（不显示上个月的日期）
     for (let i = 0; i < firstDayWeek; i++) {
         dates.push({
             key: `empty-${i}`,
@@ -142,7 +139,6 @@ const calendarDates = computed(() => {
         });
     }
     
-    // 只添加当月的日期
     for (let day = 1; day <= lastDay.getDate(); day++) {
         const date = new Date(year, month, day);
         const isSelected = selectedDate.value && 
@@ -163,15 +159,12 @@ const calendarDates = computed(() => {
             isToday
         });
     }
-    
     return dates;
 });
 
 // 改变年份
 const changeYear = (delta: number) => {
     selectedYear.value += delta;
-    if (selectedYear.value < 2020) selectedYear.value = 2020;
-    if (selectedYear.value > 2030) selectedYear.value = 2030;
 };
 
 // 改变月份
@@ -191,7 +184,6 @@ const changeMonth = (delta: number) => {
 const selectDate = (dateInfo: CalendarDate) => {
     if (!dateInfo.otherMonth) {
         selectedDate.value = dateInfo.date;
-        // 更新剩余票数（可以根据日期变化）
         updateRemainingTickets();
     }
 };
@@ -203,19 +195,36 @@ const changeTimeSlot = (delta: number) => {
         let newIndex = currentIndex + delta;
         if (newIndex < 0) newIndex = timeSlots.length - 1;
         if (newIndex >= timeSlots.length) newIndex = 0;
-        const newTimeSlot = timeSlots[newIndex];
-        if (newTimeSlot) {
-            selectedTimeSlot.value = newTimeSlot;
-            updateRemainingTickets();
-        }
+        selectedTimeSlot.value = timeSlots[newIndex];
+        updateRemainingTickets();
     }
 };
 
+// 格式化日期 YYYY-MM-DD
+const formatDate = (date: Date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+};
+
 // 更新剩余票数
-const updateRemainingTickets = () => {
-    // TODO: 根据选中的日期和时间段从API获取剩余票数
-    // 这里使用随机数模拟
-    remainingTickets.value = Math.floor(Math.random() * 100) + 1;
+const updateRemainingTickets = async () => {
+    if (!selectedDate.value || !exhibition.value.id) return;
+    
+    try {
+        const res = await ticketApi.getAvailability({
+            exhibitionId: exhibition.value.id,
+            date: formatDate(selectedDate.value),
+            timeSlot: selectedTimeSlot.value
+        });
+        if (res) {
+            remainingTickets.value = res.remainingCount;
+        }
+    } catch (e) {
+        console.error(e);
+        remainingTickets.value = 0;
+    }
 };
 
 // 返回上一页
@@ -231,32 +240,39 @@ const handleConfirm = () => {
     }
     
     // 跳转到购票信息页面
-    router.push(`/ticket-info/${exhibition.value.id}`);
+    router.push({
+        path: `/ticket-info/${exhibition.value.id}`,
+        query: {
+            date: formatDate(selectedDate.value),
+            timeSlot: selectedTimeSlot.value,
+            exhibitionName: exhibition.value.name
+        }
+    });
 };
 
-// 从路由参数获取展览ID
+// 加载展览信息
+const loadExhibitionInfo = async (id: number) => {
+    try {
+        const data = await exhibitionApi.getDetail(id);
+        if (data) {
+            exhibition.value.id = data.id;
+            exhibition.value.name = data.name;
+            // 加载完展览信息后，获取一次余票
+            updateRemainingTickets();
+        }
+    } catch (e) {
+        console.error(e);
+    }
+};
+
 onMounted(() => {
     const exhibitionId = route.params.id as string;
     if (exhibitionId) {
-        exhibition.value.id = parseInt(exhibitionId);
-        // TODO: 从API加载展览信息
-        // 这里使用假数据
-        loadExhibitionData(parseInt(exhibitionId));
+        const id = parseInt(exhibitionId);
+        exhibition.value.id = id;
+        loadExhibitionInfo(id);
     }
 });
-
-// 加载展览数据
-const loadExhibitionData = (id: number) => {
-    const mockData: Record<number, { name: string }> = {
-        1: { name: 'XXXXXXXXXX展' },
-        2: { name: '印象派大师作品展' },
-        3: { name: '现代雕塑艺术展' }
-    };
-    
-    if (mockData[id]) {
-        exhibition.value.name = mockData[id].name;
-    }
-};
 </script>
 
 <style scoped>

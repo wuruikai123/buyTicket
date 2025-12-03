@@ -87,8 +87,12 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { ArrowLeft, Plus, Minus } from '@element-plus/icons-vue';
+import { ticketApi } from '@/api/ticket';
+import { exhibitionApi } from '@/api/exhibition';
 
 interface Ticket {
+    date: string;
+    timeSlot: string;
     dateTime: string;
     quantity: number;
     unitPrice: number;
@@ -101,7 +105,8 @@ const route = useRoute();
 // 展览信息
 const exhibition = ref({
     id: 0,
-    name: 'XXXXXXXXXX展'
+    name: '',
+    price: 0
 });
 
 // 联系人信息
@@ -109,33 +114,15 @@ const contactName = ref('');
 const contactPhone = ref('');
 
 // 选中的票务列表
-const selectedTickets = ref<Ticket[]>([
-    {
-        dateTime: '2025年10月11日 12:00-14:00',
-        quantity: 2,
-        unitPrice: 150,
-        totalPrice: 300
-    },
-    {
-        dateTime: '2025年10月12日 08:00-10:00',
-        quantity: 1,
-        unitPrice: 150,
-        totalPrice: 150
-    }
-]);
+const selectedTickets = ref<Ticket[]>([]);
 
-// 服务协议内容（假数据）
+// 服务协议内容
 const agreementLines = ref([
-    'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
-    'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
-    'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
-    'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
-    'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
-    'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
-    'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
-    'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
-    'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
-    'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX'
+    '1. 购票须知：所有门票一经售出，非不可抗力因素不退不换。',
+    '2. 入场要求：请携带本人身份证原件，凭电子票二维码扫码入场。',
+    '3. 禁止携带：严禁携带易燃易爆物品、管制刀具等危险品入场。',
+    '4. 知识产权：展馆内部分区域禁止拍照，请留意现场标识。',
+    '5. 儿童说明：1.2米以下儿童免票，需由成人陪同。'
 ]);
 
 // 计算总金额
@@ -163,7 +150,6 @@ const increaseQuantity = (index: number) => {
 
 // 添加更多票务
 const addMoreTickets = () => {
-    // TODO: 可以跳转回日期选择页面或打开选择器
     router.push(`/date-choose/${exhibition.value.id}`);
 };
 
@@ -173,47 +159,83 @@ const goBack = () => {
 };
 
 // 处理支付
-const handlePayment = () => {
+const handlePayment = async () => {
     if (!contactName.value || !contactPhone.value) {
         alert('请填写联系人信息');
         return;
     }
     
-    // TODO: 跳转到支付页面
-    console.log('支付信息:', {
-        contactName: contactName.value,
-        contactPhone: contactPhone.value,
-        tickets: selectedTickets.value,
-        totalAmount: totalAmount.value
-    });
-    
-    // router.push(`/payment/${exhibition.value.id}`);
+    try {
+        // 1. 创建订单
+        const items = selectedTickets.value.map(t => ({
+            date: t.date,
+            timeSlot: t.timeSlot,
+            quantity: t.quantity,
+            unitPrice: t.unitPrice
+        }));
+
+        const createRes = await ticketApi.createOrder({
+            exhibitionId: exhibition.value.id,
+            contactName: contactName.value,
+            contactPhone: contactPhone.value,
+            totalAmount: totalAmount.value,
+            items: items
+        });
+
+        if (createRes && createRes.orderId) {
+            // 2. 模拟支付
+            await ticketApi.pay({
+                orderId: createRes.orderId,
+                type: 'ticket',
+                password: '123456' // 默认支付密码
+            });
+            
+            alert('支付成功！');
+            router.push('/profile');
+        }
+    } catch (e: any) {
+        console.error(e);
+        alert(e.message || '支付失败');
+    }
 };
 
-// 从路由参数获取数据
+// 加载展览详情
+const loadExhibition = async (id: number) => {
+    try {
+        const data = await exhibitionApi.getDetail(id);
+        if (data) {
+            exhibition.value.id = data.id;
+            exhibition.value.name = data.name;
+            exhibition.value.price = data.price || 0;
+            
+            // 初始化第一张票 (如果有参数)
+            const date = route.query.date as string;
+            const timeSlot = route.query.timeSlot as string;
+            
+            if (date && timeSlot) {
+                const price = data.price || 0;
+                selectedTickets.value = [{
+                    date,
+                    timeSlot,
+                    dateTime: `${date} ${timeSlot}`,
+                    quantity: 1,
+                    unitPrice: price,
+                    totalPrice: price
+                }];
+            }
+        }
+    } catch (e) {
+        console.error(e);
+    }
+};
+
 onMounted(() => {
     const exhibitionId = route.params.id as string;
     if (exhibitionId) {
-        exhibition.value.id = parseInt(exhibitionId);
-        loadExhibitionData(parseInt(exhibitionId));
+        const id = parseInt(exhibitionId);
+        loadExhibition(id);
     }
-    
-    // TODO: 从路由参数或状态管理获取选中的日期和时间段
-    // 这里使用假数据
 });
-
-// 加载展览数据
-const loadExhibitionData = (id: number) => {
-    const mockData: Record<number, { name: string }> = {
-        1: { name: 'XXXXXXXXXX展' },
-        2: { name: '印象派大师作品展' },
-        3: { name: '现代雕塑艺术展' }
-    };
-    
-    if (mockData[id]) {
-        exhibition.value.name = mockData[id].name;
-    }
-};
 </script>
 
 <style scoped>
