@@ -2,25 +2,27 @@
     <div class="profile">
         <!-- 用户信息头部 -->
         <div class="profile-header">
-            <!-- 未登录状态：显示登录和注册按钮 -->
-            <div v-if="!isLoggedIn" class="login-prompt">
-                <div class="login-buttons">
-                    <button class="login-btn" @click="goToLogin">登录</button>
-                    <button class="register-btn" @click="goToRegister">注册</button>
+            <div class="user-info">
+                <div class="avatar" :style="{ backgroundImage: isLoggedIn && userInfo.avatar ? `url(${userInfo.avatar})` : '', backgroundSize: 'cover' }">
+                    <span v-if="!isLoggedIn" class="avatar-placeholder">?</span>
                 </div>
-                <p class="login-tip">请先登录以查看个人信息和订单</p>
+                <div class="user-details">
+                    <h2 class="username">{{ isLoggedIn ? userInfo.username : '未登录' }}</h2>
+                    <p class="uid">UID: {{ isLoggedIn ? userInfo.uid : '---' }}</p>
+                </div>
             </div>
-            
-            <!-- 已登录状态：显示用户信息 -->
-            <template v-else>
-                <div class="user-info">
-                    <div class="avatar" :style="{ backgroundImage: userInfo.avatar ? `url(${userInfo.avatar})` : '', backgroundSize: 'cover' }"></div>
-                    <div class="user-details">
-                        <h2 class="username">{{ userInfo.username }}</h2>
-                        <p class="uid">UID: {{ userInfo.uid }}</p>
-                    </div>
-                </div>
-                <div class="action-buttons">
+            <div class="action-buttons">
+                <!-- 未登录状态：显示登录和注册按钮 -->
+                <template v-if="!isLoggedIn">
+                    <button class="action-btn login-action-btn" @click="goToLogin">
+                        <span>登录</span>
+                    </button>
+                    <button class="action-btn register-action-btn" @click="goToRegister">
+                        <span>注册</span>
+                    </button>
+                </template>
+                <!-- 已登录状态：显示地址簿和修改信息按钮 -->
+                <template v-else>
                     <button class="action-btn">
                         <el-icon><Location /></el-icon>
                         <span>地址簿</span>
@@ -29,33 +31,33 @@
                         <el-icon><EditPen /></el-icon>
                         <span>修改信息</span>
                     </button>
-                </div>
-            </template>
+                </template>
+            </div>
         </div>
 
         <!-- 分隔线 -->
-        <div class="divider" v-if="isLoggedIn"></div>
+        <div class="divider"></div>
 
         <!-- 标签页 -->
-        <div class="tabs" v-if="isLoggedIn">
+        <div class="tabs">
             <div 
                 class="tab-item" 
-                :class="{ active: isTicketsActive }"
-                @click="switchTab('tickets')"
+                :class="{ active: isTicketsActive, disabled: !isLoggedIn }"
+                @click="isLoggedIn && switchTab('tickets')"
             >
                 我的门票订单
             </div>
             <div 
                 class="tab-item" 
-                :class="{ active: isMallActive }"
-                @click="switchTab('mall')"
+                :class="{ active: isMallActive, disabled: !isLoggedIn }"
+                @click="isLoggedIn && switchTab('mall')"
             >
                 我的商城订单
             </div>
         </div>
 
         <!-- 排序和筛选 -->
-        <div class="filter-bar" v-if="isLoggedIn">
+        <div class="filter-bar">
             <div class="sort-options">
                 <span class="sort-label">排序</span>
                 <span class="sort-separator">|</span>
@@ -67,23 +69,30 @@
         </div>
 
         <!-- 订单列表 -->
-        <div class="order-list" v-if="isLoggedIn">
-            <div 
-                v-for="order in currentOrders" 
-                :key="order.id" 
-                class="order-card"
-            >
-                <div class="order-image"></div>
-                <div class="order-content">
-                    <h3 class="order-title">{{ order.title }}</h3>
-                    <p class="order-time">时间: {{ order.time }}</p>
-                    <p class="order-price">¥{{ order.price }}元</p>
-                </div>
-                <div class="ticket-edge"></div>
-                <div class="order-action">
-                    <button class="use-button">{{ order.statusText }}</button>
-                </div>
+        <div class="order-list">
+            <!-- 未登录时显示提示 -->
+            <div v-if="!isLoggedIn" class="empty-state">
+                <p class="empty-text">请先登录以查看订单信息</p>
             </div>
+            <!-- 已登录时显示订单 -->
+            <template v-else>
+                <div 
+                    v-for="order in currentOrders" 
+                    :key="order.id" 
+                    class="order-card"
+                >
+                    <div class="order-image"></div>
+                    <div class="order-content">
+                        <h3 class="order-title">{{ order.title }}</h3>
+                        <p class="order-time">时间: {{ order.time }}</p>
+                        <p class="order-price">¥{{ order.price }}元</p>
+                    </div>
+                    <div class="ticket-edge"></div>
+                    <div class="order-action">
+                        <button class="use-button">{{ order.statusText }}</button>
+                    </div>
+                </div>
+            </template>
         </div>
     </div>
 </template>
@@ -257,6 +266,16 @@ const getStatusText = (status: number) => {
     border-radius: 50%;
     background-color: #d0d0d0;
     flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.avatar-placeholder {
+    font-size: 24px;
+    color: #999;
+    font-weight: bold;
 }
 
 .user-details {
@@ -307,55 +326,21 @@ const getStatusText = (status: number) => {
     font-size: 16px;
 }
 
-/* 未登录状态样式 */
-.login-prompt {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
+/* 未登录时的按钮样式 */
+.login-action-btn {
+    background-color: #409eff !important;
+    color: white !important;
+    border-color: #409eff !important;
 }
 
-.login-buttons {
-    display: flex;
-    gap: 12px;
+.login-action-btn:hover {
+    background-color: #66b1ff !important;
+    border-color: #66b1ff !important;
 }
 
-.login-btn,
-.register-btn {
-    padding: 10px 24px;
-    border-radius: 6px;
-    font-size: 16px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    border: none;
-}
-
-.login-btn {
-    background-color: #409eff;
-    color: white;
-}
-
-.login-btn:hover {
-    background-color: #66b1ff;
-}
-
-.register-btn {
-    background-color: #f5f5f5;
-    color: #333;
-    border: 1px solid #e0e0e0;
-}
-
-.register-btn:hover {
-    background-color: #e8e8e8;
-    border-color: #d0d0d0;
-}
-
-.login-tip {
-    font-size: 14px;
-    color: #999;
-    margin: 0;
+.register-action-btn {
+    background-color: #f5f5f5 !important;
+    color: #333 !important;
 }
 
 /* 标签页 */
@@ -389,6 +374,11 @@ const getStatusText = (status: number) => {
     right: 0;
     height: 2px;
     background-color: #409eff;
+}
+
+.tab-item.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 /* 排序和筛选 */
@@ -431,6 +421,21 @@ const getStatusText = (status: number) => {
     display: flex;
     flex-direction: column;
     gap: 16px;
+}
+
+/* 空状态提示 */
+.empty-state {
+    background-color: white;
+    border-radius: 12px;
+    padding: 60px 20px;
+    text-align: center;
+    margin-top: 20px;
+}
+
+.empty-text {
+    font-size: 16px;
+    color: #999;
+    margin: 0;
 }
 
 .order-card {
