@@ -2,30 +2,42 @@
     <div class="profile">
         <!-- 用户信息头部 -->
         <div class="profile-header">
-            <div class="user-info">
-                <div class="avatar" :style="{ backgroundImage: userInfo.avatar ? `url(${userInfo.avatar})` : '', backgroundSize: 'cover' }"></div>
-                <div class="user-details">
-                    <h2 class="username">{{ userInfo.username }}</h2>
-                    <p class="uid">UID: {{ userInfo.uid }}</p>
+            <!-- 未登录状态：显示登录和注册按钮 -->
+            <div v-if="!isLoggedIn" class="login-prompt">
+                <div class="login-buttons">
+                    <button class="login-btn" @click="goToLogin">登录</button>
+                    <button class="register-btn" @click="goToRegister">注册</button>
                 </div>
+                <p class="login-tip">请先登录以查看个人信息和订单</p>
             </div>
-            <div class="action-buttons">
-                <button class="action-btn">
-                    <el-icon><Location /></el-icon>
-                    <span>地址簿</span>
-                </button>
-                <button class="action-btn">
-                    <el-icon><EditPen /></el-icon>
-                    <span>修改信息</span>
-                </button>
-            </div>
+            
+            <!-- 已登录状态：显示用户信息 -->
+            <template v-else>
+                <div class="user-info">
+                    <div class="avatar" :style="{ backgroundImage: userInfo.avatar ? `url(${userInfo.avatar})` : '', backgroundSize: 'cover' }"></div>
+                    <div class="user-details">
+                        <h2 class="username">{{ userInfo.username }}</h2>
+                        <p class="uid">UID: {{ userInfo.uid }}</p>
+                    </div>
+                </div>
+                <div class="action-buttons">
+                    <button class="action-btn">
+                        <el-icon><Location /></el-icon>
+                        <span>地址簿</span>
+                    </button>
+                    <button class="action-btn">
+                        <el-icon><EditPen /></el-icon>
+                        <span>修改信息</span>
+                    </button>
+                </div>
+            </template>
         </div>
 
         <!-- 分隔线 -->
-        <div class="divider"></div>
+        <div class="divider" v-if="isLoggedIn"></div>
 
         <!-- 标签页 -->
-        <div class="tabs">
+        <div class="tabs" v-if="isLoggedIn">
             <div 
                 class="tab-item" 
                 :class="{ active: isTicketsActive }"
@@ -43,7 +55,7 @@
         </div>
 
         <!-- 排序和筛选 -->
-        <div class="filter-bar">
+        <div class="filter-bar" v-if="isLoggedIn">
             <div class="sort-options">
                 <span class="sort-label">排序</span>
                 <span class="sort-separator">|</span>
@@ -55,7 +67,7 @@
         </div>
 
         <!-- 订单列表 -->
-        <div class="order-list">
+        <div class="order-list" v-if="isLoggedIn">
             <div 
                 v-for="order in currentOrders" 
                 :key="order.id" 
@@ -77,7 +89,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted, onBeforeMount, onActivated } from 'vue';
+import { useRouter } from 'vue-router';
 import { Location, EditPen } from '@element-plus/icons-vue';
 import { userApi, type User } from '@/api/user';
 import { ticketApi } from '@/api/ticket';
@@ -92,6 +105,17 @@ interface Order {
     status: number;
     statusText: string;
 }
+
+const router = useRouter();
+
+// 检查登录状态
+const isLoggedIn = ref(false);
+
+// 检查是否有 token
+const checkLoginStatus = () => {
+    const token = localStorage.getItem('token');
+    isLoggedIn.value = !!token;
+};
 
 // 用户信息
 const userInfo = reactive<User>({
@@ -121,8 +145,22 @@ const mallOrders = ref<Order[]>([]);
 // 当前显示的列表
 const currentOrders = computed(() => isTicketsActive.value ? ticketOrders.value : mallOrders.value);
 
-// 获取用户信息和订单
-onMounted(async () => {
+// 跳转到登录页面
+const goToLogin = () => {
+    router.push('/login');
+};
+
+// 跳转到注册页面（登录页面可以切换模式）
+const goToRegister = () => {
+    router.push('/login');
+};
+
+// 加载用户数据和订单
+const loadUserData = async () => {
+    if (!isLoggedIn.value) {
+        return;
+    }
+
     try {
         // 用户信息
         const user = await userApi.getUserInfo();
@@ -157,6 +195,26 @@ onMounted(async () => {
         }
     } catch (e) {
         console.error('获取数据失败', e);
+    }
+};
+
+// 在组件挂载前检查登录状态
+onBeforeMount(() => {
+    checkLoginStatus();
+});
+
+// 获取用户信息和订单
+onMounted(async () => {
+    await loadUserData();
+});
+
+// 当组件被激活时（从其他页面返回时）重新检查登录状态
+onActivated(() => {
+    const wasLoggedIn = isLoggedIn.value;
+    checkLoginStatus();
+    // 如果之前未登录，现在已登录，则加载数据
+    if (!wasLoggedIn && isLoggedIn.value) {
+        loadUserData();
     }
 });
 
@@ -249,7 +307,56 @@ const getStatusText = (status: number) => {
     font-size: 16px;
 }
 
+/* 未登录状态样式 */
+.login-prompt {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+}
 
+.login-buttons {
+    display: flex;
+    gap: 12px;
+}
+
+.login-btn,
+.register-btn {
+    padding: 10px 24px;
+    border-radius: 6px;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: none;
+}
+
+.login-btn {
+    background-color: #409eff;
+    color: white;
+}
+
+.login-btn:hover {
+    background-color: #66b1ff;
+}
+
+.register-btn {
+    background-color: #f5f5f5;
+    color: #333;
+    border: 1px solid #e0e0e0;
+}
+
+.register-btn:hover {
+    background-color: #e8e8e8;
+    border-color: #d0d0d0;
+}
+
+.login-tip {
+    font-size: 14px;
+    color: #999;
+    margin: 0;
+}
 
 /* 标签页 */
 .tabs {
@@ -405,7 +512,7 @@ const getStatusText = (status: number) => {
     cursor: pointer;
     transition: all 0.3s ease;
     width: 80%;
-    height: 80pxll;
+    height: 80px;
     max-width: 100%;
     box-sizing: border-box;
 }
