@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="5f82aa04-0990-4247-98ed-9ebd0abfa553" name="更改" comment="">
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/BuyTicketApplication.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/BuyTicketApplication.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/buyticket2/Buyticket2Application.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/buyticket2/Buyticket2Application.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/config/WebConfig.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/config/WebConfig.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/controller/CartController.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/controller/CartController.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/controller/CommonController.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/controller/CommonController.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/controller/ExhibitionController.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/controller/ExhibitionController.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/controller/OrderController.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/controller/OrderController.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/controller/SysProductController.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/controller/SysProductController.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/controller/TicketInventoryController.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/controller/TicketInventoryController.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/controller/UserController.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/controller/UserController.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/dto/CartAddRequest.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/dto/CartAddRequest.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/dto/CartItemVO.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/dto/CartItemVO.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/dto/CartUpdateRequest.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/dto/CartUpdateRequest.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/dto/MallOrderCreateRequest$MallItemRequest.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/dto/MallOrderCreateRequest$MallItemRequest.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/dto/MallOrderCreateRequest.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/dto/MallOrderCreateRequest.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/dto/PayRequest.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/dto/PayRequest.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/dto/TicketOrderCreateRequest$TicketItemRequest.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/dto/TicketOrderCreateRequest$TicketItemRequest.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/dto/TicketOrderCreateRequest.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/dto/TicketOrderCreateRequest.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/entity/CartItem.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/entity/CartItem.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/entity/Exhibition.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/entity/Exhibition.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/entity/MallOrder.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/entity/MallOrder.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/entity/MallOrderItem.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/entity/MallOrderItem.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/entity/OrderItem.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/entity/OrderItem.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/entity/SysProduct.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/entity/SysProduct.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/entity/SysUser.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/entity/SysUser.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/entity/TicketInventory.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/entity/TicketInventory.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/entity/TicketOrder.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/entity/TicketOrder.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/exception/GlobalExceptionHandler.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/exception/GlobalExceptionHandler.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/mapper/CartItemMapper.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/mapper/CartItemMapper.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/mapper/ExhibitionMapper.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/mapper/ExhibitionMapper.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/mapper/MallOrderItemMapper.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/mapper/MallOrderItemMapper.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/mapper/MallOrderMapper.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/mapper/MallOrderMapper.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/mapper/OrderItemMapper.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/mapper/OrderItemMapper.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/mapper/SysProductMapper.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/mapper/SysProductMapper.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/mapper/SysUserMapper.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/mapper/SysUserMapper.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/mapper/TicketInventoryMapper.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/mapper/TicketInventoryMapper.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/mapper/TicketOrderMapper.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/mapper/TicketOrderMapper.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/service/CartItemService.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/service/CartItemService.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/service/ExhibitionService.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/service/ExhibitionService.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/service/MallOrderService.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/service/MallOrderService.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/service/SysProductService.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/service/SysProductService.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/service/SysUserService.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/service/SysUserService.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/service/TicketInventoryService.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/service/TicketInventoryService.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/service/TicketOrderService.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/service/TicketOrderService.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/service/impl/CartItemServiceImpl.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/service/impl/CartItemServiceImpl.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/service/impl/ExhibitionServiceImpl.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/service/impl/ExhibitionServiceImpl.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/service/impl/MallOrderServiceImpl.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/service/impl/MallOrderServiceImpl.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/service/impl/SysProductServiceImpl.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/service/impl/SysProductServiceImpl.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/service/impl/SysUserServiceImpl.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/service/impl/SysUserServiceImpl.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/service/impl/TicketInventoryServiceImpl.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/service/impl/TicketInventoryServiceImpl.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/service/impl/TicketOrderServiceImpl.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/service/impl/TicketOrderServiceImpl.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/utils/JsonData.class" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/com/buyticket/utils/JsonData.class" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/targetProject/backend2/target/classes/sql/schema.sql" beforeDir="false" afterPath="$PROJECT_DIR$/targetProject/backend2/target/classes/sql/schema.sql" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/targetProject" />
+  </component>
+  <component name="ProjectColorInfo"><![CDATA[{
+  "associatedIndex": 0
+}]]></component>
+  <component name="ProjectId" id="36LNipa6yyWANX48kbwsbP2ITjz" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "git-widget-placeholder": "main"
+  }
+}]]></component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="默认任务">
+      <changelist id="5f82aa04-0990-4247-98ed-9ebd0abfa553" name="更改" comment="" />
+      <created>1764782022699</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1764782022699</updated>
+    </task>
+    <servers />
+  </component>
+</project>
