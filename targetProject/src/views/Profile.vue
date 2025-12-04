@@ -3,35 +3,21 @@
         <!-- 用户信息头部 -->
         <div class="profile-header">
             <div class="user-info">
-                <div class="avatar" :style="{ backgroundImage: isLoggedIn && userInfo.avatar ? `url(${userInfo.avatar})` : '', backgroundSize: 'cover' }">
-                    <span v-if="!isLoggedIn" class="avatar-placeholder">?</span>
-                </div>
+                <div class="avatar" :style="{ backgroundImage: userInfo.avatar ? `url(${userInfo.avatar})` : '', backgroundSize: 'cover' }"></div>
                 <div class="user-details">
-                    <h2 class="username">{{ isLoggedIn ? userInfo.username : '未登录' }}</h2>
-                    <p class="uid">UID: {{ isLoggedIn ? userInfo.uid : '---' }}</p>
+                    <h2 class="username">{{ userInfo.username }}</h2>
+                    <p class="uid">UID: {{ userInfo.uid }}</p>
                 </div>
             </div>
             <div class="action-buttons">
-                <!-- 未登录状态：显示登录和注册按钮 -->
-                <template v-if="!isLoggedIn">
-                    <button class="action-btn login-action-btn" @click="goToLogin">
-                        <span>登录</span>
-                    </button>
-                    <button class="action-btn register-action-btn" @click="goToRegister">
-                        <span>注册</span>
-                    </button>
-                </template>
-                <!-- 已登录状态：显示地址簿和修改信息按钮 -->
-                <template v-else>
-                    <button class="action-btn">
-                        <el-icon><Location /></el-icon>
-                        <span>地址簿</span>
-                    </button>
-                    <button class="action-btn">
-                        <el-icon><EditPen /></el-icon>
-                        <span>修改信息</span>
-                    </button>
-                </template>
+                <button class="action-btn">
+                    <el-icon><Location /></el-icon>
+                    <span>地址簿</span>
+                </button>
+                <button class="action-btn">
+                    <el-icon><EditPen /></el-icon>
+                    <span>修改信息</span>
+                </button>
             </div>
         </div>
 
@@ -42,22 +28,22 @@
         <div class="tabs">
             <div 
                 class="tab-item" 
-                :class="{ active: isTicketsActive, disabled: !isLoggedIn }"
-                @click="isLoggedIn && switchTab('tickets')"
+                :class="{ active: isTicketsActive }"
+                @click="switchTab('tickets')"
             >
                 我的门票订单
             </div>
             <div 
                 class="tab-item" 
-                :class="{ active: isMallActive, disabled: !isLoggedIn }"
-                @click="isLoggedIn && switchTab('mall')"
+                :class="{ active: isMallActive }"
+                @click="switchTab('mall')"
             >
                 我的商城订单
             </div>
         </div>
 
         <!-- 排序和筛选 -->
-        <div class="filter-bar" v-if="isLoggedIn">
+        <div class="filter-bar">
             <div class="sort-options">
                 <span class="sort-label">排序</span>
                 <span class="sort-separator">|</span>
@@ -70,36 +56,28 @@
 
         <!-- 订单列表 -->
         <div class="order-list">
-            <!-- 未登录时显示提示 -->
-            <div v-if="!isLoggedIn" class="empty-state">
-                <p class="empty-text">请先登录以查看订单信息</p>
-            </div>
-            <!-- 已登录时显示订单 -->
-            <template v-else>
-                <div 
-                    v-for="order in currentOrders" 
-                    :key="order.id" 
-                    class="order-card"
-                >
-                    <div class="order-image"></div>
-                    <div class="order-content">
-                        <h3 class="order-title">{{ order.title }}</h3>
-                        <p class="order-time">时间: {{ order.time }}</p>
-                        <p class="order-price">¥{{ order.price }}元</p>
-                    </div>
-                    <div class="ticket-edge"></div>
-                    <div class="order-action">
-                        <button class="use-button">{{ order.statusText }}</button>
-                    </div>
+            <div 
+                v-for="order in currentOrders" 
+                :key="order.id" 
+                class="order-card"
+            >
+                <div class="order-image"></div>
+                <div class="order-content">
+                    <h3 class="order-title">{{ order.title }}</h3>
+                    <p class="order-time">时间: {{ order.time }}</p>
+                    <p class="order-price">¥{{ order.price }}元</p>
                 </div>
-            </template>
+                <div class="ticket-edge"></div>
+                <div class="order-action">
+                    <button class="use-button">{{ order.statusText }}</button>
+                </div>
+            </div>
         </div>
     </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onBeforeMount, onActivated } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref, reactive, computed, onMounted } from 'vue';
 import { Location, EditPen } from '@element-plus/icons-vue';
 import { userApi, type User } from '@/api/user';
 import { ticketApi } from '@/api/ticket';
@@ -114,17 +92,6 @@ interface Order {
     status: number;
     statusText: string;
 }
-
-const router = useRouter();
-
-// 检查登录状态
-const isLoggedIn = ref(false);
-
-// 检查是否有 token
-const checkLoginStatus = () => {
-    const token = localStorage.getItem('token');
-    isLoggedIn.value = !!token;
-};
 
 // 用户信息
 const userInfo = reactive<User>({
@@ -154,22 +121,8 @@ const mallOrders = ref<Order[]>([]);
 // 当前显示的列表
 const currentOrders = computed(() => isTicketsActive.value ? ticketOrders.value : mallOrders.value);
 
-// 跳转到登录页面
-const goToLogin = () => {
-    router.push('/login');
-};
-
-// 跳转到注册页面（登录页面可以切换模式）
-const goToRegister = () => {
-    router.push('/login');
-};
-
-// 加载用户数据和订单
-const loadUserData = async () => {
-    if (!isLoggedIn.value) {
-        return;
-    }
-
+// 获取用户信息和订单
+onMounted(async () => {
     try {
         // 用户信息
         const user = await userApi.getUserInfo();
@@ -204,26 +157,6 @@ const loadUserData = async () => {
         }
     } catch (e) {
         console.error('获取数据失败', e);
-    }
-};
-
-// 在组件挂载前检查登录状态
-onBeforeMount(() => {
-    checkLoginStatus();
-});
-
-// 获取用户信息和订单
-onMounted(async () => {
-    await loadUserData();
-});
-
-// 当组件被激活时（从其他页面返回时）重新检查登录状态
-onActivated(() => {
-    const wasLoggedIn = isLoggedIn.value;
-    checkLoginStatus();
-    // 如果之前未登录，现在已登录，则加载数据
-    if (!wasLoggedIn && isLoggedIn.value) {
-        loadUserData();
     }
 });
 
@@ -266,16 +199,6 @@ const getStatusText = (status: number) => {
     border-radius: 50%;
     background-color: #d0d0d0;
     flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-}
-
-.avatar-placeholder {
-    font-size: 24px;
-    color: #999;
-    font-weight: bold;
 }
 
 .user-details {
@@ -326,22 +249,7 @@ const getStatusText = (status: number) => {
     font-size: 16px;
 }
 
-/* 未登录时的按钮样式 */
-.login-action-btn {
-    background-color: #409eff !important;
-    color: white !important;
-    border-color: #409eff !important;
-}
 
-.login-action-btn:hover {
-    background-color: #66b1ff !important;
-    border-color: #66b1ff !important;
-}
-
-.register-action-btn {
-    background-color: #f5f5f5 !important;
-    color: #333 !important;
-}
 
 /* 标签页 */
 .tabs {
@@ -374,11 +282,6 @@ const getStatusText = (status: number) => {
     right: 0;
     height: 2px;
     background-color: #409eff;
-}
-
-.tab-item.disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
 }
 
 /* 排序和筛选 */
@@ -421,21 +324,6 @@ const getStatusText = (status: number) => {
     display: flex;
     flex-direction: column;
     gap: 16px;
-}
-
-/* 空状态提示 */
-.empty-state {
-    background-color: white;
-    border-radius: 12px;
-    padding: 60px 20px;
-    text-align: center;
-    margin-top: 20px;
-}
-
-.empty-text {
-    font-size: 16px;
-    color: #999;
-    margin: 0;
 }
 
 .order-card {
@@ -517,7 +405,7 @@ const getStatusText = (status: number) => {
     cursor: pointer;
     transition: all 0.3s ease;
     width: 80%;
-    height: 80px;
+    height: 80pxll;
     max-width: 100%;
     box-sizing: border-box;
 }
