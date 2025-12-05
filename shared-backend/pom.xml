@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-parent</artifactId>
+		<version>3.2.0</version>
+		<relativePath/> <!-- lookup parent from repository -->
+	</parent>
+	<groupId>com.buyticket</groupId>
+	<artifactId>buyticket2</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<name>buyticket2</name>
+	<description>Demo project for Spring Boot</description>
+	<url/>
+	<licenses>
+		<license/>
+	</licenses>
+	<developers>
+		<developer/>
+	</developers>
+	<scm>
+		<connection/>
+		<developerConnection/>
+		<tag/>
+		<url/>
+	</scm>
+	<properties>
+		<java.version>21</java.version>
+	</properties>
+	<!--    java21 springboot3.x lombok swagger3.x mybaitsPlus配置文件如下：-->
+    <dependencies>
+       <dependency>
+          <groupId>org.springframework.boot</groupId>
+          <artifactId>spring-boot-starter</artifactId>
+       </dependency>
+
+       <dependency>
+          <groupId>org.springframework.boot</groupId>
+          <artifactId>spring-boot-starter-test</artifactId>
+          <scope>test</scope>
+       </dependency>
+
+<!--       lombok配置 ，简化代码量（data、getter、setter、sl。。）-->
+       <dependency>
+          <groupId>org.projectlombok</groupId>
+          <artifactId>lombok</artifactId>
+          <version>1.18.38</version>
+          <scope>provided</scope>
+       </dependency>
+<!--       数据库配置-->
+       <dependency>
+          <groupId>mysql</groupId>
+          <artifactId>mysql-connector-java</artifactId>
+          <version>8.0.33</version> <!-- 推荐使用 8.0.x 版本 -->
+       </dependency>
+<!--       mp的初始化配置mp3.x-->
+       <dependency>
+          <groupId>com.baomidou</groupId>
+          <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+          <version>3.5.5</version>
+       </dependency>
+<!--       springboot调用request、get 、post请求时候的配置-->
+       <dependency>
+          <groupId>org.springframework.boot</groupId>
+          <artifactId>spring-boot-starter-web</artifactId>
+       </dependency>
+<!--       MyBatis Plus的自动生成代码配置-->
+       <dependency>
+          <groupId>com.baomidou</groupId>
+          <artifactId>mybatis-plus-generator</artifactId>
+          <version>3.5.12</version>
+       </dependency>
+       <!--      这个是自动生成代码的freemarker配置-->
+       <dependency>
+          <groupId>org.freemarker</groupId>
+          <artifactId>freemarker</artifactId>
+          <version>2.3.34</version> <!-- 推荐版本 -->
+       </dependency>
+
+<!--       这个是swagger2.x-->
+<!--       <dependency>-->
+<!--          <groupId>io.springfox</groupId>-->
+<!--          <artifactId>springfox-boot-starter</artifactId>-->
+<!--          <version>3.0.0</version>-->
+<!--       </dependency>-->
+
+
+<!--       注意区分此项目使用的
+          Swagger 3.x / springdoc-openapi（Spring Boot 3 + springdoc-openapi-starter）
+          和以前 swagger2 / springfox
+          自动生成swagger可视化接口的界面 -->
+       <dependency>
+          <groupId>org.springdoc</groupId>
+          <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+          <version>2.6.0</version>
+       </dependency>
+
+       <!-- JWT 依赖 -->
+       <dependency>
+           <groupId>io.jsonwebtoken</groupId>
+           <artifactId>jjwt</artifactId>
+           <version>0.9.1</version>
+       </dependency>
+       <dependency>
+           <groupId>javax.xml.bind</groupId>
+           <artifactId>jaxb-api</artifactId>
+           <version>2.3.1</version>
+       </dependency>
+
+    </dependencies>
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-maven-plugin</artifactId>
+			</plugin>
+		</plugins>
+	</build>
+
+</project>

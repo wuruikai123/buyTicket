@@ -1,0 +1,36 @@
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+.nb-gradle/
+nbproject/
+
+### VS Code ###
+.vscode/
+
+### Node ###
+node_modules/
+npm-debug.log
+yarn-error.log
+package-lock.json
+
+### OS ###
+.DS_Store
+Thumbs.db
