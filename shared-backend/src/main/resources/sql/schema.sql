@@ -79,7 +79,7 @@ CREATE TABLE IF NOT EXISTS `sys_product` (
     `description` TEXT DEFAULT NULL COMMENT '商品描述',
     `price` DECIMAL(10, 2) NOT NULL COMMENT '单价',
     `stock` INT DEFAULT 0 COMMENT '库存',
-    `cover_image` VARCHAR(255) DEFAULT NULL COMMENT '封面图片URL',
+    `cover_image` LONGTEXT DEFAULT NULL COMMENT '封面图片URL或Base64',
     `status` TINYINT DEFAULT 1 COMMENT '状态 (0:下架, 1:上架)',
     `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (`id`)

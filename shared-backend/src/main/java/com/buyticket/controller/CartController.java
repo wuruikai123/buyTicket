@@ -33,11 +33,11 @@ public class CartController {
     public JsonData add(@RequestBody CartAddRequest request) {
         Long userId = getCurrentUserId();
         
-        // 检查是否已存在
+        // 检查是否已存在（使用 false 参数避免多条记录时报错）
         LambdaQueryWrapper<CartItem> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(CartItem::getUserId, userId)
                     .eq(CartItem::getProductId, request.getProductId());
-        CartItem existItem = cartItemService.getOne(queryWrapper);
+        CartItem existItem = cartItemService.getOne(queryWrapper, false);
         
         if (existItem != null) {
             existItem.setQuantity(existItem.getQuantity() + request.getQuantity());

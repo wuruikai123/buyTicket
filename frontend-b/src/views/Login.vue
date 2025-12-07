@@ -106,43 +106,100 @@ const handleLogin = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  position: relative;
+  overflow: hidden;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+    animation: pulse 15s ease-in-out infinite;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
 }
 
 .login-box {
-  width: 400px;
-  padding: 40px;
-  background: #fff;
-  border-radius: 10px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+  width: 420px;
+  padding: 48px 40px;
+  background: #ffffff;
+  border-radius: 20px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  position: relative;
+  z-index: 1;
 }
 
 .login-header {
   text-align: center;
-  margin-bottom: 30px;
+  margin-bottom: 36px;
   
   h2 {
-    font-size: 28px;
+    font-size: 26px;
+    font-weight: 700;
     color: #303133;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
   
   p {
     font-size: 14px;
     color: #909399;
+    font-weight: 500;
   }
 }
 
 .login-form {
-  margin-top: 30px;
+  margin-top: 32px;
+  
+  :deep(.el-input__wrapper) {
+    padding: 4px 16px;
+    height: 48px;
+    border-radius: 12px;
+  }
+  
+  :deep(.el-button) {
+    height: 48px;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    
+    &:hover {
+      opacity: 0.9;
+    }
+  }
 }
 
 .login-tip {
   text-align: center;
-  margin-top: 20px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #f0f0f0;
   
   p {
-    font-size: 12px;
+    font-size: 13px;
     color: #909399;
+  }
+}
+
+// 响应式
+@media (max-width: 480px) {
+  .login-box {
+    width: 90%;
+    padding: 32px 24px;
+    margin: 0 20px;
   }
 }
 </style>

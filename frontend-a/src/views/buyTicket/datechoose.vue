@@ -239,6 +239,12 @@ const handleConfirm = () => {
         return;
     }
     
+    // 检查库存是否足够
+    if (remainingTickets.value <= 0) {
+        alert('该时间段已售罄，请选择其他时间');
+        return;
+    }
+    
     // 跳转到购票信息页面
     router.push({
         path: `/ticket-info/${exhibition.value.id}`,

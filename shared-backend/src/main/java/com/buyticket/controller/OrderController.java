@@ -97,4 +97,79 @@ public class OrderController {
             return JsonData.buildError("支付密码错误");
         }
     }
+
+    /**
+     * 获取门票订单详情
+     */
+    @GetMapping("/ticket/{id}")
+    public JsonData getTicketOrderDetail(@PathVariable Long id) {
+        TicketOrder order = ticketOrderService.getById(id);
+        if (order == null) {
+            return JsonData.buildError("订单不存在");
+        }
+        return JsonData.buildSuccess(order);
+    }
+
+    /**
+     * 获取商城订单详情
+     */
+    @GetMapping("/mall/{id}")
+    public JsonData getMallOrderDetail(@PathVariable Long id) {
+        MallOrder order = mallOrderService.getById(id);
+        if (order == null) {
+            return JsonData.buildError("订单不存在");
+        }
+        return JsonData.buildSuccess(order);
+    }
+
+    /**
+     * 核销门票订单（待使用 -> 已使用）
+     */
+    @PutMapping("/ticket/{id}/verify")
+    public JsonData verifyTicketOrder(@PathVariable Long id) {
+        TicketOrder order = ticketOrderService.getById(id);
+        if (order == null) {
+            return JsonData.buildError("订单不存在");
+        }
+        if (order.getStatus() != 1) {
+            return JsonData.buildError("只有待使用的订单才能核销");
+        }
+        order.setStatus(2); // 已使用
+        ticketOrderService.updateById(order);
+        return JsonData.buildSuccess("核销成功");
+    }
+
+    /**
+     * 取消门票订单
+     */
+    @PutMapping("/ticket/{id}/cancel")
+    public JsonData cancelTicketOrder(@PathVariable Long id) {
+        TicketOrder order = ticketOrderService.getById(id);
+        if (order == null) {
+            return JsonData.buildError("订单不存在");
+        }
+        if (order.getStatus() != 0) {
+            return JsonData.buildError("只有待支付的订单才能取消");
+        }
+        order.setStatus(3); // 已取消
+        ticketOrderService.updateById(order);
+        return JsonData.buildSuccess("取消成功");
+    }
+
+    /**
+     * 取消商城订单
+     */
+    @PutMapping("/mall/{id}/cancel")
+    public JsonData cancelMallOrder(@PathVariable Long id) {
+        MallOrder order = mallOrderService.getById(id);
+        if (order == null) {
+            return JsonData.buildError("订单不存在");
+        }
+        if (order.getStatus() != 0) {
+            return JsonData.buildError("只有待支付的订单才能取消");
+        }
+        order.setStatus(4); // 已取消
+        mallOrderService.updateById(order);
+        return JsonData.buildSuccess("取消成功");
+    }
 }

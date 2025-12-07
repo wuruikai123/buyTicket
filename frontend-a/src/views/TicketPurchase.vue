@@ -9,13 +9,17 @@
 
         <!-- 展览信息区域（左右布局） -->
         <div class="exhibition-header">
-            <div class="exhibition-image"></div>
+            <div 
+                class="exhibition-image" 
+                :style="{ backgroundImage: exhibition.coverImage ? `url(${exhibition.coverImage})` : '' }"
+            >
+                <span v-if="!exhibition.coverImage" class="no-image">暂无图片</span>
+            </div>
             <div class="exhibition-basic-info">
                 <h2 class="exhibition-name">{{ exhibition.name }}</h2>
                 <p class="exhibition-short-desc">{{ exhibition.shortDescription }}</p>
-                <div class="exhibition-tags">
-                    <span class="tag">美团</span>
-                    <span class="tag">抖音</span>
+                <div class="exhibition-tags" v-if="exhibition.tags?.length">
+                    <span class="tag" v-for="tag in parseTags(exhibition.tags)" :key="tag">{{ tag }}</span>
                 </div>
                 <div class="exhibition-time">
                     <span class="time-label">展览时间:</span>
@@ -28,9 +32,18 @@
         <div class="exhibition-details">
             <h3 class="details-title">展览详情</h3>
             <p class="details-description">{{ exhibition.description }}</p>
-            <div class="details-content-blocks">
-                <div class="content-block"></div>
-                <div class="content-block"></div>
+            <div class="details-content-blocks" v-if="exhibition.images?.length">
+                <div 
+                    v-for="(img, index) in exhibition.images" 
+                    :key="index" 
+                    class="content-block"
+                    :style="{ backgroundImage: `url(${img})` }"
+                ></div>
+            </div>
+            <div class="details-content-blocks" v-else>
+                <div class="content-block placeholder">
+                    <span>暂无详情图片</span>
+                </div>
             </div>
         </div>
 
@@ -54,12 +67,29 @@ const router = useRouter();
 const route = useRoute();
 
 // 展览数据
-const exhibition = ref<Exhibition>({
+interface ExhibitionDetail extends Exhibition {
+    shortDescription?: string;
+    dateRange?: string;
+    images?: string[];
+}
+
+const exhibition = ref<ExhibitionDetail>({
     id: 0,
     name: '',
     description: '',
     price: 0
-} as Exhibition);
+} as ExhibitionDetail);
+
+// 解析标签
+const parseTags = (tags: string | string[] | undefined): string[] => {
+    if (!tags) return [];
+    if (Array.isArray(tags)) return tags;
+    try {
+        return JSON.parse(tags);
+    } catch {
+        return tags.split(',').map(t => t.trim()).filter(Boolean);
+    }
+};
 
 // 返回上一页
 const goBack = () => {
@@ -156,8 +186,18 @@ onMounted(() => {
     width: 120px;
     height: 120px;
     background-color: #d0d0d0;
+    background-size: cover;
+    background-position: center;
     border-radius: 8px;
     flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.exhibition-image .no-image {
+    font-size: 12px;
+    color: #999;
 }
 
 .exhibition-basic-info {
@@ -248,7 +288,17 @@ onMounted(() => {
     width: 100%;
     height: 200px;
     background-color: #d0d0d0;
+    background-size: cover;
+    background-position: center;
     border-radius: 8px;
+}
+
+.content-block.placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #999;
+    font-size: 14px;
 }
 
 /* 底部固定购票栏 */

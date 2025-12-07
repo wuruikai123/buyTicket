@@ -1,13 +1,16 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
+// 先导入Element Plus默认样式
 import 'element-plus/dist/index.css'
-import 'element-plus/theme-chalk/dark/css-vars.css'
+// 然后导入自定义主题变量覆盖
+import './styles/element-variables.scss'
+// 最后导入全局样式覆盖
+import './styles/index.css'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
 import App from './App.vue'
 import router from './router'
-import './styles/index.css'
 
 const app = createApp(App)
 const pinia = createPinia()

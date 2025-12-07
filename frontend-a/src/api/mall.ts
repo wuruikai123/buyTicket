@@ -58,5 +58,20 @@ export const mallApi = {
     // 获取商城订单列表
     getOrderList() {
         return request.get<any, any[]>('/order/mall/list')
+    },
+
+    // 获取订单详情
+    getOrderDetail(id: number) {
+        return request.get<any, any>(`/order/mall/${id}`)
+    },
+
+    // 取消订单
+    cancelOrder(id: number) {
+        return request.put(`/order/mall/${id}/cancel`)
+    },
+
+    // 支付订单
+    pay(data: { orderId: string | number; type: string; password: string }) {
+        return request.post('/order/pay', data)
     }
 }

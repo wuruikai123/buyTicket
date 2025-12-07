@@ -23,11 +23,11 @@
                 </template>
                 <!-- 已登录状态：显示地址簿和修改信息按钮 -->
                 <template v-else>
-                    <button class="action-btn">
+                    <button class="action-btn" @click="goToAddressBook">
                         <el-icon><Location /></el-icon>
                         <span>地址簿</span>
                     </button>
-                    <button class="action-btn">
+                    <button class="action-btn" @click="goToEditProfile">
                         <el-icon><EditPen /></el-icon>
                         <span>修改信息</span>
                     </button>
@@ -80,8 +80,9 @@
                     v-for="order in currentOrders" 
                     :key="order.id" 
                     class="order-card"
+                    @click="goToOrderDetail(order)"
                 >
-                    <div class="order-image"></div>
+                    <div class="order-image" :style="{ backgroundImage: order.coverImage ? `url(${order.coverImage})` : '' }"></div>
                     <div class="order-content">
                         <h3 class="order-title">{{ order.title }}</h3>
                         <p class="order-time">时间: {{ order.time }}</p>
@@ -89,7 +90,11 @@
                     </div>
                     <div class="ticket-edge"></div>
                     <div class="order-action">
-                        <button class="use-button">{{ order.statusText }}</button>
+                        <button 
+                            class="use-button" 
+                            :class="{ 'use-button-active': order.status === 1 }"
+                            @click.stop="handleOrderAction(order)"
+                        >{{ order.statusText }}</button>
                     </div>
                 </div>
             </template>
@@ -113,6 +118,7 @@ interface Order {
     price: number;
     status: number;
     statusText: string;
+    coverImage?: string;
 }
 
 const router = useRouter();
@@ -164,6 +170,40 @@ const goToRegister = () => {
     router.push('/login');
 };
 
+// 跳转到地址簿
+const goToAddressBook = () => {
+    router.push('/address-book');
+};
+
+// 跳转到修改信息
+const goToEditProfile = () => {
+    router.push('/edit-profile');
+};
+
+// 跳转到订单详情
+const goToOrderDetail = (order: Order) => {
+    const type = isTicketsActive.value ? 'ticket' : 'mall';
+    router.push(`/order/${order.id}?type=${type}`);
+};
+
+// 处理订单操作（核销）
+const handleOrderAction = async (order: Order) => {
+    // 只有待使用状态(status=1)的门票订单可以核销
+    if (isTicketsActive.value && order.status === 1) {
+        if (confirm('确认核销此门票？核销后将无法撤销。')) {
+            try {
+                await ticketApi.verifyOrder(order.id);
+                alert('核销成功！');
+                // 更新订单状态
+                order.status = 2;
+                order.statusText = '已使用';
+            } catch (e: any) {
+                alert(e.message || '核销失败');
+            }
+        }
+    }
+};
+
 // 加载用户数据和订单
 const loadUserData = async () => {
     if (!isLoggedIn.value) {
@@ -182,11 +222,12 @@ const loadUserData = async () => {
         if (tOrders) {
             ticketOrders.value = tOrders.map((o: any) => ({
                 id: o.id,
-                title: o.contactName ? `${o.contactName}的门票订单` : '门票订单', // 暂时无法获取展览名，用联系人代替
+                title: o.exhibitionName || o.contactName ? `${o.contactName}的门票订单` : '门票订单',
                 time: o.createTime,
                 price: o.totalAmount,
                 status: o.status,
-                statusText: getStatusText(o.status)
+                statusText: getStatusText(o.status),
+                coverImage: o.coverImage
             }));
         }
 
@@ -195,11 +236,12 @@ const loadUserData = async () => {
         if (mOrders) {
             mallOrders.value = mOrders.map((o: any) => ({
                 id: o.id,
-                title: '商城购物订单',
+                title: o.title || '商城购物订单',
                 time: o.createTime,
                 price: o.totalAmount,
                 status: o.status,
-                statusText: getStatusText(o.status)
+                statusText: getMallStatusText(o.status),
+                coverImage: o.coverImage
             }));
         }
     } catch (e) {
@@ -230,9 +272,20 @@ onActivated(() => {
 const getStatusText = (status: number) => {
     const map: Record<number, string> = {
         0: '待支付',
-        1: '已支付',
-        2: '已完成',
+        1: '待使用',
+        2: '已使用',
         3: '已取消'
+    };
+    return map[status] || '未知';
+};
+
+const getMallStatusText = (status: number) => {
+    const map: Record<number, string> = {
+        0: '待支付',
+        1: '待发货',
+        2: '已发货',
+        3: '已完成',
+        4: '已取消'
     };
     return map[status] || '未知';
 };
@@ -447,12 +500,21 @@ const getStatusText = (status: number) => {
     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
     border: 1px solid #e8e8e8;
     margin-bottom: 16px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.order-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
 }
 
 .order-image {
     width: 140px;
     height: 140px;
     background-color: #d0d0d0;
+    background-size: cover;
+    background-position: center;
     flex-shrink: 0;
     border-radius: 12px 0 0 12px;
     margin: 8px 0 8px 8px;
@@ -525,6 +587,18 @@ const getStatusText = (status: number) => {
 .use-button:hover {
     background-color: #e8e8e8;
     border-color: #d0d0d0;
+}
+
+/* 待使用状态 - 蓝色按钮 */
+.use-button-active {
+    background-color: #409eff !important;
+    color: white !important;
+    border-color: #409eff !important;
+}
+
+.use-button-active:hover {
+    background-color: #66b1ff !important;
+    border-color: #66b1ff !important;
 }
 
 /* 票根边缘效果 - 虚线分隔 */

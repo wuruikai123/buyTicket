@@ -58,10 +58,6 @@
                 <div class="ticket-price">¥{{ ticket.totalPrice }}</div>
             </div>
 
-            <!-- 添加更多票务 -->
-            <div class="add-ticket" @click="addMoreTickets">
-                <el-icon class="add-icon"><Plus /></el-icon>
-            </div>
         </div>
 
         <!-- 服务协议 -->
@@ -148,10 +144,7 @@ const increaseQuantity = (index: number) => {
     }
 };
 
-// 添加更多票务
-const addMoreTickets = () => {
-    router.push(`/date-choose/${exhibition.value.id}`);
-};
+
 
 // 返回上一页
 const goBack = () => {
@@ -164,9 +157,28 @@ const handlePayment = async () => {
         alert('请填写联系人信息');
         return;
     }
+
+    if (selectedTickets.value.length === 0) {
+        alert('请选择票务');
+        return;
+    }
     
     try {
-        // 1. 创建订单
+        // 1. 先检查每个时间段的票数是否足够
+        for (const ticket of selectedTickets.value) {
+            const availability = await ticketApi.getAvailability({
+                exhibitionId: exhibition.value.id,
+                date: ticket.date,
+                timeSlot: ticket.timeSlot
+            });
+            
+            if (!availability || availability.remainingCount < ticket.quantity) {
+                alert(`${ticket.dateTime} 票数不足！剩余 ${availability?.remainingCount || 0} 张，您选择了 ${ticket.quantity} 张`);
+                return;
+            }
+        }
+
+        // 2. 创建订单
         const items = selectedTickets.value.map(t => ({
             date: t.date,
             timeSlot: t.timeSlot,
@@ -183,7 +195,7 @@ const handlePayment = async () => {
         });
 
         if (createRes && createRes.orderId) {
-            // 2. 模拟支付
+            // 3. 模拟支付（写死支付成功）
             await ticketApi.pay({
                 orderId: createRes.orderId,
                 type: 'ticket',
@@ -195,7 +207,7 @@ const handlePayment = async () => {
         }
     } catch (e: any) {
         console.error(e);
-        alert(e.message || '支付失败');
+        alert(e.message || '支付失败，请重试');
     }
 };
 
@@ -409,33 +421,7 @@ onMounted(() => {
     text-align: right;
 }
 
-/* 添加更多票务 */
-.add-ticket {
-    margin-top: 16px;
-    padding: 40px;
-    border: 2px dashed #d0d0d0;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    background-color: #fafafa;
-}
 
-.add-ticket:hover {
-    border-color: #409eff;
-    background-color: #f0f7ff;
-}
-
-.add-icon {
-    font-size: 32px;
-    color: #999;
-}
-
-.add-ticket:hover .add-icon {
-    color: #409eff;
-}
 
 /* 服务协议 */
 .agreement-section {

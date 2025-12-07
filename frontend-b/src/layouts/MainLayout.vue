@@ -1,17 +1,15 @@
 <template>
   <el-container class="main-layout">
-    <el-aside :width="isCollapse ? '64px' : '200px'" class="sidebar">
+    <el-aside :width="isCollapse ? '64px' : '240px'" class="sidebar">
       <div class="logo">
-        <span v-if="!isCollapse">展览管理系统</span>
-        <span v-else>展览</span>
+        <div class="logo-icon">🎨</div>
+        <span v-if="!isCollapse" class="logo-text">展览管理系统</span>
       </div>
       <el-menu
         :default-active="activeMenu"
         :collapse="isCollapse"
         router
-        background-color="#304156"
-        text-color="#bfcbd9"
-        active-text-color="#409eff"
+        class="sidebar-menu"
       >
         <el-menu-item index="/dashboard">
           <el-icon><Odometer /></el-icon>
@@ -85,24 +83,31 @@
       </el-menu>
     </el-aside>
     
-    <el-container>
+    <el-container class="main-container">
       <el-header class="header">
         <div class="header-left">
           <el-icon class="collapse-icon" @click="toggleCollapse">
             <Expand v-if="isCollapse" />
             <Fold v-else />
           </el-icon>
+          <el-breadcrumb separator="/">
+            <el-breadcrumb-item :to="{ path: '/' }">首页</el-breadcrumb-item>
+            <el-breadcrumb-item>{{ route.meta.title || '页面' }}</el-breadcrumb-item>
+          </el-breadcrumb>
         </div>
         <div class="header-right">
           <el-dropdown @command="handleCommand">
-            <span class="user-info">
-              <el-icon><User /></el-icon>
-              <span>{{ authStore.userInfo?.realName || '管理员' }}</span>
+            <div class="user-avatar">
+              <el-avatar :size="36" class="avatar">
+                {{ (authStore.userInfo?.realName || '管')[0] }}
+              </el-avatar>
+              <span class="user-name">{{ authStore.userInfo?.realName || '管理员' }}</span>
               <el-icon><ArrowDown /></el-icon>
-            </span>
+            </div>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item command="logout">退出登录</el-dropdown-item>
+                <el-dropdown-item command="profile">个人设置</el-dropdown-item>
+                <el-dropdown-item divided command="logout">退出登录</el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
@@ -130,7 +135,6 @@ const isCollapse = ref(false)
 
 const activeMenu = computed(() => {
   const { path } = route
-  // 如果路径包含子路由，返回父路径用于高亮菜单
   if (path.startsWith('/user')) {
     return path.includes('/statistics') ? '/user/statistics' : '/user/list'
   }
@@ -183,64 +187,167 @@ const handleCommand = async (command: string) => {
 <style scoped lang="scss">
 .main-layout {
   height: 100vh;
+  background-color: #f5f7fa;
 }
 
 .sidebar {
-  background-color: #304156;
-  transition: width 0.3s;
+  background-color: #ffffff;
+  border-right: 1px solid #e8e8e8;
+  transition: width 0.3s ease;
+  display: flex;
+  flex-direction: column;
   
   .logo {
-    height: 60px;
-    line-height: 60px;
-    text-align: center;
-    color: #fff;
-    font-size: 18px;
-    font-weight: bold;
-    background-color: #2b3a4b;
-  }
-
-  .el-menu {
-    border: none;
-    height: calc(100vh - 60px);
-    overflow-y: auto;
-  }
-}
-
-.header {
-  background-color: #fff;
-  border-bottom: 1px solid #e4e7ed;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 20px;
-
-  .collapse-icon {
-    font-size: 20px;
-    cursor: pointer;
-    color: #606266;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    border-bottom: 1px solid #f0f0f0;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     
-    &:hover {
-      color: #409eff;
+    .logo-icon {
+      font-size: 28px;
+    }
+    
+    .logo-text {
+      font-size: 16px;
+      font-weight: 600;
+      color: #ffffff;
+      white-space: nowrap;
     }
   }
 
-  .user-info {
+  .sidebar-menu {
+    flex: 1;
+    border: none;
+    padding: 8px;
+    overflow-y: auto;
+    background-color: transparent;
+    
+    &::-webkit-scrollbar {
+      width: 4px;
+    }
+    
+    &::-webkit-scrollbar-thumb {
+      background-color: #e0e0e0;
+      border-radius: 2px;
+    }
+  }
+}
+
+.main-container {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.header {
+  height: 64px;
+  background-color: #ffffff;
+  border-bottom: 1px solid #e8e8e8;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  
+  .header-left {
     display: flex;
     align-items: center;
-    gap: 8px;
-    cursor: pointer;
-    color: #606266;
+    gap: 20px;
     
-    &:hover {
-      color: #409eff;
+    .collapse-icon {
+      font-size: 20px;
+      cursor: pointer;
+      color: #606266;
+      padding: 8px;
+      border-radius: 6px;
+      transition: all 0.3s;
+      
+      &:hover {
+        color: #409eff;
+        background-color: #f5f7fa;
+      }
+    }
+  }
+  
+  .header-right {
+    .user-avatar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      padding: 6px 12px;
+      border-radius: 8px;
+      transition: all 0.3s;
+      
+      &:hover {
+        background-color: #f5f7fa;
+      }
+      
+      .avatar {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: #ffffff;
+        font-weight: 600;
+      }
+      
+      .user-name {
+        font-size: 14px;
+        color: #303133;
+        font-weight: 500;
+      }
     }
   }
 }
 
 .main-content {
-  background-color: #f0f2f5;
-  padding: 20px;
+  background-color: #f5f7fa;
+  padding: 24px;
   overflow-y: auto;
+  min-height: calc(100vh - 64px);
+}
+
+// 菜单样式覆盖
+:deep(.el-menu) {
+  --el-menu-bg-color: transparent;
+  --el-menu-hover-bg-color: #f5f7fa;
+  --el-menu-active-color: #409eff;
+  --el-menu-text-color: #606266;
+  --el-menu-hover-text-color: #303133;
+  --el-menu-item-height: 44px;
+  
+  .el-menu-item {
+    margin: 4px 0;
+    border-radius: 8px;
+    
+    &.is-active {
+      background: linear-gradient(135deg, #ecf5ff 0%, #f0f7ff 100%);
+      color: #409eff;
+      font-weight: 500;
+      
+      &::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 3px;
+        height: 20px;
+        background-color: #409eff;
+        border-radius: 0 2px 2px 0;
+      }
+    }
+  }
+  
+  .el-sub-menu__title {
+    margin: 4px 0;
+    border-radius: 8px;
+  }
+}
+
+:deep(.el-menu--collapse) {
+  .el-sub-menu__title {
+    padding-left: 20px !important;
+  }
 }
 </style>
-

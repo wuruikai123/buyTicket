@@ -23,10 +23,15 @@
         <div class="upcoming-exhibitions">
             <div class="section-header">
                 <h3 class="section-title">近期展览</h3>
-                <a href="#" class="more-link">更多 ></a>
+                <a class="more-link" @click="router.push('/exhibitions')">更多 ></a>
             </div>
             <div class="exhibition-cards">
-                <div v-for="exhibition in upcomingExhibitions" :key="exhibition.id" class="exhibition-card">
+                <div 
+                    v-for="exhibition in upcomingExhibitions" 
+                    :key="exhibition.id" 
+                    class="exhibition-card"
+                    @click="goToExhibition(exhibition.id)"
+                >
                     <div 
                         class="card-image"
                         :style="exhibition.coverImage ? { backgroundImage: `url(${exhibition.coverImage})` } : {}"
@@ -66,11 +71,11 @@ onMounted(async () => {
             }
         }
 
-        // 2. 获取近期展览 (假设我们获取待开始的)
+        // 2. 获取近期展览 (只显示前2个)
         const list = await exhibitionApi.getList();
         if (list) {
-            // 格式化日期
-            const formattedList = list.map(item => ({
+            // 格式化日期，只取前2个展示在首页
+            const formattedList = list.slice(0, 2).map(item => ({
                 ...item,
                 date: item.startDate ? item.startDate : '待定'
             }));
@@ -82,7 +87,15 @@ onMounted(async () => {
 });
 
 const toBuyTicket = () => {
-    router.push('/mall')
+    if (currentExhibition.id) {
+        router.push(`/ticket/${currentExhibition.id}`)
+    } else {
+        router.push('/exhibitions')
+    }
+}
+
+const goToExhibition = (exhibitionId: number) => {
+    router.push(`/ticket/${exhibitionId}`)
 }
 </script>
 
@@ -216,6 +229,10 @@ const toBuyTicket = () => {
     overflow: hidden;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.exhibition-card {
+    cursor: pointer;
 }
 
 .exhibition-card:hover {

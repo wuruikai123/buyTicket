@@ -260,66 +260,99 @@ onMounted(() => {
 <style scoped lang="scss">
 .dashboard {
   .stats-cards {
-    margin-bottom: 20px;
+    margin-bottom: 24px;
   }
 
   .stat-card {
+    border-radius: 16px !important;
+    overflow: hidden;
+    
     .stat-content {
       display: flex;
       align-items: center;
       gap: 20px;
+      padding: 8px;
 
       .stat-icon {
-        width: 60px;
-        height: 60px;
-        border-radius: 10px;
+        width: 64px;
+        height: 64px;
+        border-radius: 16px;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 30px;
+        font-size: 28px;
         color: #fff;
+        flex-shrink: 0;
 
         &.user {
           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          box-shadow: 0 4px 14px rgba(102, 126, 234, 0.4);
         }
 
         &.order {
           background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+          box-shadow: 0 4px 14px rgba(245, 87, 108, 0.4);
         }
 
         &.sales {
           background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+          box-shadow: 0 4px 14px rgba(79, 172, 254, 0.4);
         }
 
         &.visit {
           background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+          box-shadow: 0 4px 14px rgba(67, 233, 123, 0.4);
         }
       }
 
       .stat-info {
         flex: 1;
+        min-width: 0;
 
         .stat-value {
           font-size: 28px;
-          font-weight: bold;
+          font-weight: 700;
           color: #303133;
-          margin-bottom: 8px;
+          margin-bottom: 6px;
+          line-height: 1.2;
         }
 
         .stat-label {
-          font-size: 14px;
+          font-size: 13px;
           color: #909399;
+          font-weight: 500;
         }
       }
     }
   }
 
   .charts-row {
-    margin-bottom: 20px;
+    margin-bottom: 24px;
   }
 
   .chart {
-    height: 300px;
+    height: 320px;
+  }
+}
+
+// 响应式
+@media (max-width: 768px) {
+  .dashboard {
+    .stat-card .stat-content {
+      .stat-icon {
+        width: 52px;
+        height: 52px;
+        font-size: 24px;
+      }
+      
+      .stat-info .stat-value {
+        font-size: 24px;
+      }
+    }
+    
+    .chart {
+      height: 260px;
+    }
   }
 }
 </style>
