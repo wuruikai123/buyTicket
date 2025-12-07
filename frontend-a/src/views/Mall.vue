@@ -4,6 +4,7 @@
             <h2 class="page-title">文创商城</h2>
             <div class="cart-icon" @click="goToCart">
                 <span class="icon">🛒</span>
+                <span v-if="cartCount > 0" class="cart-badge">{{ cartCount > 99 ? '99+' : cartCount }}</span>
             </div>
         </div>
 
@@ -34,6 +35,7 @@ import { mallApi, type Product } from '@/api/mall';
 
 const router = useRouter();
 const products = ref<Product[]>([]);
+const cartCount = ref(0);
 
 // 加载商品列表
 const loadProducts = async () => {
@@ -47,6 +49,18 @@ const loadProducts = async () => {
     }
 };
 
+// 加载购物车数量
+const loadCartCount = async () => {
+    try {
+        const res = await mallApi.getCartList();
+        if (res) {
+            cartCount.value = res.length;
+        }
+    } catch (e) {
+        console.error(e);
+    }
+};
+
 // 加入购物车
 const addToCart = async (product: Product) => {
     try {
@@ -54,6 +68,7 @@ const addToCart = async (product: Product) => {
             productId: product.id,
             quantity: 1
         });
+        cartCount.value++;
         alert('已加入购物车');
     } catch (e) {
         console.error(e);
@@ -62,11 +77,12 @@ const addToCart = async (product: Product) => {
 };
 
 const goToCart = () => {
-    alert('查看后端接口已调用成功');
+    router.push('/cart');
 };
 
 onMounted(() => {
     loadProducts();
+    loadCartCount();
 });
 </script>
 
@@ -111,6 +127,27 @@ onMounted(() => {
 
 .cart-icon:hover {
     background-color: #e0e0e0;
+}
+
+.cart-icon {
+    position: relative;
+}
+
+.cart-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    background-color: #f56c6c;
+    color: white;
+    font-size: 11px;
+    font-weight: bold;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .product-list {

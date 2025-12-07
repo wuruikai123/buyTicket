@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import BasicLayout from '@/layouts/BasicLayout.vue'
+import AdminLayout from '@/layouts/AdminLayout.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -44,12 +45,102 @@ const router = createRouter({
           component: () => import('@/views/buyTicket/datechoose.vue'),
         },
         {
-      path: 'ticket-info/:id',
-      name: 'TicketInfo',
-      component: () => import('@/views/buyTicket/ticketinfo.vue'),
+          path: 'ticket-info/:id',
+          name: 'TicketInfo',
+          component: () => import('@/views/buyTicket/ticketinfo.vue'),
+        },
+        {
+          path: 'cart',
+          name: 'Cart',
+          component: () => import('@/views/Cart.vue'),
+        },
+        {
+          path: 'mall-checkout',
+          name: 'MallCheckout',
+          component: () => import('@/views/MallCheckout.vue'),
+        },
+        {
+          path: 'address-book',
+          name: 'AddressBook',
+          component: () => import('@/views/AddressBook.vue'),
+        },
+        {
+          path: 'edit-profile',
+          name: 'EditProfile',
+          component: () => import('@/views/EditProfile.vue'),
+        },
+        {
+          path: 'order/:id',
+          name: 'OrderDetail',
+          component: () => import('@/views/OrderDetail.vue'),
+        },
+      ],
     },
-  ],
-},
+    // 管理后台路由
+    {
+      path: '/admin',
+      component: AdminLayout,
+      redirect: '/admin/dashboard',
+      children: [
+        {
+          path: 'dashboard',
+          name: 'AdminDashboard',
+          component: () => import('@/views/admin/Dashboard.vue'),
+          meta: { title: '数据概览' }
+        },
+        // 展览管理
+        {
+          path: 'exhibition',
+          name: 'AdminExhibitionList',
+          component: () => import('@/views/admin/ExhibitionList.vue'),
+          meta: { title: '展览列表' }
+        },
+        {
+          path: 'exhibition/create',
+          name: 'AdminExhibitionCreate',
+          component: () => import('@/views/admin/ExhibitionForm.vue'),
+          meta: { title: '创建展览' }
+        },
+        {
+          path: 'exhibition/edit/:id',
+          name: 'AdminExhibitionEdit',
+          component: () => import('@/views/admin/ExhibitionForm.vue'),
+          meta: { title: '编辑展览' }
+        },
+        // 库存管理
+        {
+          path: 'inventory',
+          name: 'AdminInventoryList',
+          component: () => import('@/views/admin/InventoryList.vue'),
+          meta: { title: '库存列表' }
+        },
+        {
+          path: 'inventory/batch',
+          name: 'AdminInventoryBatch',
+          component: () => import('@/views/admin/InventoryBatch.vue'),
+          meta: { title: '批量创建库存' }
+        },
+        // 商品管理
+        {
+          path: 'product',
+          name: 'AdminProductList',
+          component: () => import('@/views/admin/ProductList.vue'),
+          meta: { title: '商品列表' }
+        },
+        {
+          path: 'product/create',
+          name: 'AdminProductCreate',
+          component: () => import('@/views/admin/ProductForm.vue'),
+          meta: { title: '创建商品' }
+        },
+        {
+          path: 'product/edit/:id',
+          name: 'AdminProductEdit',
+          component: () => import('@/views/admin/ProductForm.vue'),
+          meta: { title: '编辑商品' }
+        },
+      ]
+    },
 ],
 })
 

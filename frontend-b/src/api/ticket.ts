@@ -5,6 +5,10 @@ export const ticketApi = {
     return request.get('/ticket/inventory/list', { params })
   },
 
+  getInventoryDetail(id: number) {
+    return request.get(`/ticket/inventory/${id}`)
+  },
+
   createInventory(data: any) {
     return request.post('/ticket/inventory/create', data)
   },
@@ -13,13 +17,30 @@ export const ticketApi = {
     return request.post('/ticket/inventory/update', data)
   },
 
+  deleteInventory(id: number) {
+    return request.delete(`/ticket/inventory/${id}`)
+  },
+
+  batchCreateInventory(data: {
+    exhibitionId: number
+    startDate: string
+    endDate: string
+    timeSlots: string[]
+    totalCount: number
+  }) {
+    return request.post('/ticket/inventory/batch-create', data)
+  },
+
   getWarningList() {
-    // 后端暂未实现预警接口，暂时返回空数组或模拟数据，或者调用 list 并自行筛选
-    // 这里为了不报错，暂时调用 list 并前端过滤（如果需要）或者直接返回空
-    // 也可以请求一个不存在的接口看后端是否处理，或者直接保留 Mock
-    // 既然用户要求接入所有接口，我就留着 Mock 或者暂时不实现真实调用
-    // 为了演示，我尝试调用一个假设的接口，或者直接返回空
-    return Promise.resolve([])
+    // 获取库存预警列表（剩余票数少于20%的）
+    return request.get('/ticket/inventory/list', { params: { page: 1, size: 100 } })
+      .then((data: any) => {
+        // 前端过滤出预警数据
+        return (data.records || []).filter((item: any) => {
+          const remaining = item.totalCount - item.soldCount
+          return remaining < item.totalCount * 0.2
+        })
+      })
   }
 }
 

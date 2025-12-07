@@ -38,5 +38,20 @@ export const ticketApi = {
     // 获取门票订单列表
     getOrderList() {
         return request.get<any, any[]>('/order/ticket/list')
+    },
+
+    // 获取订单详情
+    getOrderDetail(id: number) {
+        return request.get<any, any>(`/order/ticket/${id}`)
+    },
+
+    // 取消订单
+    cancelOrder(id: number) {
+        return request.put(`/order/ticket/${id}/cancel`)
+    },
+
+    // 核销订单（将待使用变为已使用）
+    verifyOrder(id: number) {
+        return request.put(`/order/ticket/${id}/verify`)
     }
 }

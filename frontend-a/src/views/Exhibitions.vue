@@ -85,9 +85,18 @@ const goToTicket = (exhibitionId: number) => {
 // 加载数据
 const loadExhibitions = async () => {
     try {
-        const list = await exhibitionApi.getList(activeTab.value);
+        // 获取所有展览，然后根据标签页筛选
+        const list = await exhibitionApi.getList();
         if (list) {
-            exhibitions.value = list.map(item => ({
+            // 根据标签页筛选：ongoing=进行中(status=1), upcoming=待开始(status=0)
+            const filtered = list.filter(item => {
+                if (activeTab.value === 'ongoing') {
+                    return item.status === 1;
+                } else {
+                    return item.status === 0;
+                }
+            });
+            exhibitions.value = filtered.map(item => ({
                 ...item,
                 dateRange: item.startDate && item.endDate ? `${item.startDate} - ${item.endDate}` : '待定'
             }));
