@@ -8,25 +8,25 @@
         </div>
       </template>
 
-      <el-form :model="searchForm" inline class="search-form">
+        <el-form :model="searchForm" inline class="search-form">
         <el-form-item label="搜索门票订单号">
-          <el-input
-            v-model="searchForm.orderNo"
+            <el-input
+              v-model="searchForm.orderNo"
             placeholder="请输入门票订单号"
-            clearable
-            @clear="handleSearch"
-            @keyup.enter="handleSearch"
+              clearable
+              @clear="handleSearch"
+              @keyup.enter="handleSearch"
             style="width: 300px"
-          />
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="handleSearch">搜索</el-button>
-        </el-form-item>
-      </el-form>
+            />
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" @click="handleSearch">搜索</el-button>
+          </el-form-item>
+        </el-form>
 
       <el-table :data="tableData" v-loading="loading" border style="width: 100%">
         <el-table-column label="展览名称&门票订单号" min-width="250">
-          <template #default="{ row }">
+            <template #default="{ row }">
             <div class="exhibition-order-info">
               <div class="exhibition-name">
                 {{ row.exhibitionName || (row.items && row.items[0]?.exhibitionName) || '-' }}
@@ -38,10 +38,10 @@
         <el-table-column label="用户账号" min-width="150">
           <template #default="{ row }">
             {{ row.uid || row.userId || '-' }}
-          </template>
-        </el-table-column>
+            </template>
+          </el-table-column>
         <el-table-column label="有效时间" width="200">
-          <template #default="{ row }">
+            <template #default="{ row }">
             <div class="time-slot">
               <div v-if="row.ticketDate && row.timeSlot">
                 {{ formatValidTime(row.ticketDate, row.timeSlot?.split('-')[0]) }}
@@ -58,31 +58,31 @@
               </div>
               <div v-else>-</div>
             </div>
-          </template>
-        </el-table-column>
+            </template>
+          </el-table-column>
         <el-table-column prop="verifyTime" label="核销时间" width="180" sortable>
-          <template #default="{ row }">
+            <template #default="{ row }">
             {{ formatDateTime(row.verifyTime || row.updateTime || row.createTime) }}
-          </template>
-        </el-table-column>
+            </template>
+          </el-table-column>
         <el-table-column label="操作" width="150" align="center">
-          <template #default="{ row }">
+            <template #default="{ row }">
             <el-button link type="primary" @click="handleReset(row)">重置</el-button>
             <el-button link type="danger" @click="handleDelete(row)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+            </template>
+          </el-table-column>
+        </el-table>
 
-      <el-pagination
-        v-model:current-page="pagination.page"
-        v-model:page-size="pagination.size"
-        :total="pagination.total"
-        :page-sizes="[10, 20, 50, 100]"
-        layout="total, sizes, prev, pager, next, jumper"
-        @size-change="handleSizeChange"
-        @current-change="handlePageChange"
-        style="margin-top: 20px; justify-content: flex-end"
-      />
+        <el-pagination
+          v-model:current-page="pagination.page"
+          v-model:page-size="pagination.size"
+          :total="pagination.total"
+          :page-sizes="[10, 20, 50, 100]"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handlePageChange"
+          style="margin-top: 20px; justify-content: flex-end"
+        />
     </el-card>
   </div>
 </template>
@@ -219,18 +219,18 @@ onMounted(() => {
 
     .title {
       font-size: 18px;
-    }
+      }
 
     .total-count {
       font-size: 14px;
       font-weight: normal;
       color: #666;
-    }
-  }
+        }
+      }
 
-  .search-form {
-    margin-bottom: 20px;
-  }
+    .search-form {
+      margin-bottom: 20px;
+    }
 
   .exhibition-order-info {
     display: flex;

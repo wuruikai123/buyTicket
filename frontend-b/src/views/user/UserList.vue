@@ -165,7 +165,7 @@ const loadData = async () => {
     // 处理分页数据，兼容不同的返回格式
     if (data && typeof data === 'object') {
       if (data.records) {
-        tableData.value = data.records
+    tableData.value = data.records
         pagination.total = data.total || 0
       } else if (Array.isArray(data)) {
         tableData.value = data
@@ -336,8 +336,8 @@ const handleRefund = async (row: any) => {
   } catch (error: any) {
     if (error !== 'cancel') {
       ElMessage.error('退款失败')
-    }
   }
+}
 }
 
 
