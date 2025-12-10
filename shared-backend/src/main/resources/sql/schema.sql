@@ -1,6 +1,6 @@
 -- 创建数据库 (如果在本地执行，请先手动创建数据库 buy_ticket)
--- CREATE DATABASE IF NOT EXISTS buy_ticket DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
--- USE buy_ticket;
+ CREATE DATABASE IF NOT EXISTS buy_ticket DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ USE buy_ticket;
 
 SET NAMES utf8mb4;
 
