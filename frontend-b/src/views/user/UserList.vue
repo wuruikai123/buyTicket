@@ -3,68 +3,39 @@
     <el-card>
       <template #header>
         <div class="card-header">
-          <span>用户列表</span>
+          <span class="title">用户列表</span>
+          <span class="user-count">当前用户{{ pagination.total }}人</span>
         </div>
       </template>
 
       <el-form :model="searchForm" inline class="search-form">
-        <el-form-item label="关键词">
+        <el-form-item label="搜索用户">
           <el-input
             v-model="searchForm.keyword"
             placeholder="用户名/手机号/UID"
             clearable
             @clear="handleSearch"
             @keyup.enter="handleSearch"
+            style="width: 300px"
           />
-        </el-form-item>
-        <el-form-item label="状态">
-          <el-select v-model="searchForm.status" placeholder="全部" clearable>
-            <el-option label="正常" :value="1" />
-            <el-option label="禁用" :value="0" />
-          </el-select>
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="handleSearch">搜索</el-button>
-          <el-button @click="handleReset">重置</el-button>
         </el-form-item>
       </el-form>
 
-      <el-table :data="tableData" v-loading="loading" border>
-        <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="username" label="用户名" width="120" />
-        <el-table-column prop="nickname" label="昵称" width="120" />
-        <el-table-column prop="phone" label="手机号" width="130" />
-        <el-table-column prop="balance" label="余额" width="100">
+      <el-table :data="tableData" v-loading="loading" border style="width: 100%">
+        <el-table-column prop="username" label="用户名" min-width="120" />
+        <el-table-column prop="uid" label="用户账号" min-width="150" />
+        <el-table-column prop="phone" label="用户手机号" min-width="130" />
+        <el-table-column prop="createTime" label="注册时间" min-width="200" sortable>
           <template #default="{ row }">
-            ¥{{ row.balance }}
+            {{ formatDateTime(row.createTime) }}
           </template>
         </el-table-column>
-        <el-table-column prop="ticketOrderCount" label="门票订单" width="100" />
-        <el-table-column prop="mallOrderCount" label="商城订单" width="100" />
-        <el-table-column prop="totalAmount" label="总消费" width="100">
-          <template #default="{ row }">
-            ¥{{ row.totalAmount }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="status" label="状态" width="100">
-          <template #default="{ row }">
-            <el-tag :type="row.status === 1 ? 'success' : 'danger'">
-              {{ row.status === 1 ? '正常' : '禁用' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="registerTime" label="注册时间" width="180" />
-        <el-table-column label="操作" fixed="right" width="200">
+        <el-table-column label="操作" width="100" align="center">
           <template #default="{ row }">
             <el-button link type="primary" @click="handleView(row)">详情</el-button>
-            <el-button
-              link
-              :type="row.status === 1 ? 'warning' : 'success'"
-              @click="handleToggleStatus(row)"
-            >
-              {{ row.status === 1 ? '禁用' : '启用' }}
-            </el-button>
-            <el-button link type="primary" @click="handleBalance(row)">余额</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -82,49 +53,80 @@
     </el-card>
 
     <!-- 用户详情对话框 -->
-    <el-dialog v-model="detailDialogVisible" title="用户详情" width="600px">
-      <el-descriptions :column="2" border v-if="currentUser">
-        <el-descriptions-item label="用户ID">{{ currentUser.id }}</el-descriptions-item>
-        <el-descriptions-item label="用户名">{{ currentUser.username }}</el-descriptions-item>
-        <el-descriptions-item label="昵称">{{ currentUser.nickname }}</el-descriptions-item>
-        <el-descriptions-item label="手机号">{{ currentUser.phone }}</el-descriptions-item>
-        <el-descriptions-item label="邮箱">{{ currentUser.email }}</el-descriptions-item>
-        <el-descriptions-item label="余额">¥{{ currentUser.balance }}</el-descriptions-item>
-        <el-descriptions-item label="门票订单">{{ currentUser.ticketOrderCount }}</el-descriptions-item>
-        <el-descriptions-item label="商城订单">{{ currentUser.mallOrderCount }}</el-descriptions-item>
-        <el-descriptions-item label="总消费">¥{{ currentUser.totalAmount }}</el-descriptions-item>
-        <el-descriptions-item label="状态">
-          <el-tag :type="currentUser.status === 1 ? 'success' : 'danger'">
-            {{ currentUser.status === 1 ? '正常' : '禁用' }}
-          </el-tag>
-        </el-descriptions-item>
-        <el-descriptions-item label="注册时间">{{ currentUser.registerTime }}</el-descriptions-item>
-      </el-descriptions>
+    <el-dialog v-model="detailDialogVisible" title="用户详情" width="900px">
+      <div class="user-detail-content" v-if="currentUser">
+        <!-- 用户信息部分 -->
+        <div class="user-info-section">
+          <!-- <h3 class="section-title">用户信息</h3> -->
+          <div class="user-info-grid">
+            <div class="info-item">
+              <span class="info-label">用户名：</span>
+              <span class="info-value">{{ currentUser.username || '-' }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">用户账号：</span>
+              <span class="info-value">{{ currentUser.uid || '-' }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">用户手机号：</span>
+              <span class="info-value">{{ currentUser.phone || '-' }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">邮箱：</span>
+              <span class="info-value">{{ currentUser.email || '-' }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">注册时间：</span>
+              <span class="info-value">{{ formatDateTime(currentUser.createTime || currentUser.registerTime) }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="user-actions">
+            <el-button @click="handleFreeze">冻结</el-button>
+            <el-button link type="danger" @click="handleLogout">注销</el-button>
+          </div>
+
+        <!-- 用户门票订单部分 -->
+        <div class="ticket-orders-section">
+          <h3 class="section-title">用户门票订单</h3>
+          <el-table :data="ticketOrders" v-loading="orderLoading" border style="width: 100%">
+            <el-table-column prop="exhibitionName" label="展览名称" min-width="200" />
+            <el-table-column prop="validTime" label="有效时间" width="200">
+              <template #default="{ row }">
+                <div class="time-slot">
+                  <div>{{ formatDate(row.ticketDate) }} {{ row.timeSlot?.split('-')[0] }}</div>
+                  <div>{{ formatDate(row.ticketDate) }} {{ row.timeSlot?.split('-')[1] }}</div>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column prop="price" label="价格" width="100">
+              <template #default="{ row }">
+                {{ row.price || row.unitPrice || 0 }}元
+              </template>
+            </el-table-column>
+            <el-table-column prop="createTime" label="成交时间" width="180">
+              <template #default="{ row }">
+                {{ formatDateTime(row.createTime) }}
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="150" align="center">
+              <template #default="{ row }">
+                <el-button size="small" @click="handleInvalidateOrder(row)">作废</el-button>
+                <el-button 
+                  link 
+                  type="primary" 
+                  @click="handleRefund(row)"
+                  :disabled="row.refundStatus === 1"
+                >
+                  {{ row.refundStatus === 1 ? '已退款' : '退款' }}
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+      </div>
     </el-dialog>
 
-    <!-- 余额调整对话框 -->
-    <el-dialog v-model="balanceDialogVisible" title="调整余额" width="400px">
-      <el-form :model="balanceForm" label-width="80px">
-        <el-form-item label="当前余额">
-          <span>{{ currentUser?.balance }}</span>
-        </el-form-item>
-        <el-form-item label="调整金额" required>
-          <el-input-number
-            v-model="balanceForm.amount"
-            :precision="2"
-            :step="10"
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="调整后">
-          <span>{{ (currentUser?.balance || 0) + (balanceForm.amount || 0) }}</span>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="balanceDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleBalanceSubmit">确定</el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
@@ -132,16 +134,17 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { userApi } from '@/api/user'
+import { orderApi } from '@/api/order'
 
 const loading = ref(false)
 const tableData = ref<any[]>([])
 const detailDialogVisible = ref(false)
-const balanceDialogVisible = ref(false)
 const currentUser = ref<any>(null)
+const ticketOrders = ref<any[]>([])
+const orderLoading = ref(false)
 
 const searchForm = reactive({
-  keyword: '',
-  status: undefined as number | undefined
+  keyword: ''
 })
 
 const pagination = reactive({
@@ -150,22 +153,35 @@ const pagination = reactive({
   total: 0
 })
 
-const balanceForm = reactive({
-  amount: 0
-})
 
 const loadData = async () => {
   loading.value = true
   try {
-    const data = await userApi.getList({
+    const data: any = await userApi.getList({
       page: pagination.page,
       size: pagination.size,
       ...searchForm
     })
-    tableData.value = data.records
-    pagination.total = data.total
+    // 处理分页数据，兼容不同的返回格式
+    if (data && typeof data === 'object') {
+      if (data.records) {
+        tableData.value = data.records
+        pagination.total = data.total || 0
+      } else if (Array.isArray(data)) {
+        tableData.value = data
+        pagination.total = data.length
+      } else {
+        tableData.value = []
+        pagination.total = 0
+      }
+    } else {
+      tableData.value = []
+      pagination.total = 0
+    }
   } catch (error) {
     ElMessage.error('加载数据失败')
+    tableData.value = []
+    pagination.total = 0
   } finally {
     loading.value = false
   }
@@ -176,10 +192,25 @@ const handleSearch = () => {
   loadData()
 }
 
-const handleReset = () => {
-  searchForm.keyword = ''
-  searchForm.status = undefined
-  handleSearch()
+const formatDateTime = (dateTime: string | undefined) => {
+  if (!dateTime) return '-'
+  const date = new Date(dateTime)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  const seconds = String(date.getSeconds()).padStart(2, '0')
+  return `${year}年${month}月${day}日 ${hours}:${minutes}:${seconds}`
+}
+
+const formatDate = (date: string | undefined) => {
+  if (!date) return '-'
+  const d = new Date(date)
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}年${month}月${day}日`
 }
 
 const handleSizeChange = () => {
@@ -190,20 +221,46 @@ const handlePageChange = () => {
   loadData()
 }
 
+const loadTicketOrders = async (userId: number) => {
+  orderLoading.value = true
+  try {
+    const data: any = await orderApi.getTicketOrderList({
+      userId,
+      page: 1,
+      size: 100
+    })
+    if (data && data.records) {
+      ticketOrders.value = data.records
+    } else if (Array.isArray(data)) {
+      ticketOrders.value = data
+    } else {
+      ticketOrders.value = []
+    }
+  } catch (error) {
+    ElMessage.error('加载订单数据失败')
+    ticketOrders.value = []
+  } finally {
+    orderLoading.value = false
+  }
+}
+
 const handleView = async (row: any) => {
   try {
     const data = await userApi.getDetail(row.id)
     currentUser.value = data
     detailDialogVisible.value = true
+    // 加载用户的门票订单
+    await loadTicketOrders(row.id)
   } catch (error) {
     ElMessage.error('获取用户详情失败')
   }
 }
 
-const handleToggleStatus = async (row: any) => {
+const handleFreeze = async () => {
+  if (!currentUser.value) return
   try {
     await ElMessageBox.confirm(
-      `确定要${row.status === 1 ? '禁用' : '启用'}该用户吗？`,
+      `确定要${currentUser.value.status === 1 ? '冻结' : '解冻'}该用户吗？`,
       '提示',
       {
         confirmButtonText: '确定',
@@ -211,8 +268,9 @@ const handleToggleStatus = async (row: any) => {
         type: 'warning'
       }
     )
-    await userApi.updateStatus(row.id, row.status === 1 ? 0 : 1)
+    await userApi.updateStatus(currentUser.value.id, currentUser.value.status === 1 ? 0 : 1)
     ElMessage.success('操作成功')
+    currentUser.value.status = currentUser.value.status === 1 ? 0 : 1
     loadData()
   } catch (error: any) {
     if (error !== 'cancel') {
@@ -221,23 +279,67 @@ const handleToggleStatus = async (row: any) => {
   }
 }
 
-const handleBalance = (row: any) => {
-  currentUser.value = row
-  balanceForm.amount = 0
-  balanceDialogVisible.value = true
-}
-
-const handleBalanceSubmit = async () => {
+const handleLogout = async () => {
   if (!currentUser.value) return
   try {
-    await userApi.updateBalance(currentUser.value.id, balanceForm.amount)
-    ElMessage.success('调整成功')
-    balanceDialogVisible.value = false
+    await ElMessageBox.confirm('确定要注销该用户吗？此操作不可恢复！', '警告', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    // TODO: 调用注销接口
+    ElMessage.success('注销成功')
+    detailDialogVisible.value = false
     loadData()
-  } catch (error) {
-    ElMessage.error('调整失败')
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error('注销失败')
+    }
   }
 }
+
+const handleInvalidateOrder = async (row: any) => {
+  try {
+    await ElMessageBox.confirm('确定要作废该订单吗？', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    await orderApi.cancelTicketOrder(row.id)
+    ElMessage.success('作废成功')
+    if (currentUser.value) {
+      await loadTicketOrders(currentUser.value.id)
+    }
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error('作废失败')
+    }
+  }
+}
+
+const handleRefund = async (row: any) => {
+  if (row.refundStatus === 1) {
+    ElMessage.info('该订单已退款')
+    return
+  }
+  try {
+    await ElMessageBox.confirm('确定要退款该订单吗？', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    // TODO: 调用退款接口
+    ElMessage.success('退款成功')
+    if (currentUser.value) {
+      await loadTicketOrders(currentUser.value.id)
+    }
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error('退款失败')
+    }
+  }
+}
+
 
 onMounted(() => {
   loadData()
@@ -247,12 +349,88 @@ onMounted(() => {
 <style scoped lang="scss">
 .user-list {
   .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     font-weight: bold;
     font-size: 16px;
+
+    .title {
+      font-size: 18px;
+    }
+
+    .user-count {
+      font-size: 14px;
+      font-weight: normal;
+      color: #666;
+    }
   }
 
   .search-form {
     margin-bottom: 20px;
+  }
+
+  .user-detail-content {
+    .user-info-section {
+      margin-bottom: 20px;
+      padding: 12px 16px;
+      background-color: #f5f7fa;
+      border-radius: 4px;
+
+      .section-title {
+        margin: 0 0 12px 0;
+        font-size: 14px;
+        font-weight: bold;
+        color: #303133;
+      }
+
+      .user-info-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px 24px;
+        margin-bottom: 12px;
+
+        .info-item {
+          display: flex;
+          align-items: center;
+          font-size: 13px;
+          white-space: nowrap;
+
+          .info-label {
+            color: #606266;
+            margin-right: 6px;
+          }
+
+          .info-value {
+            color: #303133;
+            font-weight: 500;
+          }
+        }
+      }
+
+      .user-actions {
+        display: flex;
+        gap: 12px;
+        margin-top: 12px;
+        padding: 10px;
+      }
+    }
+
+    .ticket-orders-section {
+      .section-title {
+        margin: 16px 0 16px 0;
+        font-size: 16px;
+        font-weight: bold;
+        color: #303133;
+      }
+
+      .time-slot {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 13px;
+      }
+    }
   }
 }
 </style>

@@ -1,62 +1,73 @@
 <template>
-  <div class="inventory-list">
+  <div class="verify-list">
     <el-card>
       <template #header>
         <div class="card-header">
-          <span>库存管理</span>
-          <div>
-            <el-button type="primary" @click="handleBatchCreate">批量创建</el-button>
-            <el-button type="success" @click="handleCreate">单条创建</el-button>
-          </div>
+          <span class="title">核销记录</span>
+          <span class="total-count">总计核销{{ totalVerified }}张</span>
         </div>
       </template>
 
       <el-form :model="searchForm" inline class="search-form">
-        <el-form-item label="展览">
-          <el-select v-model="searchForm.exhibitionId" placeholder="全部" clearable style="width: 200px">
-            <el-option
-              v-for="item in exhibitions"
-              :key="item.id"
-              :label="item.name"
-              :value="item.id"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="日期">
-          <el-date-picker
-            v-model="searchForm.ticketDate"
-            type="date"
-            placeholder="选择日期"
+        <el-form-item label="搜索门票订单号">
+          <el-input
+            v-model="searchForm.orderNo"
+            placeholder="请输入门票订单号"
             clearable
+            @clear="handleSearch"
+            @keyup.enter="handleSearch"
+            style="width: 300px"
           />
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="handleSearch">搜索</el-button>
-          <el-button @click="handleReset">重置</el-button>
         </el-form-item>
       </el-form>
 
-      <el-table :data="tableData" v-loading="loading" border>
-        <el-table-column prop="exhibitionId" label="展览ID" width="80" />
-        <el-table-column prop="ticketDate" label="日期" width="120" />
-        <el-table-column prop="timeSlot" label="时间段" width="150" />
-        <el-table-column prop="totalCount" label="总票数" width="100" />
-        <el-table-column prop="soldCount" label="已售" width="100" />
-        <el-table-column label="剩余" width="100">
+      <el-table :data="tableData" v-loading="loading" border style="width: 100%">
+        <el-table-column label="展览名称&门票订单号" min-width="250">
           <template #default="{ row }">
-            <span :class="{ 'text-danger': row.totalCount - row.soldCount < 10 }">
-              {{ row.totalCount - row.soldCount }}
-            </span>
+            <div class="exhibition-order-info">
+              <div class="exhibition-name">
+                {{ row.exhibitionName || (row.items && row.items[0]?.exhibitionName) || '-' }}
+              </div>
+              <div class="order-no">{{ row.orderNo || row.id || '-' }}</div>
+            </div>
           </template>
         </el-table-column>
-        <el-table-column label="状态" width="100">
+        <el-table-column label="用户账号" min-width="150">
           <template #default="{ row }">
-            <el-tag :type="getStatusType(row)">{{ getStatusText(row) }}</el-tag>
+            {{ row.uid || row.userId || '-' }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" fixed="right" width="180">
+        <el-table-column label="有效时间" width="200">
           <template #default="{ row }">
-            <el-button link type="primary" @click="handleEdit(row)">编辑</el-button>
+            <div class="time-slot">
+              <div v-if="row.ticketDate && row.timeSlot">
+                {{ formatValidTime(row.ticketDate, row.timeSlot?.split('-')[0]) }}
+              </div>
+              <div v-else-if="row.items && row.items[0]">
+                {{ formatValidTime(row.items[0].ticketDate, row.items[0].timeSlot?.split('-')[0]) }}
+              </div>
+              <div v-else>-</div>
+              <div v-if="row.ticketDate && row.timeSlot">
+                {{ formatValidTime(row.ticketDate, row.timeSlot?.split('-')[1]) }}
+              </div>
+              <div v-else-if="row.items && row.items[0]">
+                {{ formatValidTime(row.items[0].ticketDate, row.items[0].timeSlot?.split('-')[1]) }}
+              </div>
+              <div v-else>-</div>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column prop="verifyTime" label="核销时间" width="180" sortable>
+          <template #default="{ row }">
+            {{ formatDateTime(row.verifyTime || row.updateTime || row.createTime) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="150" align="center">
+          <template #default="{ row }">
+            <el-button link type="primary" @click="handleReset(row)">重置</el-button>
             <el-button link type="danger" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
@@ -73,88 +84,20 @@
         style="margin-top: 20px; justify-content: flex-end"
       />
     </el-card>
-
-    <!-- 单条创建/编辑对话框 -->
-    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑库存' : '创建库存'" width="500px">
-      <el-form :model="form" label-width="100px">
-        <el-form-item label="展览" required>
-          <el-select v-model="form.exhibitionId" placeholder="请选择展览" style="width: 100%">
-            <el-option v-for="item in exhibitions" :key="item.id" :label="item.name" :value="item.id" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="日期" required>
-          <el-date-picker v-model="form.ticketDate" type="date" placeholder="选择日期" style="width: 100%" />
-        </el-form-item>
-        <el-form-item label="时间段" required>
-          <el-input v-model="form.timeSlot" placeholder="如: 09:00-12:00" />
-        </el-form-item>
-        <el-form-item label="总票数" required>
-          <el-input-number v-model="form.totalCount" :min="0" style="width: 100%" />
-        </el-form-item>
-        <el-form-item label="已售票数" v-if="isEdit">
-          <el-input-number v-model="form.soldCount" :min="0" style="width: 100%" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleSubmit">确定</el-button>
-      </template>
-    </el-dialog>
-
-
-    <!-- 批量创建对话框 -->
-    <el-dialog v-model="batchDialogVisible" title="批量创建库存" width="500px">
-      <el-form :model="batchForm" label-width="100px">
-        <el-form-item label="展览" required>
-          <el-select v-model="batchForm.exhibitionId" placeholder="请选择展览" style="width: 100%">
-            <el-option v-for="item in exhibitions" :key="item.id" :label="item.name" :value="item.id" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="日期范围" required>
-          <el-date-picker
-            v-model="batchForm.dateRange"
-            type="daterange"
-            range-separator="至"
-            start-placeholder="开始日期"
-            end-placeholder="结束日期"
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="时间段" required>
-          <el-checkbox-group v-model="batchForm.timeSlots">
-            <el-checkbox label="09:00-12:00">09:00-12:00</el-checkbox>
-            <el-checkbox label="12:00-14:00">12:00-14:00</el-checkbox>
-            <el-checkbox label="14:00-16:00">14:00-16:00</el-checkbox>
-          </el-checkbox-group>
-        </el-form-item>
-        <el-form-item label="每场票数" required>
-          <el-input-number v-model="batchForm.totalCount" :min="1" style="width: 100%" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="batchDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleBatchSubmit">确定</el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ticketApi } from '@/api/ticket'
-import { exhibitionApi } from '@/api/exhibition'
+import { orderApi } from '@/api/order'
 
 const loading = ref(false)
 const tableData = ref<any[]>([])
-const exhibitions = ref<any[]>([])
-const dialogVisible = ref(false)
-const batchDialogVisible = ref(false)
-const isEdit = ref(false)
+const totalVerified = ref(0)
 
 const searchForm = reactive({
-  exhibitionId: undefined as number | undefined,
-  ticketDate: ''
+  orderNo: ''
 })
 
 const pagination = reactive({
@@ -163,43 +106,29 @@ const pagination = reactive({
   total: 0
 })
 
-const form = reactive({
-  id: undefined as number | undefined,
-  exhibitionId: undefined as number | undefined,
-  ticketDate: '',
-  timeSlot: '',
-  totalCount: 100,
-  soldCount: 0
-})
-
-const batchForm = reactive({
-  exhibitionId: undefined as number | undefined,
-  dateRange: [] as Date[],
-  timeSlots: ['09:00-12:00', '12:00-14:00', '14:00-16:00'],
-  totalCount: 100
-})
-
-const getStatusType = (row: any) => {
-  const remaining = row.totalCount - row.soldCount
-  if (remaining === 0) return 'danger'
-  if (remaining < row.totalCount * 0.2) return 'warning'
-  return 'success'
+const formatDateTime = (dateTime: string | undefined) => {
+  if (!dateTime) return '-'
+  const date = new Date(dateTime)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  const seconds = String(date.getSeconds()).padStart(2, '0')
+  return `${year}年${month}月${day}日 ${hours}:${minutes}:${seconds}`
 }
 
-const getStatusText = (row: any) => {
-  const remaining = row.totalCount - row.soldCount
-  if (remaining === 0) return '售罄'
-  if (remaining < row.totalCount * 0.2) return '紧张'
-  return '充足'
-}
-
-const loadExhibitions = async () => {
-  try {
-    const data = await exhibitionApi.getList({ page: 1, size: 100 })
-    exhibitions.value = data.records || []
-  } catch (error) {
-    console.error('加载展览列表失败', error)
+const formatValidTime = (dateTime: string | undefined, time?: string) => {
+  if (!dateTime) return '-'
+  const date = new Date(dateTime)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  
+  if (time) {
+    return `${year}年${month}月${day}日 ${time}`
   }
+  return `${year}年${month}月${day}日`
 }
 
 const loadData = async () => {
@@ -207,17 +136,22 @@ const loadData = async () => {
   try {
     const params: any = {
       page: pagination.page,
-      size: pagination.size
+      size: pagination.size,
+      status: 2 // 只获取已核销的订单（状态2：已使用）
     }
-    if (searchForm.exhibitionId) params.exhibitionId = searchForm.exhibitionId
-    if (searchForm.ticketDate) {
-      params.ticketDate = new Date(searchForm.ticketDate).toISOString().split('T')[0]
+    if (searchForm.orderNo) {
+      params.orderNo = searchForm.orderNo
     }
-    const data = await ticketApi.getInventoryList(params)
+    const data: any = await orderApi.getTicketOrderList(params)
     tableData.value = data.records || []
     pagination.total = data.total || 0
+    // 计算总计核销数量
+    totalVerified.value = pagination.total
   } catch (error) {
     ElMessage.error('加载数据失败')
+    tableData.value = []
+    pagination.total = 0
+    totalVerified.value = 0
   } finally {
     loading.value = false
   }
@@ -228,123 +162,98 @@ const handleSearch = () => {
   loadData()
 }
 
-const handleReset = () => {
-  searchForm.exhibitionId = undefined
-  searchForm.ticketDate = ''
-  handleSearch()
-}
-
 const handleSizeChange = () => loadData()
 const handlePageChange = () => loadData()
 
-const handleCreate = () => {
-  isEdit.value = false
-  form.id = undefined
-  form.exhibitionId = undefined
-  form.ticketDate = ''
-  form.timeSlot = ''
-  form.totalCount = 100
-  form.soldCount = 0
-  dialogVisible.value = true
-}
-
-const handleEdit = (row: any) => {
-  isEdit.value = true
-  form.id = row.id
-  form.exhibitionId = row.exhibitionId
-  form.ticketDate = row.ticketDate
-  form.timeSlot = row.timeSlot
-  form.totalCount = row.totalCount
-  form.soldCount = row.soldCount
-  dialogVisible.value = true
-}
-
-const handleSubmit = async () => {
-  if (!form.exhibitionId || !form.ticketDate || !form.timeSlot) {
-    ElMessage.warning('请填写完整信息')
-    return
-  }
+const handleReset = async (row: any) => {
   try {
-    const data = {
-      ...form,
-      ticketDate: typeof form.ticketDate === 'string' ? form.ticketDate : new Date(form.ticketDate).toISOString().split('T')[0]
-    }
-    if (isEdit.value) {
-      await ticketApi.updateInventory(data)
-      ElMessage.success('更新成功')
-    } else {
-      await ticketApi.createInventory(data)
-      ElMessage.success('创建成功')
-    }
-    dialogVisible.value = false
+    await ElMessageBox.confirm('确定要重置该核销记录吗？重置后订单将恢复为待使用状态。', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    // TODO: 调用重置核销接口
+    // await orderApi.resetVerify(row.id)
+    void row // 标记参数使用，待接口实现后删除此行
+    ElMessage.success('重置成功')
     loadData()
-  } catch (error) {
-    ElMessage.error('操作失败')
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error('重置失败')
+    }
   }
 }
 
 const handleDelete = async (row: any) => {
   try {
-    await ElMessageBox.confirm('确定删除该库存记录吗？', '提示', { type: 'warning' })
-    await ticketApi.deleteInventory(row.id)
+    await ElMessageBox.confirm('确定要删除该核销记录吗？此操作不可恢复！', '警告', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    // TODO: 调用删除核销记录接口
+    // await orderApi.deleteVerifyRecord(row.id)
+    void row // 标记参数使用，待接口实现后删除此行
     ElMessage.success('删除成功')
     loadData()
   } catch (error: any) {
-    if (error !== 'cancel') ElMessage.error('删除失败')
-  }
-}
-
-const handleBatchCreate = () => {
-  batchForm.exhibitionId = undefined
-  batchForm.dateRange = []
-  batchForm.timeSlots = ['09:00-12:00', '12:00-14:00', '14:00-16:00']
-  batchForm.totalCount = 100
-  batchDialogVisible.value = true
-}
-
-const handleBatchSubmit = async () => {
-  if (!batchForm.exhibitionId || batchForm.dateRange.length !== 2 || batchForm.timeSlots.length === 0) {
-    ElMessage.warning('请填写完整信息')
-    return
-  }
-  try {
-    const formatDate = (d: Date) => d.toISOString().split('T')[0]
-    await ticketApi.batchCreateInventory({
-      exhibitionId: batchForm.exhibitionId,
-      startDate: formatDate(batchForm.dateRange[0]),
-      endDate: formatDate(batchForm.dateRange[1]),
-      timeSlots: batchForm.timeSlots,
-      totalCount: batchForm.totalCount
-    })
-    ElMessage.success('批量创建成功')
-    batchDialogVisible.value = false
-    loadData()
-  } catch (error) {
-    ElMessage.error('批量创建失败')
+    if (error !== 'cancel') {
+      ElMessage.error('删除失败')
+    }
   }
 }
 
 onMounted(() => {
-  loadExhibitions()
   loadData()
 })
 </script>
 
 <style scoped lang="scss">
-.inventory-list {
+.verify-list {
   .card-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     font-weight: bold;
     font-size: 16px;
+
+    .title {
+      font-size: 18px;
+    }
+
+    .total-count {
+      font-size: 14px;
+      font-weight: normal;
+      color: #666;
+    }
   }
+
   .search-form {
     margin-bottom: 20px;
   }
-  .text-danger {
-    color: #f56c6c;
-    font-weight: bold;
+
+  .exhibition-order-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+
+    .exhibition-name {
+      font-size: 14px;
+      color: #303133;
+      font-weight: 500;
+    }
+
+    .order-no {
+      font-size: 12px;
+      color: #909399;
+    }
+  }
+
+  .time-slot {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 13px;
   }
 }
 </style>

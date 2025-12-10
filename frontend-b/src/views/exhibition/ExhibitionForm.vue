@@ -2,114 +2,126 @@
   <div class="exhibition-form">
     <el-card>
       <template #header>
-        <span>{{ isEdit ? '编辑展览' : '创建展览' }}</span>
+        <span>{{ isEdit ? '编辑展览信息' : '创建展览信息' }}</span>
       </template>
 
       <el-form
         ref="formRef"
         :model="form"
         :rules="rules"
-        label-width="120px"
+        label-width="100px"
+        class="exhibition-form-content"
       >
-        <el-form-item label="展览名称" prop="name">
-          <el-input v-model="form.name" placeholder="请输入展览名称" />
+        <div class="form-layout">
+          <!-- 左侧：主图上传 -->
+          <div class="main-image-section">
+            <el-form-item prop="coverImage">
+              <el-upload
+                class="main-image-uploader"
+                action="#"
+                :show-file-list="false"
+                :before-upload="beforeUpload"
+              >
+                <img v-if="form.coverImage" :src="form.coverImage" class="main-image" />
+                <div v-else class="main-image-placeholder">
+                  <el-icon class="upload-icon"><Plus /></el-icon>
+                </div>
+              </el-upload>
+            </el-form-item>
+            
+            <!-- 门票价格 -->
+            <el-form-item label="门票价格" prop="price" class="price-item">
+              <div class="price-input-wrapper">
+                <el-input-number
+                  v-model="form.price"
+                  :min="0"
+                  :precision="2"
+                  class="price-input"
+                />
+                <span class="price-unit">元/人次</span>
+              </div>
+            </el-form-item>
+          </div>
+
+          <!-- 右侧：表单字段 -->
+          <div class="form-fields-section">
+            <el-form-item label="展览名称" prop="name">
+              <el-input v-model="form.name" placeholder="请输入展览名称" />
+            </el-form-item>
+            
+            <div class="date-range-item">
+              <el-form-item prop="startDate" class="date-field">
+                <template #label>
+                  <span>开始时间</span>
+                </template>
+                <el-date-picker
+                  v-model="form.startDate"
+                  type="date"
+                  placeholder="开始时间"
+                  style="width: 100%"
+                />
+              </el-form-item>
+              <el-form-item prop="endDate" class="date-field">
+                <template #label>
+                  <span>结束时间</span>
+                </template>
+                <el-date-picker
+                  v-model="form.endDate"
+                  type="date"
+                  placeholder="结束时间"
+                  style="width: 100%"
+                />
+              </el-form-item>
+            </div>
+            
+            <el-form-item label="展览副标题" prop="shortDesc">
+              <el-input
+                v-model="form.shortDesc"
+                placeholder="请输入展览副标题"
+              />
+            </el-form-item>
+            
+            <el-form-item label="展览介绍" prop="description">
+              <el-input
+                v-model="form.description"
+                type="textarea"
+                :rows="8"
+                placeholder="请输入展览介绍"
+              />
+            </el-form-item>
+          </div>
+        </div>
+
+        <!-- 介绍插图 -->
+        <el-form-item label="介绍插图" class="detail-images-section">
+          <div class="detail-images-list">
+            <el-upload
+              v-for="(item, index) in detailImagesList"
+              :key="index"
+              class="detail-image-item"
+              action="#"
+              :show-file-list="false"
+              :before-upload="(file: File) => handleDetailImageUpload(file, index)"
+            >
+              <img v-if="item.url" :src="item.url" class="detail-image" />
+              <div v-else class="detail-image-placeholder">
+                <el-icon v-if="index < 2" class="add-icon"><Plus /></el-icon>
+                <el-icon v-else class="remove-icon" @click.stop="handleRemoveDetailImage(index)"><Close /></el-icon>
+              </div>
+            </el-upload>
+          </div>
         </el-form-item>
         
-        <el-form-item label="短描述" prop="shortDesc">
-          <el-input
-            v-model="form.shortDesc"
-            type="textarea"
-            :rows="3"
-            placeholder="请输入简短描述"
-          />
-        </el-form-item>
-        
-        <el-form-item label="详细介绍" prop="description">
-          <el-input
-            v-model="form.description"
-            type="textarea"
-            :rows="6"
-            placeholder="请输入详细介绍"
-          />
-        </el-form-item>
-        
-        <el-form-item label="开始日期" prop="startDate">
-          <el-date-picker
-            v-model="form.startDate"
-            type="date"
-            placeholder="选择开始日期"
-            style="width: 100%"
-          />
-        </el-form-item>
-        
-        <el-form-item label="结束日期" prop="endDate">
-          <el-date-picker
-            v-model="form.endDate"
-            type="date"
-            placeholder="选择结束日期"
-            style="width: 100%"
-          />
-        </el-form-item>
-        
-        <el-form-item label="基础票价" prop="price">
-          <el-input-number
-            v-model="form.price"
-            :min="0"
-            :precision="2"
-            style="width: 100%"
-          />
-        </el-form-item>
-        
-        <el-form-item label="封面图片" prop="coverImage">
-          <el-upload
-            class="avatar-uploader"
-            action="#"
-            :show-file-list="false"
-            :before-upload="beforeUpload"
+        <!-- 保存按钮 -->
+        <el-form-item class="submit-section">
+          <el-button 
+            type="default" 
+            @click="handleSubmit" 
+            :loading="loading"
+            class="save-button"
           >
-            <img v-if="form.coverImage" :src="form.coverImage" class="avatar" />
-            <el-icon v-else class="avatar-uploader-icon"><Plus /></el-icon>
-          </el-upload>
-        </el-form-item>
-        
-        <el-form-item label="详情图片">
-          <el-upload
-            action="#"
-            list-type="picture-card"
-            :file-list="detailImages"
-            :on-preview="handlePreview"
-            :on-remove="handleRemove"
-          >
-            <el-icon><Plus /></el-icon>
-          </el-upload>
-        </el-form-item>
-        
-        <el-form-item label="标签">
-          <el-select
-            v-model="form.tags"
-            multiple
-            placeholder="请选择标签"
-            style="width: 100%"
-          >
-            <el-option label="美团" value="美团" />
-            <el-option label="抖音" value="抖音" />
-            <el-option label="热门" value="热门" />
-          </el-select>
-        </el-form-item>
-        
-        <el-form-item label="状态" prop="status">
-          <el-radio-group v-model="form.status">
-            <el-radio :label="0">待开始</el-radio>
-            <el-radio :label="1">进行中</el-radio>
-            <el-radio :label="2">已结束</el-radio>
-          </el-radio-group>
-        </el-form-item>
-        
-        <el-form-item>
-          <el-button type="primary" @click="handleSubmit" :loading="loading">
             保存
           </el-button>
-          <el-button @click="$router.back()">取消</el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -120,6 +132,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import { Plus, Close } from '@element-plus/icons-vue'
 import { exhibitionApi } from '@/api/exhibition'
 
 const route = useRoute()
@@ -127,7 +140,14 @@ const router = useRouter()
 
 const formRef = ref<FormInstance>()
 const loading = ref(false)
-const detailImages = ref<any[]>([])
+const detailImagesList = ref<Array<{ url: string }>>([
+  { url: '' },
+  { url: '' },
+  { url: '' },
+  { url: '' },
+  { url: '' },
+  { url: '' }
+])
 
 const isEdit = computed(() => !!route.params.id)
 
@@ -145,12 +165,12 @@ const form = reactive({
 
 const rules: FormRules = {
   name: [{ required: true, message: '请输入展览名称', trigger: 'blur' }],
-  shortDesc: [{ required: true, message: '请输入短描述', trigger: 'blur' }],
-  description: [{ required: true, message: '请输入详细介绍', trigger: 'blur' }],
-  startDate: [{ required: true, message: '请选择开始日期', trigger: 'change' }],
-  endDate: [{ required: true, message: '请选择结束日期', trigger: 'change' }],
-  price: [{ required: true, message: '请输入基础票价', trigger: 'blur' }],
-  coverImage: [{ required: true, message: '请上传封面图片', trigger: 'change' }]
+  shortDesc: [{ required: true, message: '请输入展览副标题', trigger: 'blur' }],
+  description: [{ required: true, message: '请输入展览介绍', trigger: 'blur' }],
+  startDate: [{ required: true, message: '请选择开始时间', trigger: 'change' }],
+  endDate: [{ required: true, message: '请选择结束时间', trigger: 'change' }],
+  price: [{ required: true, message: '请输入门票价格', trigger: 'blur' }],
+  coverImage: [{ required: true, message: '请上传主图', trigger: 'change' }]
 }
 
 const beforeUpload = (file: File) => {
@@ -162,19 +182,24 @@ const beforeUpload = (file: File) => {
   return false
 }
 
-const handlePreview = () => {
-  // 预览逻辑
+const handleDetailImageUpload = (file: File, index: number): boolean => {
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    detailImagesList.value[index].url = e.target?.result as string
+  }
+  reader.readAsDataURL(file)
+  return false
 }
 
-const handleRemove = () => {
-  // 移除逻辑
+const handleRemoveDetailImage = (index: number) => {
+  detailImagesList.value[index].url = ''
 }
 
 const loadData = async () => {
   if (!isEdit.value) return
   
   try {
-    const data = await exhibitionApi.getDetail(Number(route.params.id))
+    const data: any = await exhibitionApi.getDetail(Number(route.params.id))
     
     // 处理 tags: 字符串转数组
     let tagsArray: string[] = []
@@ -230,33 +255,183 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .exhibition-form {
-  .avatar-uploader {
-    :deep(.el-upload) {
-      border: 1px dashed #d9d9d9;
-      border-radius: 6px;
-      cursor: pointer;
-      position: relative;
-      overflow: hidden;
-      transition: all 0.3s;
+  .exhibition-form-content {
+    .form-layout {
+      display: flex;
+      gap: 30px;
+      margin-bottom: 30px;
 
-      &:hover {
-        border-color: #409eff;
+      .main-image-section {
+        flex-shrink: 0;
+        width: 300px;
+
+        .main-image-uploader {
+          :deep(.el-upload) {
+            width: 100%;
+            border: 1px solid #dcdfe6;
+            border-radius: 4px;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s;
+            background-color: #f5f7fa;
+
+            &:hover {
+              border-color: #409eff;
+            }
+          }
+
+          .main-image {
+            width: 200px;
+            height: 400px;
+            object-fit: cover;
+            display: block;
+          }
+
+          .main-image-placeholder {
+            width: 200px;
+            height: 400px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #f5f7fa;
+
+            .upload-icon {
+              font-size: 48px;
+              color: #8c939d;
+            }
+          }
+        }
+
+        .price-item {
+          margin-top: 20px;
+          margin-bottom: 0;
+
+          :deep(.el-form-item__label) {
+            font-weight: 500;
+          }
+
+          .price-input-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+
+            .price-input {
+              flex: 1;
+            }
+
+            .price-unit {
+              font-size: 14px;
+              color: #606266;
+              white-space: nowrap;
+            }
+          }
+        }
+      }
+
+      .form-fields-section {
+        flex: 1;
+        min-width: 0;
+
+        .date-range-item {
+          display: flex;
+          gap: 16px;
+          margin-bottom: 22px;
+
+          .date-field {
+            flex: 1;
+            margin-bottom: 0;
+          }
+        }
       }
     }
 
-    .avatar {
-      width: 178px;
-      height: 178px;
-      display: block;
+    .detail-images-section {
+      margin-top: 30px;
+
+      :deep(.el-form-item__label) {
+        font-weight: 500;
+      }
+
+      .detail-images-list {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+
+        .detail-image-item {
+          :deep(.el-upload) {
+            width: 120px;
+            height: 120px;
+            border: 1px solid #dcdfe6;
+            border-radius: 4px;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s;
+            background-color: #f5f7fa;
+
+            &:hover {
+              border-color: #409eff;
+            }
+          }
+
+          .detail-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+          }
+
+          .detail-image-placeholder {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #f5f7fa;
+
+            .add-icon {
+              font-size: 32px;
+              color: #8c939d;
+            }
+
+            .remove-icon {
+              font-size: 32px;
+              color: #8c939d;
+              cursor: pointer;
+
+              &:hover {
+                color: #f56c6c;
+              }
+            }
+          }
+        }
+      }
     }
 
-    .avatar-uploader-icon {
-      font-size: 28px;
-      color: #8c939d;
-      width: 178px;
-      height: 178px;
+    .submit-section {
+      margin-top: 30px;
+      margin-bottom: 0;
       text-align: center;
-      line-height: 178px;
+
+      :deep(.el-form-item__content) {
+        margin-left: 0 !important;
+      }
+
+      .save-button {
+        min-width: 120px;
+        height: 40px;
+        background-color: #e4e7ed;
+        border-color: #dcdfe6;
+        color: #303133;
+        font-size: 14px;
+
+        &:hover {
+          background-color: #d3d4d6;
+          border-color: #c0c4cc;
+          color: #303133;
+        }
+      }
     }
   }
 }

@@ -120,8 +120,9 @@ const loadData = async () => {
       size: pagination.size,
       ...searchForm
     })
-    tableData.value = data.records
-    pagination.total = data.total
+    const result: any = data
+    tableData.value = result.records || []
+    pagination.total = result.total || 0
   } catch (error) {
     ElMessage.error('加载数据失败')
   } finally {

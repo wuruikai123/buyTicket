@@ -1,59 +1,21 @@
 <template>
   <div class="dashboard">
-    <el-row :gutter="20" class="stats-cards">
-      <el-col :xs="24" :sm="12" :md="6">
-        <el-card class="stat-card">
-          <div class="stat-content">
-            <div class="stat-icon user">
-              <el-icon><User /></el-icon>
-            </div>
-            <div class="stat-info">
-              <div class="stat-value">{{ dashboardData.todayUsers }}</div>
-              <div class="stat-label">今日新增用户</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :xs="24" :sm="12" :md="6">
-        <el-card class="stat-card">
-          <div class="stat-content">
-            <div class="stat-icon order">
-              <el-icon><ShoppingBag /></el-icon>
-            </div>
-            <div class="stat-info">
-              <div class="stat-value">{{ dashboardData.todayOrders }}</div>
-              <div class="stat-label">今日订单数</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :xs="24" :sm="12" :md="6">
-        <el-card class="stat-card">
-          <div class="stat-content">
-            <div class="stat-icon sales">
-              <el-icon><Money /></el-icon>
-            </div>
-            <div class="stat-info">
-              <div class="stat-value">¥{{ formatNumber(dashboardData.todaySales) }}</div>
-              <div class="stat-label">今日销售额</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :xs="24" :sm="12" :md="6">
-        <el-card class="stat-card">
-          <div class="stat-content">
-            <div class="stat-icon visit">
-              <el-icon><View /></el-icon>
-            </div>
-            <div class="stat-info">
-              <div class="stat-value">{{ dashboardData.todayVisits }}</div>
-              <div class="stat-label">今日访问量</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-    </el-row>
+    <div class="dashboard-header">
+      <div class="ticket-stats">
+        <div class="stat-item">
+          <div class="stat-label">今日销售门票</div>
+          <div class="stat-value">{{ dashboardData.todayTicketSales || 0 }}<span class="unit">张</span></div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">今日核销门票</div>
+          <div class="stat-value">{{ dashboardData.todayTicketVerified || 0 }}<span class="unit">张</span></div>
+        </div>
+      </div>
+      <div class="current-time">
+        <div class="time-date">{{ currentDate }}</div>
+        <div class="time-clock">{{ currentTime }}</div>
+      </div>
+    </div>
 
     <el-row :gutter="20" class="charts-row">
       <el-col :xs="24" :lg="12">
@@ -96,7 +58,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
 import { LineChart, PieChart, BarChart } from 'echarts/charts'
@@ -126,6 +88,8 @@ const dashboardData = ref({
   todayOrders: 0,
   todaySales: 0,
   todayVisits: 0,
+  todayTicketSales: 0,
+  todayTicketVerified: 0,
   userGrowth: [] as any[],
   orderTrend: [] as any[],
   salesTrend: [] as any[],
@@ -133,8 +97,20 @@ const dashboardData = ref({
   orderStatusRatio: [] as any[]
 })
 
-const formatNumber = (num: number) => {
-  return (num || 0).toLocaleString()
+const currentDate = ref('')
+const currentTime = ref('')
+let timeInterval: any = null
+
+const updateTime = () => {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  const hours = String(now.getHours()).padStart(2, '0')
+  const minutes = String(now.getMinutes()).padStart(2, '0')
+  
+  currentDate.value = `${year}年${month}月${day}日`
+  currentTime.value = `${hours}:${minutes}`
 }
 
 const userGrowthOption = computed<EChartsOption>(() => {
@@ -245,7 +221,7 @@ const orderTypeOption = computed<EChartsOption>(() => ({
 
 const loadData = async () => {
   try {
-    const data = await statisticsApi.getDashboardData()
+    const data: any = await statisticsApi.getDashboardData()
     dashboardData.value = data
   } catch (error) {
     console.error('加载数据失败', error)
@@ -253,75 +229,72 @@ const loadData = async () => {
 }
 
 onMounted(() => {
+  updateTime()
+  timeInterval = setInterval(updateTime, 1000) // 每秒更新一次时间
   loadData()
+})
+
+onUnmounted(() => {
+  if (timeInterval) {
+    clearInterval(timeInterval)
+  }
 })
 </script>
 
 <style scoped lang="scss">
 .dashboard {
-  .stats-cards {
+  .dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 24px;
+    background-color: #ffffff;
+    border-radius: 8px;
     margin-bottom: 24px;
-  }
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 
-  .stat-card {
-    border-radius: 16px !important;
-    overflow: hidden;
-    
-    .stat-content {
+    .ticket-stats {
       display: flex;
-      align-items: center;
-      gap: 20px;
-      padding: 8px;
+      gap: 60px;
 
-      .stat-icon {
-        width: 64px;
-        height: 64px;
-        border-radius: 16px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 28px;
-        color: #fff;
-        flex-shrink: 0;
-
-        &.user {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          box-shadow: 0 4px 14px rgba(102, 126, 234, 0.4);
+      .stat-item {
+        .stat-label {
+          font-size: 14px;
+          color: #606266;
+          margin-bottom: 8px;
         }
-
-        &.order {
-          background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-          box-shadow: 0 4px 14px rgba(245, 87, 108, 0.4);
-        }
-
-        &.sales {
-          background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-          box-shadow: 0 4px 14px rgba(79, 172, 254, 0.4);
-        }
-
-        &.visit {
-          background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
-          box-shadow: 0 4px 14px rgba(67, 233, 123, 0.4);
-        }
-      }
-
-      .stat-info {
-        flex: 1;
-        min-width: 0;
 
         .stat-value {
-          font-size: 28px;
-          font-weight: 700;
+          font-size: 32px;
+          font-weight: 600;
           color: #303133;
-          margin-bottom: 6px;
-          line-height: 1.2;
-        }
+          display: flex;
+          align-items: baseline;
+          gap: 4px;
 
-        .stat-label {
-          font-size: 13px;
-          color: #909399;
-          font-weight: 500;
+          .unit {
+            font-size: 16px;
+            font-weight: 400;
+            color: #909399;
+          }
         }
+      }
+    }
+
+    .current-time {
+      text-align: right;
+
+      .time-date {
+        font-size: 16px;
+        color: #303133;
+        margin-bottom: 4px;
+        font-weight: 500;
+      }
+
+      .time-clock {
+        font-size: 20px;
+        color: #606266;
+        font-weight: 500;
       }
     }
   }
@@ -338,15 +311,23 @@ onMounted(() => {
 // 响应式
 @media (max-width: 768px) {
   .dashboard {
-    .stat-card .stat-content {
-      .stat-icon {
-        width: 52px;
-        height: 52px;
-        font-size: 24px;
+    .dashboard-header {
+      flex-direction: column;
+      gap: 20px;
+      align-items: flex-start;
+
+      .ticket-stats {
+        gap: 40px;
+        width: 100%;
+
+        .stat-item .stat-value {
+          font-size: 28px;
+        }
       }
-      
-      .stat-info .stat-value {
-        font-size: 24px;
+
+      .current-time {
+        text-align: left;
+        width: 100%;
       }
     }
     
