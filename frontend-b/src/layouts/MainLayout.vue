@@ -32,6 +32,7 @@
           </template>
           <el-menu-item index="/exhibition/list">展览列表</el-menu-item>
           <el-menu-item index="/exhibition/create">创建展览</el-menu-item>
+          <el-menu-item index="/exhibition/carousel">轮播图管理</el-menu-item>
         </el-sub-menu>
 
         <el-sub-menu index="ticket">
@@ -39,18 +40,8 @@
             <el-icon><Ticket /></el-icon>
             <span>门票管理</span>
           </template>
-          <el-menu-item index="/ticket/inventory">库存管理</el-menu-item>
-          <el-menu-item index="/ticket/warning">库存预警</el-menu-item>
-        </el-sub-menu>
-
-        <el-sub-menu index="order">
-          <template #title>
-            <el-icon><List /></el-icon>
-            <span>订单管理</span>
-          </template>
-          <el-menu-item index="/order/ticket">门票订单</el-menu-item>
-          <el-menu-item index="/order/mall">商城订单</el-menu-item>
-          <el-menu-item index="/order/statistics">订单统计</el-menu-item>
+          <el-menu-item index="/ticket/inventory">核销记录</el-menu-item>
+          <el-menu-item index="/ticket/warning">销售记录</el-menu-item>
         </el-sub-menu>
 
         <el-sub-menu index="product">
@@ -141,15 +132,11 @@ const activeMenu = computed(() => {
   if (path.startsWith('/exhibition')) {
     if (path.includes('/create')) return '/exhibition/create'
     if (path.includes('/edit')) return '/exhibition/list'
+    if (path.includes('/carousel')) return '/exhibition/carousel'
     return '/exhibition/list'
   }
   if (path.startsWith('/ticket')) {
     return path.includes('/warning') ? '/ticket/warning' : '/ticket/inventory'
-  }
-  if (path.startsWith('/order')) {
-    if (path.includes('/mall')) return '/order/mall'
-    if (path.includes('/statistics')) return '/order/statistics'
-    return '/order/ticket'
   }
   if (path.startsWith('/product')) {
     if (path.includes('/create')) return '/product/create'

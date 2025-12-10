@@ -51,6 +51,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '编辑展览', icon: 'Picture' }
       },
       {
+        path: 'exhibition/carousel',
+        name: 'CarouselManagement',
+        component: () => import('@/views/exhibition/CarouselManagement.vue'),
+        meta: { title: '轮播图管理', icon: 'Picture' }
+      },
+      {
         path: 'ticket/inventory',
         name: 'TicketInventory',
         component: () => import('@/views/ticket/InventoryList.vue'),
@@ -61,24 +67,6 @@ const routes: RouteRecordRaw[] = [
         name: 'TicketWarning',
         component: () => import('@/views/ticket/WarningList.vue'),
         meta: { title: '库存预警', icon: 'Ticket' }
-      },
-      {
-        path: 'order/ticket',
-        name: 'TicketOrder',
-        component: () => import('@/views/order/TicketOrderList.vue'),
-        meta: { title: '门票订单', icon: 'List' }
-      },
-      {
-        path: 'order/mall',
-        name: 'MallOrder',
-        component: () => import('@/views/order/MallOrderList.vue'),
-        meta: { title: '商城订单', icon: 'List' }
-      },
-      {
-        path: 'order/statistics',
-        name: 'OrderStatistics',
-        component: () => import('@/views/order/OrderStatistics.vue'),
-        meta: { title: '订单统计', icon: 'List' }
       },
       {
         path: 'product/list',
