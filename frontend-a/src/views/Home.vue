@@ -6,17 +6,41 @@
             </el-icon>
         </div>
 
-        <!-- 当前展出区域 -->
-        <div 
-            class="current-exhibition"
-            :style="currentExhibition.coverImage ? { backgroundImage: `url(${currentExhibition.coverImage})` } : {}"
-        >
-            <div class="exhibition-content">
-                <h2 class="exhibition-title">当前展出</h2>
-                <p class="exhibition-name">{{ currentExhibition.name }}</p>
-                <button class="ticket-button" @click="toBuyTicket">前往购票</button>
+        <!-- 轮播图区域 -->
+        <div class="banner-section" v-if="banners.length > 0">
+            <el-carousel 
+                height="500px" 
+                :interval="5000" 
+                arrow="always"
+                :autoplay="true"
+            >
+                <el-carousel-item v-for="banner in banners" :key="banner.id">
+                    <div 
+                        class="banner-item"
+                        :style="{ backgroundImage: `url(${banner.imageUrl})` }"
+                        @click="handleBannerClick(banner)"
+                    >
+                        <div class="banner-overlay"></div>
+                        <div class="banner-content">
+                            <p class="banner-subtitle">{{ banner.title }}</p>
+                            <button class="banner-button">
+                                <span>立即预约</span>
+                                <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M5 12h14M12 5l7 7-7 7"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </el-carousel-item>
+            </el-carousel>
+        </div>
+        
+        <!-- 无轮播图时的占位 -->
+        <div class="banner-placeholder" v-else>
+            <div class="placeholder-content">
+                <h2>欢迎来到展览购票系统</h2>
+                <p>精彩展览即将呈现</p>
             </div>
-            <div class="overlay"></div>
         </div>
 
         <!-- 近期展览区域 -->
@@ -45,33 +69,52 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, onMounted } from 'vue';
+import { reactive, ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { Expand } from '@element-plus/icons-vue';
+import request from '@/utils/request';
 import { exhibitionApi, type Exhibition } from '@/api/exhibition';
 
 const router = useRouter();
 
-// 当前展出
-const currentExhibition = reactive<Partial<Exhibition>>({});
+// 轮播图数据
+interface Banner {
+    id: number;
+    title: string;
+    imageUrl: string;
+    linkType: number;
+    linkId?: number;
+    linkUrl?: string;
+}
+const banners = ref<Banner[]>([]);
+const currentBannerIndex = ref(0);
 
 // 近期展览列表
 const upcomingExhibitions = reactive<Exhibition[]>([]);
 
+// 处理轮播图点击
+const handleBannerClick = (banner: Banner) => {
+    if (banner.linkType === 1 && banner.linkId) {
+        // 跳转到展览详情
+        router.push(`/ticket/${banner.linkId}`);
+    } else if (banner.linkType === 2 && banner.linkUrl) {
+        // 外部链接
+        window.open(banner.linkUrl, '_blank');
+    }
+};
+
 // 获取数据
 onMounted(async () => {
+    // 获取轮播图
     try {
-        // 1. 获取当前展出
-        const current = await exhibitionApi.getCurrent();
-        if (current) {
-            Object.assign(currentExhibition, current);
-            // 后端可能返回 startDate/endDate，前端展示需要拼接
-            if (current.startDate && current.endDate) {
-                currentExhibition.date = `${current.startDate} - ${current.endDate}`;
-            }
-        }
-
-        // 2. 获取近期展览 (只显示前2个)
+        const data = await request.get('/banner/list');
+        banners.value = data || [];
+    } catch (e) {
+        console.error('获取轮播图失败', e);
+    }
+    
+    try {
+        // 获取近期展览 (只显示前2个)
         const list = await exhibitionApi.getList();
         if (list) {
             // 格式化日期，只取前2个展示在首页
@@ -85,14 +128,6 @@ onMounted(async () => {
         console.error('获取展览数据失败', error);
     }
 });
-
-const toBuyTicket = () => {
-    if (currentExhibition.id) {
-        router.push(`/ticket/${currentExhibition.id}`)
-    } else {
-        router.push('/exhibitions')
-    }
-}
 
 const goToExhibition = (exhibitionId: number) => {
     router.push(`/ticket/${exhibitionId}`)
@@ -120,73 +155,159 @@ const goToExhibition = (exhibitionId: number) => {
     border-radius: 4px;
 }
 
-/* 当前展出区域 */
-.current-exhibition {
-    flex: 2;
-    background-color: #e0e0e0;
+/* 轮播图区域 */
+.banner-section {
+    width: 100%;
+    background-color: #fff;
+    margin: 0;
+    padding: 0;
+    position: relative;
+}
+
+/* 隐藏 Element Plus 默认箭头，使用自定义样式 */
+.banner-section :deep(.el-carousel__arrow) {
+    background-color: rgba(255, 255, 255, 0.3);
+    backdrop-filter: blur(10px);
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    transition: all 0.3s ease;
+}
+
+.banner-section :deep(.el-carousel__arrow:hover) {
+    background-color: rgba(255, 255, 255, 0.5);
+    transform: scale(1.1);
+}
+
+.banner-section :deep(.el-carousel__arrow--left) {
+    left: 20px;
+}
+
+.banner-section :deep(.el-carousel__arrow--right) {
+    right: 20px;
+}
+
+.banner-item {
+    width: 100%;
+    height: 500px;
     background-size: cover;
     background-position: center;
     position: relative;
+    cursor: pointer;
     display: flex;
-    align-items: flex-end;
-    padding: 40px;
-    min-height: 60vh;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
 }
 
-.overlay {
+.banner-overlay {
     position: absolute;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    background: linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.6) 100%);
+    background: linear-gradient(
+        to bottom,
+        rgba(0, 0, 0, 0) 0%,
+        rgba(0, 0, 0, 0.15) 70%,
+        rgba(0, 0, 0, 0.4) 100%
+    );
     z-index: 1;
+    pointer-events: none;
 }
 
-.exhibition-content {
-    width: 100%;
-    position: relative;
+.banner-content {
+    position: absolute;
+    bottom: 60px;
+    left: 50%;
+    transform: translateX(-50%);
     z-index: 2;
-}
-
-.exhibition-title {
-    font-size: 32px;
-    font-weight: bold;
+    text-align: center;
     color: white;
-    margin-bottom: 16px;
-    text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    padding: 0 20px;
+    width: 100%;
+    max-width: 600px;
 }
 
-.exhibition-name {
-    font-size: 18px;
-    color: rgba(255, 255, 255, 0.9);
-    margin-bottom: 24px;
-    line-height: 1.5;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+.banner-subtitle {
+    font-size: 20px;
+    font-weight: 500;
+    margin: 0;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    letter-spacing: 0.5px;
 }
 
-.ticket-button {
-    background-color: white;
-    color: #333;
+.banner-button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
     border: none;
-    padding: 12px 32px;
-    border-radius: 8px;
+    padding: 14px 36px;
+    border-radius: 50px;
     font-size: 16px;
-    font-weight: bold;
+    font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
+    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
 }
 
-.ticket-button:hover {
-    background-color: #f0f0f0;
+.banner-button:hover {
     transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+}
+
+.banner-button:active {
+    transform: translateY(0);
+}
+
+.arrow-icon {
+    width: 18px;
+    height: 18px;
+    transition: transform 0.3s ease;
+}
+
+.banner-button:hover .arrow-icon {
+    transform: translateX(3px);
+}
+
+/* 无轮播图占位 */
+.banner-placeholder {
+    width: 100%;
+    height: 400px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.placeholder-content {
+    text-align: center;
+    color: white;
+}
+
+.placeholder-content h2 {
+    font-size: 36px;
+    font-weight: bold;
+    margin: 0 0 16px 0;
+}
+
+.placeholder-content p {
+    font-size: 18px;
+    margin: 0;
+    opacity: 0.9;
 }
 
 /* 近期展览区域 */
 .upcoming-exhibitions {
     flex: 1;
-    background-color: #f5f5f5;
-    padding: 30px 20px;
+    background-color: #f8f9fa;
+    padding: 40px 20px;
     min-height: 40vh;
 }
 
@@ -194,101 +315,225 @@ const goToExhibition = (exhibitionId: number) => {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
+    margin-bottom: 24px;
 }
 
 .section-title {
-    font-size: 24px;
-    font-weight: bold;
-    color: #333;
+    font-size: 26px;
+    font-weight: 700;
+    color: #1a1a1a;
     margin: 0;
+    position: relative;
+    padding-left: 16px;
+}
+
+.section-title::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 4px;
+    height: 24px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 2px;
 }
 
 .more-link {
-    color: #409eff;
+    color: #667eea;
     text-decoration: none;
-    font-size: 14px;
-    transition: color 0.3s ease;
+    font-size: 15px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    cursor: pointer;
 }
 
 .more-link:hover {
-    color: #66b1ff;
+    color: #764ba2;
+    transform: translateX(2px);
 }
 
 .exhibition-cards {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 16px;
-    justify-content: flex-start;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
 }
 
 .exhibition-card {
-    flex: 0 0 calc(50% - 8px);
     background-color: white;
-    border-radius: 8px;
+    border-radius: 12px;
     overflow: hidden;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.exhibition-card {
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    transition: all 0.3s ease;
     cursor: pointer;
 }
 
 .exhibition-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transform: translateY(-6px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
 
 .card-image {
     width: 100%;
-    height: 180px;
-    background-color: #d0d0d0;
-    margin-bottom: 12px;
+    height: 200px;
+    background-color: #e9ecef;
     background-size: cover;
     background-position: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.card-image::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(to bottom, transparent 60%, rgba(0, 0, 0, 0.1));
+}
+
+.exhibition-card:hover .card-image {
+    transform: scale(1.05);
 }
 
 .card-title {
-    font-size: 16px;
-    color: #333;
-    margin: 0 12px 8px 12px;
-    font-weight: 500;
+    font-size: 17px;
+    color: #1a1a1a;
+    margin: 16px 16px 8px 16px;
+    font-weight: 600;
+    line-height: 1.4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
 }
 
 .card-date {
     font-size: 14px;
-    color: #666;
-    margin: 0 12px 16px 12px;
+    color: #6c757d;
+    margin: 0 16px 16px 16px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.card-date::before {
+    content: '📅';
+    font-size: 14px;
 }
 
 /* 响应式设计 */
 @media (max-width: 768px) {
-    .current-exhibition {
-        min-height: 50vh;
-        padding: 30px 20px;
+    .banner-item,
+    .banner-placeholder {
+        height: 400px;
     }
 
-    .exhibition-title {
-        font-size: 28px;
+    .banner-content {
+        bottom: 50px;
     }
 
-    .exhibition-name {
-        font-size: 16px;
+    .banner-subtitle {
+        font-size: 18px;
     }
 
-    .exhibition-card {
-        flex: 0 0 calc(50% - 8px);
+    .banner-button {
+        padding: 12px 30px;
+        font-size: 15px;
+    }
+
+    .banner-section :deep(.el-carousel__arrow) {
+        width: 40px;
+        height: 40px;
+    }
+
+    .upcoming-exhibitions {
+        padding: 32px 16px;
+    }
+
+    .section-title {
+        font-size: 22px;
+    }
+
+    .exhibition-cards {
+        gap: 16px;
     }
 
     .card-image {
-        height: 150px;
+        height: 160px;
+    }
+
+    .card-title {
+        font-size: 16px;
+        margin: 14px 14px 8px 14px;
+    }
+
+    .card-date {
+        font-size: 13px;
+        margin: 0 14px 14px 14px;
     }
 }
 
 @media (max-width: 480px) {
-    .exhibition-card {
-        flex: 0 0 100%;
+    .banner-item,
+    .banner-placeholder {
+        height: 350px;
+    }
+
+    .banner-content {
+        bottom: 40px;
+    }
+
+    .banner-subtitle {
+        font-size: 16px;
+    }
+
+    .banner-button {
+        padding: 10px 24px;
+        font-size: 14px;
+    }
+
+    .arrow-icon {
+        width: 16px;
+        height: 16px;
+    }
+
+    .banner-section :deep(.el-carousel__arrow) {
+        width: 36px;
+        height: 36px;
+    }
+
+    .banner-section :deep(.el-carousel__arrow--left) {
+        left: 10px;
+    }
+
+    .banner-section :deep(.el-carousel__arrow--right) {
+        right: 10px;
+    }
+
+    .upcoming-exhibitions {
+        padding: 28px 16px;
+    }
+
+    .section-title {
+        font-size: 20px;
+        padding-left: 12px;
+    }
+
+    .section-title::before {
+        width: 3px;
+        height: 20px;
+    }
+
+    .exhibition-cards {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .card-image {
+        height: 180px;
     }
 }
 </style>

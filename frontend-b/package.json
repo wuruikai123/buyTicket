@@ -15,6 +15,7 @@
     "echarts": "^5.5.0",
     "element-plus": "^2.5.6",
     "pinia": "^2.1.7",
+    "qrcode-reader-vue3": "^3.1.4",
     "vue": "^3.4.21",
     "vue-echarts": "^6.6.9",
     "vue-router": "^4.3.0"

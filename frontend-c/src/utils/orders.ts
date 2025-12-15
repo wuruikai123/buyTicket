@@ -1,3 +1,5 @@
+import request from './request'
+
 export type OrderRecord = {
   id: number
   orderNo: string
@@ -5,48 +7,73 @@ export type OrderRecord = {
   validTime: string
   buyer: string
   verifyTime?: string
+  status: number
 }
 
-const mockOrders: OrderRecord[] = [
-  {
-    id: 1,
-    orderNo: '12345678900011',
-    exhibition: 'XXXXXXXXXXXXXXXX展',
-    validTime: '2025年6月9日 14:30-15:30',
-    buyer: '137777581964',
-    verifyTime: '2025年6月10日 14:59'
-  },
-  {
-    id: 2,
-    orderNo: '1234589663333',
-    exhibition: 'XXXXXXXXXXXXXXXX展',
-    validTime: '2025年6月9日 xx:xx-xx:xx',
-    buyer: 'xxxxxxxxxxx',
-    verifyTime: '2025年6月9日 xx:xx'
-  },
-  {
-    id: 3,
-    orderNo: '9999999999999',
-    exhibition: 'XXXXXXXXXXXXXXXX展',
-    validTime: '2025年6月9日 xx:xx-xx:xx',
-    buyer: 'xxxxxxxxxxx',
-    verifyTime: '2025年6月9日 xx:xx'
+/**
+ * 核销订单
+ * 逻辑：查询订单 → 验证状态 → 核销
+ * @param orderNo 订单号
+ * @returns 核销成功返回true，失败抛出错误
+ */
+export async function verifyOrder(orderNo: string): Promise<boolean> {
+  if (!orderNo || !orderNo.trim()) {
+    throw new Error('请输入订单号')
   }
-]
-
-export function queryOrder(orderNo: string) {
-  if (!orderNo) return null
-  return mockOrders.find((item) => item.orderNo === orderNo) || null
-}
-
-export function getTodayVerifiedCount() {
-  return 16
-}
-
-export function listRecordsByDate(year: number, month: number, day: number) {
-  return mockOrders.filter(() => {
-    // 模拟筛选，真实项目应调用后端接口
+  
+  try {
+    // 调用后端核销接口
+    // 后端会自动：1.查询订单 2.验证状态 3.更新为已使用
+    await request.post('/order/ticket/verify', { orderNo: orderNo.trim() })
     return true
-  })
+  } catch (error: any) {
+    console.error('核销失败:', error)
+    // 抛出错误，让调用方处理
+    throw error
+  }
+}
+
+// 获取今日核销数量
+export async function getTodayVerifiedCount(): Promise<number> {
+  try {
+    const data = await request.get<number>('/order/ticket/today-count')
+    return data || 0
+  } catch (error) {
+    console.error('获取今日核销数量失败:', error)
+    return 0
+  }
+}
+
+// 获取核销记录列表
+export async function listRecordsByDate(year: number, month: number, day: number): Promise<OrderRecord[]> {
+  try {
+    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+    const data = await request.get<any[]>(`/order/ticket/records?date=${dateStr}`)
+    
+    return (data || []).map(item => ({
+      id: item.id,
+      orderNo: item.orderNo,
+      exhibition: item.exhibitionName || (item.contactName ? `${item.contactName}的门票订单` : '门票订单'),
+      validTime: item.ticketDate && item.timeSlot ? `${item.ticketDate} ${item.timeSlot}` : formatDateTime(item.createTime),
+      buyer: item.contactPhone || item.contactName || '未知',
+      verifyTime: item.verifyTime ? formatDateTime(item.verifyTime) : undefined,
+      status: item.status
+    }))
+  } catch (error) {
+    console.error('获取核销记录失败:', error)
+    return []
+  }
+}
+
+// 格式化日期时间
+function formatDateTime(dateTime: string): string {
+  if (!dateTime) return ''
+  const date = new Date(dateTime)
+  const year = date.getFullYear()
+  const month = date.getMonth() + 1
+  const day = date.getDate()
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${year}年${month}月${day}日 ${hours}:${minutes}`
 }
 

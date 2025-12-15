@@ -75,6 +75,20 @@ services:
     networks:
       - buyticket-network
 
+  # 卖家端/核销端前端 (frontend-c)
+  frontend-seller:
+    build:
+      context: ./frontend-c
+      dockerfile: Dockerfile
+    container_name: buyticket-frontend-seller
+    restart: always
+    ports:
+      - "3002:80"
+    depends_on:
+      - backend
+    networks:
+      - buyticket-network
+
 networks:
   buyticket-network:
     driver: bridge

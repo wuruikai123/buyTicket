@@ -11,6 +11,7 @@
         type="text"
         required
         autocomplete="username"
+        :disabled="loading"
       />
 
       <label class="label" for="password">密码</label>
@@ -21,28 +22,63 @@
         type="password"
         required
         autocomplete="current-password"
+        :disabled="loading"
       />
 
-      <button class="primary" type="submit">登录</button>
+      <div v-if="errorMsg" class="error-msg">{{ errorMsg }}</div>
+
+      <button class="primary" type="submit" :disabled="loading">
+        {{ loading ? '登录中...' : '登录' }}
+      </button>
+      
+      <div class="tip">默认账号：seller / 密码：123456</div>
     </form>
   </div>
 </template>
 
 <script setup lang="ts">
-import { reactive } from 'vue'
+import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { setToken } from '@/router'
+import request from '@/utils/request'
 
 const router = useRouter()
 const form = reactive({
-  account: '',
-  password: ''
+  account: 'seller',
+  password: '123456'
 })
+const loading = ref(false)
+const errorMsg = ref('')
 
-function handleLogin() {
-  // 简易模拟登录，实际应调用后端接口
-  setToken('mock-token')
-  router.replace({ name: 'home' })
+async function handleLogin() {
+  if (!form.account || !form.password) {
+    errorMsg.value = '请输入账号和密码'
+    return
+  }
+  
+  loading.value = true
+  errorMsg.value = ''
+  
+  try {
+    // 调用后端登录接口
+    const res = await request.post('/auth/login', {
+      username: form.account,
+      password: form.password
+    })
+    
+    // 保存token
+    if (res.token) {
+      setToken(res.token)
+      router.replace({ name: 'home' })
+    } else {
+      errorMsg.value = '登录失败：未返回token'
+    }
+  } catch (error: any) {
+    console.error('登录失败:', error)
+    errorMsg.value = error.message || '登录失败，请检查账号密码'
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 
@@ -108,6 +144,28 @@ function handleLogin() {
 
 .primary:active {
   background: #cfcfcf;
+}
+
+.primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.error-msg {
+  padding: 12px;
+  background: #fee;
+  border: 1px solid #fcc;
+  border-radius: 8px;
+  color: #c33;
+  font-size: 16px;
+  text-align: center;
+}
+
+.tip {
+  margin-top: 20px;
+  text-align: center;
+  font-size: 14px;
+  color: #909399;
 }
 </style>
 

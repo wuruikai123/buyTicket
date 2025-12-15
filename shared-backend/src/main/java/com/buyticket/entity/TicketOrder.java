@@ -15,6 +15,8 @@ public class TicketOrder {
     @TableId(value = "id", type = IdType.AUTO)
     private Long id;
 
+    private String orderNo;
+
     private Long userId;
 
     private BigDecimal totalAmount;

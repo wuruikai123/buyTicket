@@ -26,6 +26,7 @@ docker-compose up --build -d
 |------|------|------|
 | 用户端 | http://localhost:3000 | 用户购票前端 |
 | 管理端 | http://localhost:3001 | 管理后台前端 |
+| 卖家端/核销端 | http://localhost:3002 | 订单核销前端 |
 | 后端API | http://localhost:8080 | Spring Boot API |
 | MySQL | localhost:3307 | 数据库 (外部访问端口) |
 
@@ -76,6 +77,7 @@ docker exec -it buyticket-backend sh
 | buyticket-backend | 自构建 | 8080 |
 | buyticket-frontend-user | nginx:alpine | 3000 |
 | buyticket-frontend-admin | nginx:alpine | 3001 |
+| buyticket-frontend-seller | nginx:alpine | 3002 |
 
 ## 数据持久化
 

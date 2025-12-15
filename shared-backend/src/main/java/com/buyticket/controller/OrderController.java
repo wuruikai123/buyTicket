@@ -123,11 +123,20 @@ public class OrderController {
     }
 
     /**
-     * 核销门票订单（待使用 -> 已使用）
+     * 通过订单号核销门票订单（待使用 -> 已使用）
      */
-    @PutMapping("/ticket/{id}/verify")
-    public JsonData verifyTicketOrder(@PathVariable Long id) {
-        TicketOrder order = ticketOrderService.getById(id);
+    @PostMapping("/ticket/verify")
+    public JsonData verifyTicketOrderByNo(@RequestBody java.util.Map<String, String> request) {
+        String orderNo = request.get("orderNo");
+        if (orderNo == null || orderNo.trim().isEmpty()) {
+            return JsonData.buildError("请输入订单号");
+        }
+        
+        com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<TicketOrder> queryWrapper = 
+            new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
+        queryWrapper.eq(TicketOrder::getOrderNo, orderNo.trim());
+        TicketOrder order = ticketOrderService.getOne(queryWrapper);
+        
         if (order == null) {
             return JsonData.buildError("订单不存在");
         }

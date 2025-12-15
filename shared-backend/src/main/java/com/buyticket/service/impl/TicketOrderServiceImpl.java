@@ -57,6 +57,11 @@ public class TicketOrderServiceImpl extends ServiceImpl<TicketOrderMapper, Ticke
         order.setStatus(0); // 待支付
         order.setContactName(request.getContactName());
         order.setContactPhone(request.getContactPhone());
+        
+        // 生成安全的订单号: T + 时间戳(13位) + 随机6位字母数字
+        String orderNo = generateSecureOrderNo();
+        order.setOrderNo(orderNo);
+        
         this.save(order);
 
         // 3. 创建订单详情
@@ -74,6 +79,30 @@ public class TicketOrderServiceImpl extends ServiceImpl<TicketOrderMapper, Ticke
 
         Map<String, Object> result = new HashMap<>();
         result.put("orderId", order.getId());
+        result.put("orderNo", orderNo);
         return result;
+    }
+    
+    /**
+     * 生成安全的订单号
+     * 格式：T + 时间戳(13位) + 随机6位字母数字
+     */
+    private String generateSecureOrderNo() {
+        long timestamp = System.currentTimeMillis();
+        String randomStr = generateRandomString(6);
+        return "T" + timestamp + randomStr;
+    }
+    
+    /**
+     * 生成随机字符串
+     */
+    private String generateRandomString(int length) {
+        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        StringBuilder sb = new StringBuilder();
+        java.util.Random random = new java.util.Random();
+        for (int i = 0; i < length; i++) {
+            sb.append(chars.charAt(random.nextInt(chars.length())));
+        }
+        return sb.toString();
     }
 }

@@ -50,13 +50,15 @@ CREATE TABLE IF NOT EXISTS `ticket_inventory` (
 -- 4. 订单表 (门票订单)
 CREATE TABLE IF NOT EXISTS `ticket_order` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `order_no` VARCHAR(32) NOT NULL UNIQUE COMMENT '订单号（唯一）',
     `user_id` BIGINT NOT NULL COMMENT '下单用户ID',
     `total_amount` DECIMAL(10, 2) NOT NULL COMMENT '订单总金额',
     `status` TINYINT DEFAULT 0 COMMENT '订单状态 (0:待支付, 1:待使用, 2:已使用, 3:已取消)',
     `contact_name` VARCHAR(50) DEFAULT NULL COMMENT '联系人姓名',
     `contact_phone` VARCHAR(20) DEFAULT NULL COMMENT '联系人电话',
     `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    PRIMARY KEY (`id`)
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_order_no` (`order_no`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='门票订单表';
 
 -- 5. 订单详情表 (门票)
@@ -173,3 +175,42 @@ INSERT IGNORE INTO cart_item (user_id, product_id, quantity) VALUES
 (1, 1, 1),
 (1, 3, 2);
 
+
+
+-- 用户地址表
+CREATE TABLE IF NOT EXISTS user_address (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  user_id BIGINT NOT NULL COMMENT '用户ID',
+  name VARCHAR(50) NOT NULL COMMENT '收货人姓名',
+  phone VARCHAR(20) NOT NULL COMMENT '手机号',
+  province VARCHAR(50) NOT NULL COMMENT '省份',
+  city VARCHAR(50) NOT NULL COMMENT '城市',
+  district VARCHAR(50) NOT NULL COMMENT '区县',
+  detail VARCHAR(200) NOT NULL COMMENT '详细地址',
+  is_default TINYINT(1) DEFAULT 0 COMMENT '是否默认地址',
+  create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+  update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_user_id (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户地址表';
+
+
+-- 轮播图表
+CREATE TABLE IF NOT EXISTS banner (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  title VARCHAR(100) NOT NULL COMMENT '标题',
+  image_url TEXT NOT NULL COMMENT '图片URL',
+  link_url VARCHAR(500) COMMENT '跳转链接',
+  link_type TINYINT DEFAULT 0 COMMENT '链接类型：0-无链接，1-展览详情，2-外部链接',
+  link_id BIGINT COMMENT '关联ID（展览ID等）',
+  sort_order INT DEFAULT 0 COMMENT '排序（数字越小越靠前）',
+  status TINYINT DEFAULT 1 COMMENT '状态：0-禁用，1-启用',
+  create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+  update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_status_sort (status, sort_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='轮播图表';
+
+-- 插入示例轮播图数据（使用展览的封面图片）
+INSERT INTO banner (title, image_url, link_type, link_id, sort_order, status) VALUES
+('2025年当代艺术双年展', '/images/exhibition_current.jpg', 1, 1, 1, 1),
+('印象派大师作品展', '/images/exhibition_1.jpg', 1, 2, 2, 1),
+('未来科技互动展', '/images/exhibition_2.jpg', 1, 3, 3, 1);

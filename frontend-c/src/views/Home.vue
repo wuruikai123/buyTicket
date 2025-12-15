@@ -29,10 +29,19 @@ import { clearToken } from '@/router'
 import { getTodayVerifiedCount } from '@/utils/orders'
 
 const router = useRouter()
-const todayCount = ref(getTodayVerifiedCount())
+const todayCount = ref(0)
 const currentDate = ref('')
 const currentTime = ref('')
 let timer: number | undefined
+
+// 加载今日核销数量
+async function loadTodayCount() {
+  try {
+    todayCount.value = await getTodayVerifiedCount()
+  } catch (error) {
+    console.error('获取今日核销数量失败:', error)
+  }
+}
 
 function formatDateTime() {
   const now = new Date()
@@ -50,15 +59,7 @@ function goRecords() {
 }
 
 function goScan() {
-  router.push({
-    name: 'scanResult',
-    query: {
-      status: 'success',
-      exhibition: 'XXXXXXXXXXXXXXXXXXXX展',
-      time: '14:30-15:30',
-      buyer: '购买账号13777581964'
-    }
-  })
+  router.push({ name: 'scanVerify' })
 }
 
 function goOrder() {
@@ -72,6 +73,7 @@ function logout() {
 
 onMounted(() => {
   formatDateTime()
+  loadTodayCount()
   timer = window.setInterval(formatDateTime, 1000)
 })
 

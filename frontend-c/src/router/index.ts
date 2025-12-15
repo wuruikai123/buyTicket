@@ -26,6 +26,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/ScanResult.vue')
   },
   {
+    path: '/scan-verify',
+    name: 'scanVerify',
+    meta: { requiresAuth: true },
+    component: () => import('@/views/ScanVerify.vue')
+  },
+  {
     path: '/records',
     name: 'records',
     meta: { requiresAuth: true },
