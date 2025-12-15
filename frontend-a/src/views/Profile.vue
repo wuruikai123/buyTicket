@@ -85,16 +85,20 @@
                     <div class="order-image" :style="{ backgroundImage: order.coverImage ? `url(${order.coverImage})` : '' }"></div>
                     <div class="order-content">
                         <h3 class="order-title">{{ order.title }}</h3>
+                        <div class="order-no-wrapper" v-if="order.orderNo">
+                            <span class="order-no">{{ order.orderNo }}</span>
+                            <button class="copy-btn" @click.stop="copyOrderNo(order.orderNo)">
+                                <el-icon><CopyDocument /></el-icon>
+                            </button>
+                        </div>
                         <p class="order-time">时间: {{ order.time }}</p>
                         <p class="order-price">¥{{ order.price }}元</p>
                     </div>
                     <div class="ticket-edge"></div>
                     <div class="order-action">
-                        <button 
-                            class="use-button" 
-                            :class="{ 'use-button-active': order.status === 1 }"
-                            @click.stop="handleOrderAction(order)"
-                        >{{ order.statusText }}</button>
+                        <div class="status-badge" :class="'status-' + order.status">
+                            {{ order.statusText }}
+                        </div>
                     </div>
                 </div>
             </template>
@@ -105,7 +109,8 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onBeforeMount, onActivated } from 'vue';
 import { useRouter } from 'vue-router';
-import { Location, EditPen } from '@element-plus/icons-vue';
+import { Location, EditPen, CopyDocument } from '@element-plus/icons-vue';
+import { ElMessage } from 'element-plus';
 import { userApi, type User } from '@/api/user';
 import { ticketApi } from '@/api/ticket';
 import { mallApi } from '@/api/mall';
@@ -113,6 +118,7 @@ import { mallApi } from '@/api/mall';
 // 定义订单数据类型
 interface Order {
     id: number;
+    orderNo?: string;
     title: string;
     time: string;
     price: number;
@@ -186,23 +192,7 @@ const goToOrderDetail = (order: Order) => {
     router.push(`/order/${order.id}?type=${type}`);
 };
 
-// 处理订单操作（核销）
-const handleOrderAction = async (order: Order) => {
-    // 只有待使用状态(status=1)的门票订单可以核销
-    if (isTicketsActive.value && order.status === 1) {
-        if (confirm('确认核销此门票？核销后将无法撤销。')) {
-            try {
-                await ticketApi.verifyOrder(order.id);
-                alert('核销成功！');
-                // 更新订单状态
-                order.status = 2;
-                order.statusText = '已使用';
-            } catch (e: any) {
-                alert(e.message || '核销失败');
-            }
-        }
-    }
-};
+// 移除了手动核销功能，订单只能在 B 端通过订单号核销
 
 // 加载用户数据和订单
 const loadUserData = async () => {
@@ -222,6 +212,7 @@ const loadUserData = async () => {
         if (tOrders) {
             ticketOrders.value = tOrders.map((o: any) => ({
                 id: o.id,
+                orderNo: o.orderNo,
                 title: o.exhibitionName || o.contactName ? `${o.contactName}的门票订单` : '门票订单',
                 time: o.createTime,
                 price: o.totalAmount,
@@ -288,6 +279,29 @@ const getMallStatusText = (status: number) => {
         4: '已取消'
     };
     return map[status] || '未知';
+};
+
+// 复制订单号
+const copyOrderNo = async (orderNo: string) => {
+    try {
+        await navigator.clipboard.writeText(orderNo);
+        ElMessage.success('订单号已复制');
+    } catch (e) {
+        // 降级方案
+        const textarea = document.createElement('textarea');
+        textarea.value = orderNo;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+            document.execCommand('copy');
+            ElMessage.success('订单号已复制');
+        } catch (err) {
+            ElMessage.error('复制失败，请手动复制');
+        }
+        document.body.removeChild(textarea);
+    }
 };
 </script>
 
@@ -533,7 +547,7 @@ const getMallStatusText = (status: number) => {
     font-size: 18px;
     font-weight: bold;
     color: #333;
-    margin: 0 0 12px 0;
+    margin: 0 0 8px 0;
     line-height: 1.4;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -541,6 +555,45 @@ const getMallStatusText = (status: number) => {
     -webkit-line-clamp: 2;
     line-clamp: 2;
     -webkit-box-orient: vertical;
+}
+
+.order-no-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 8px 0;
+}
+
+.order-no {
+    font-size: 12px;
+    color: #409eff;
+    font-family: 'Courier New', monospace;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    margin: 0;
+}
+
+.copy-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 6px;
+    background-color: #ecf5ff;
+    border: 1px solid #b3d8ff;
+    border-radius: 4px;
+    color: #409eff;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 12px;
+}
+
+.copy-btn:hover {
+    background-color: #409eff;
+    color: white;
+}
+
+.copy-btn .el-icon {
+    font-size: 12px;
 }
 
 .order-time {
@@ -569,36 +622,32 @@ const getMallStatusText = (status: number) => {
     box-sizing: border-box;
 }
 
-.use-button {
-    padding: 10px 16px;
-    background-color: #f5f5f5;
-    color: #666;
-    border: 1px solid #e0e0e0;
+.status-badge {
+    padding: 8px 16px;
     border-radius: 6px;
     font-size: 14px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    width: 80%;
-    height: 80px;
-    max-width: 100%;
-    box-sizing: border-box;
+    font-weight: 500;
+    text-align: center;
 }
 
-.use-button:hover {
-    background-color: #e8e8e8;
-    border-color: #d0d0d0;
+.status-0 {
+    background-color: #f0f0f0;
+    color: #909399;
 }
 
-/* 待使用状态 - 蓝色按钮 */
-.use-button-active {
-    background-color: #409eff !important;
-    color: white !important;
-    border-color: #409eff !important;
+.status-1 {
+    background-color: #e1f3d8;
+    color: #67c23a;
 }
 
-.use-button-active:hover {
-    background-color: #66b1ff !important;
-    border-color: #66b1ff !important;
+.status-2 {
+    background-color: #e6f7ff;
+    color: #409eff;
+}
+
+.status-3 {
+    background-color: #fef0f0;
+    color: #f56c6c;
 }
 
 /* 票根边缘效果 - 虚线分隔 */
@@ -711,8 +760,8 @@ const getMallStatusText = (status: number) => {
         padding: 12px 6px;
     }
 
-    .use-button {
-        padding: 8px 10px;
+    .status-badge {
+        padding: 6px 12px;
         font-size: 12px;
     }
 
@@ -754,8 +803,8 @@ const getMallStatusText = (status: number) => {
         padding: 10px 4px;
     }
 
-    .use-button {
-        padding: 6px 8px;
+    .status-badge {
+        padding: 4px 8px;
         font-size: 11px;
     }
 

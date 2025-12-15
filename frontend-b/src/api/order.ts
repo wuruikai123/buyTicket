@@ -1,7 +1,7 @@
 import request from '@/utils/request'
 
 export const orderApi = {
-  // 门票订单（baseURL已经是/api/v1/admin，所以路径是/order/ticket/...）
+  // 门票订单
   getTicketOrderList(params: any) {
     return request.get('/order/ticket/list', { params })
   },

@@ -222,7 +222,23 @@ const orderTypeOption = computed<EChartsOption>(() => ({
 const loadData = async () => {
   try {
     const data: any = await statisticsApi.getDashboardData()
-    dashboardData.value = data
+    // 后端返回的数据结构，需要适配前端
+    dashboardData.value = {
+      todayTicketSales: data.todayTicketOrders || 0,
+      todayTicketVerified: 0, // 后端暂未提供核销数据
+      todayUsers: data.todayUsers || 0,
+      todayOrders: data.todayOrders || 0,
+      todaySales: 0,
+      todayVisits: 0,
+      userGrowth: [],
+      orderTrend: [],
+      salesTrend: [],
+      orderTypeRatio: [
+        { name: '门票订单', value: data.totalTicketOrders || 0 },
+        { name: '商城订单', value: data.totalMallOrders || 0 }
+      ],
+      orderStatusRatio: []
+    }
   } catch (error) {
     console.error('加载数据失败', error)
   }

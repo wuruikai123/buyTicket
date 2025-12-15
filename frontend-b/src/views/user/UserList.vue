@@ -246,12 +246,22 @@ const loadTicketOrders = async (userId: number) => {
 
 const handleView = async (row: any) => {
   try {
-    const data = await userApi.getDetail(row.id)
-    currentUser.value = data
+    const data: any = await userApi.getDetail(row.id)
+    console.log('用户详情数据:', data)
+    
+    // 后端返回的数据包含 user, ticketOrders, mallOrders
+    if (data.user) {
+      currentUser.value = data.user
+      ticketOrders.value = data.ticketOrders || []
+      console.log('门票订单数量:', ticketOrders.value.length)
+    } else {
+      // 兼容旧格式
+      currentUser.value = data
+      await loadTicketOrders(row.id)
+    }
     detailDialogVisible.value = true
-    // 加载用户的门票订单
-    await loadTicketOrders(row.id)
   } catch (error) {
+    console.error('获取用户详情失败:', error)
     ElMessage.error('获取用户详情失败')
   }
 }
