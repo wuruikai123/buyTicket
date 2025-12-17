@@ -42,9 +42,10 @@
                             'other-month': date.otherMonth,
                             'selected': date.selected,
                             'today': date.isToday,
-                            'empty': date.day === 0
+                'empty': date.day === 0,
+                'disabled': date.disabled
                         }"
-                        @click="date.day !== 0 ? selectDate(date) : null"
+            @click="date.day !== 0 ? selectDate(date) : null"
                     >
                         {{ date.day !== 0 ? date.day : '' }}
                     </div>
@@ -89,6 +90,7 @@ interface CalendarDate {
     otherMonth: boolean;
     selected: boolean;
     isToday: boolean;
+    disabled: boolean;
 }
 
 const router = useRouter();
@@ -123,6 +125,7 @@ const calendarDates = computed(() => {
     const dates: CalendarDate[] = [];
     const year = selectedYear.value;
     const month = selectedMonth.value - 1;
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
@@ -135,7 +138,8 @@ const calendarDates = computed(() => {
             date: new Date(),
             otherMonth: true,
             selected: false,
-            isToday: false
+            isToday: false,
+            disabled: true
         });
     }
     
@@ -149,6 +153,7 @@ const calendarDates = computed(() => {
         const isToday = date.getFullYear() === today.getFullYear() &&
             date.getMonth() === today.getMonth() &&
             date.getDate() === today.getDate();
+        const isPast = date < todayStart;
         
         dates.push({
             key: `${year}-${month + 1}-${day}`,
@@ -156,7 +161,8 @@ const calendarDates = computed(() => {
             date,
             otherMonth: false,
             selected: isSelected || false,
-            isToday
+            isToday,
+            disabled: isPast
         });
     }
     return dates;
@@ -164,25 +170,46 @@ const calendarDates = computed(() => {
 
 // 改变年份
 const changeYear = (delta: number) => {
-    selectedYear.value += delta;
+    const minYear = now.getFullYear();
+    const minMonth = now.getMonth() + 1;
+    const newYear = selectedYear.value + delta;
+    if (newYear < minYear) return;
+    selectedYear.value = newYear;
+    if (selectedYear.value === minYear && selectedMonth.value < minMonth) {
+        selectedMonth.value = minMonth;
+    }
 };
 
 // 改变月份
 const changeMonth = (delta: number) => {
-    selectedMonth.value += delta;
-    if (selectedMonth.value < 1) {
-        selectedMonth.value = 12;
-        selectedYear.value -= 1;
+    const minYear = now.getFullYear();
+    const minMonth = now.getMonth() + 1;
+
+    let newYear = selectedYear.value;
+    let newMonth = selectedMonth.value + delta;
+
+    if (newMonth < 1) {
+        newMonth = 12;
+        newYear -= 1;
     }
-    if (selectedMonth.value > 12) {
-        selectedMonth.value = 1;
-        selectedYear.value += 1;
+    if (newMonth > 12) {
+        newMonth = 1;
+        newYear += 1;
     }
+
+    if (newYear < minYear || (newYear === minYear && newMonth < minMonth)) {
+        selectedYear.value = minYear;
+        selectedMonth.value = minMonth;
+        return;
+    }
+
+    selectedYear.value = newYear;
+    selectedMonth.value = newMonth;
 };
 
 // 选择日期
 const selectDate = (dateInfo: CalendarDate) => {
-    if (!dateInfo.otherMonth) {
+    if (!dateInfo.otherMonth && !dateInfo.disabled) {
         selectedDate.value = dateInfo.date;
         updateRemainingTickets();
     }
@@ -444,6 +471,19 @@ onMounted(() => {
 
 .calendar-date.empty:hover {
     background-color: transparent;
+}
+
+.calendar-date.disabled {
+    color: #c0c4cc;
+    border-style: dashed;
+    text-decoration: line-through;
+    cursor: not-allowed;
+    background-color: #f8f8f8;
+}
+
+.calendar-date.disabled:hover {
+    background-color: #f8f8f8;
+    border-color: #e0e0e0;
 }
 
 .calendar-date.selected {

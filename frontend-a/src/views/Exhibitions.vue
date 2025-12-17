@@ -31,7 +31,7 @@
         <!-- 展览列表 -->
         <div class="exhibition-list">
             <div 
-                v-for="exhibition in (exhibitions as unknown as Exhibition[])" 
+                v-for="exhibition in exhibitions" 
                 :key="exhibition.id" 
                 class="exhibition-card"
             >
@@ -60,13 +60,15 @@ import { ref, computed, watch, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { exhibitionApi, type Exhibition } from '@/api/exhibition';
 
+type ExhibitionWithRange = Exhibition & { dateRange: string };
+
 // 当前激活的标签页
 const activeTab = ref<'ongoing' | 'upcoming'>('ongoing');
 
 const router = useRouter();
 
 // 展览列表数据
-const exhibitions = ref<any[]>([]);
+const exhibitions = ref<ExhibitionWithRange[]>([]);
 
 // 切换标签页
 const switchTab = (tab: 'ongoing' | 'upcoming') => {
@@ -260,16 +262,21 @@ watch(activeTab, () => {
     align-items: center;
     gap: 8px;
     margin-top: 4px;
+    flex-wrap: nowrap;
 }
 
 .time-label {
     font-size: 12px;
     color: #999;
+    white-space: nowrap;
 }
 
 .time-value {
     font-size: 14px;
     color: #666;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .exhibition-action {
