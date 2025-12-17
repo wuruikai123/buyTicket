@@ -31,7 +31,7 @@
         {{ loading ? '登录中...' : '登录' }}
       </button>
       
-      <div class="tip">默认账号：seller / 密码：123456</div>
+      <div class="tip">默认账号：admin / 密码：123456</div>
     </form>
   </div>
 </template>
@@ -44,7 +44,7 @@ import request from '@/utils/request'
 
 const router = useRouter()
 const form = reactive({
-  account: 'seller',
+  account: 'admin',
   password: '123456'
 })
 const loading = ref(false)
@@ -168,4 +168,5 @@ async function handleLogin() {
   color: #909399;
 }
 </style>
+
 

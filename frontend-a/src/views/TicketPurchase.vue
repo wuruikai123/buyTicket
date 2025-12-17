@@ -9,11 +9,11 @@
 
         <!-- 展览信息区域（左右布局） -->
         <div class="exhibition-header">
-            <div 
-                class="exhibition-image" 
-                :style="{ backgroundImage: exhibition.coverImage ? `url(${exhibition.coverImage})` : '' }"
-            >
-                <span v-if="!exhibition.coverImage" class="no-image">暂无图片</span>
+            <div class="exhibition-image">
+                <template v-if="exhibition.coverImage">
+                    <img class="exhibition-img" :src="exhibition.coverImage" alt="展览封面" />
+                </template>
+                <span v-else class="no-image">暂无图片</span>
             </div>
             <div class="exhibition-basic-info">
                 <h2 class="exhibition-name">{{ exhibition.name }}</h2>
@@ -184,15 +184,20 @@ onMounted(() => {
 
 .exhibition-image {
     width: 120px;
-    height: 120px;
-    background-color: #d0d0d0;
-    background-size: cover;
-    background-position: center;
     border-radius: 8px;
     flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
+    overflow: hidden;
+}
+
+.exhibition-img {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 8px;
+    object-fit: contain;
 }
 
 .exhibition-image .no-image {

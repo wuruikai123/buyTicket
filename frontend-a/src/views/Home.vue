@@ -107,8 +107,8 @@ const handleBannerClick = (banner: Banner) => {
 onMounted(async () => {
     // 获取轮播图
     try {
-        const data = await request.get('/banner/list');
-        banners.value = data || [];
+        const data: any = await request.get('/banner/list');
+        banners.value = (data?.data ?? data ?? []) as Banner[];
     } catch (e) {
         console.error('获取轮播图失败', e);
     }
@@ -426,13 +426,21 @@ const goToExhibition = (exhibitionId: number) => {
 
 /* 响应式设计 */
 @media (max-width: 768px) {
+    /* 压缩轮播高度，减少与下一块的留白 */
+    .banner-section {
+        margin-bottom: 8px;
+    }
+    .banner-section :deep(.el-carousel__container) {
+        height: 360px;
+    }
     .banner-item,
     .banner-placeholder {
-        height: 400px;
+        height: 360px;
     }
 
     .banner-content {
-        bottom: 50px;
+        bottom: 32px;
+        gap: 12px;
     }
 
     .banner-subtitle {
@@ -440,7 +448,7 @@ const goToExhibition = (exhibitionId: number) => {
     }
 
     .banner-button {
-        padding: 12px 30px;
+        padding: 12px 26px;
         font-size: 15px;
     }
 
@@ -450,7 +458,7 @@ const goToExhibition = (exhibitionId: number) => {
     }
 
     .upcoming-exhibitions {
-        padding: 32px 16px;
+        padding: 20px 16px;
     }
 
     .section-title {
@@ -477,13 +485,17 @@ const goToExhibition = (exhibitionId: number) => {
 }
 
 @media (max-width: 480px) {
+    /* 更小屏幕进一步压缩轮播高度与内边距 */
+    .banner-section :deep(.el-carousel__container) {
+        height: 460px;
+    }
     .banner-item,
     .banner-placeholder {
-        height: 350px;
+        height: 460px;
     }
 
     .banner-content {
-        bottom: 40px;
+        bottom: 28px;
     }
 
     .banner-subtitle {
@@ -491,7 +503,7 @@ const goToExhibition = (exhibitionId: number) => {
     }
 
     .banner-button {
-        padding: 10px 24px;
+        padding: 10px 22px;
         font-size: 14px;
     }
 
