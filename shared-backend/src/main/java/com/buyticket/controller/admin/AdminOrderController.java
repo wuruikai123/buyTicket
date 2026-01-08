@@ -47,7 +47,7 @@ public class AdminOrderController {
         return JsonData.buildSuccess(ticketOrderService.getById(id));
     }
 
-    @PutMapping("/ticket/{id}/cancel")
+    @PostMapping("/ticket/{id}/cancel")
     public JsonData cancelTicketOrder(@PathVariable Long id) {
         TicketOrder order = new TicketOrder();
         order.setId(id);
@@ -56,7 +56,7 @@ public class AdminOrderController {
         return JsonData.buildSuccess("订单取消成功");
     }
     
-    @PutMapping("/ticket/{id}/verify")
+    @PostMapping("/ticket/{id}/verify")
     public JsonData verifyTicketOrder(@PathVariable Long id) {
         TicketOrder order = new TicketOrder();
         order.setId(id);
@@ -170,7 +170,7 @@ public class AdminOrderController {
         return JsonData.buildSuccess(mallOrderService.getById(id));
     }
 
-    @PutMapping("/mall/{id}/cancel")
+    @PostMapping("/mall/{id}/cancel")
     public JsonData cancelMallOrder(@PathVariable Long id) {
         MallOrder order = new MallOrder();
         order.setId(id);
@@ -179,7 +179,7 @@ public class AdminOrderController {
         return JsonData.buildSuccess("订单取消成功");
     }
     
-    @PutMapping("/mall/{id}/ship")
+    @PostMapping("/mall/{id}/ship")
     public JsonData shipMallOrder(@PathVariable Long id, @RequestBody java.util.Map<String, String> request) {
         MallOrder order = mallOrderService.getById(id);
         if (order == null) {
@@ -194,7 +194,7 @@ public class AdminOrderController {
         return JsonData.buildSuccess("发货成功");
     }
     
-    @PutMapping("/mall/{id}/complete")
+    @PostMapping("/mall/{id}/complete")
     public JsonData completeMallOrder(@PathVariable Long id) {
         MallOrder order = new MallOrder();
         order.setId(id);

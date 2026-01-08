@@ -146,7 +146,7 @@ const handleVerifyByOrderNo = async () => {
       type: 'warning'
     })
     // 使用 admin 端点
-    await request.post('/order/ticket/verify', { orderNo: verifyOrderNo.value.trim() })
+    await request.post('/api/v1/admin/order/ticket/verify', { orderNo: verifyOrderNo.value.trim() })
     ElMessage.success('核销成功')
     verifyOrderNo.value = ''
     fetchData()

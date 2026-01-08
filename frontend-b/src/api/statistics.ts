@@ -2,7 +2,7 @@ import request from '@/utils/request'
 
 export const statisticsApi = {
   getDashboardData() {
-    return request.get('/stats/dashboard')
+    return request.get('/api/v1/admin/stats/dashboard')
   },
 
   getSalesReport(params: any) {

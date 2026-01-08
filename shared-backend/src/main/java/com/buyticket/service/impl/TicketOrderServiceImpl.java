@@ -105,4 +105,11 @@ public class TicketOrderServiceImpl extends ServiceImpl<TicketOrderMapper, Ticke
         }
         return sb.toString();
     }
+    
+    @Override
+    public TicketOrder getByOrderNo(String orderNo) {
+        LambdaQueryWrapper<TicketOrder> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(TicketOrder::getOrderNo, orderNo);
+        return this.getOne(queryWrapper);
+    }
 }

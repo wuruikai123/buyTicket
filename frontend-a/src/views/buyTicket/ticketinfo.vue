@@ -195,19 +195,15 @@ const handlePayment = async () => {
         });
 
         if (createRes && createRes.orderId) {
-            // 3. 模拟支付（写死支付成功）
-            await ticketApi.pay({
-                orderId: createRes.orderId,
-                type: 'ticket',
-                password: '123456' // 默认支付密码
+            // 3. 跳转到支付页面
+            router.push({
+                path: `/payment/${createRes.orderId}`,
+                query: { type: 'ticket' }
             });
-            
-            alert('支付成功！');
-            router.push('/profile');
         }
     } catch (e: any) {
         console.error(e);
-        alert(e.message || '支付失败，请重试');
+        alert(e.message || '创建订单失败，请重试');
     }
 };
 

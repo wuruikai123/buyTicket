@@ -36,7 +36,7 @@ export async function verifyOrder(orderNo: string): Promise<boolean> {
 // 获取今日核销数量
 export async function getTodayVerifiedCount(): Promise<number> {
   try {
-    const data = await request.get<number>('/order/ticket/today-count')
+    const data: any = await request.get('/order/ticket/today-count')
     return data || 0
   } catch (error) {
     console.error('获取今日核销数量失败:', error)
@@ -48,9 +48,9 @@ export async function getTodayVerifiedCount(): Promise<number> {
 export async function listRecordsByDate(year: number, month: number, day: number): Promise<OrderRecord[]> {
   try {
     const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-    const data = await request.get<any[]>(`/order/ticket/records?date=${dateStr}`)
+    const data: any = await request.get(`/order/ticket/records?date=${dateStr}`)
     
-    return (data || []).map(item => ({
+    return (data || []).map((item: any) => ({
       id: item.id,
       orderNo: item.orderNo,
       exhibition: item.exhibitionName || (item.contactName ? `${item.contactName}的门票订单` : '门票订单'),
