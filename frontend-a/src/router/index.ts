@@ -74,6 +74,16 @@ const router = createRouter({
           name: 'OrderDetail',
           component: () => import('@/views/OrderDetail.vue'),
         },
+        {
+          path: 'payment/:orderId',
+          name: 'Payment',
+          component: () => import('@/views/Payment.vue'),
+        },
+        {
+          path: 'order-success',
+          name: 'OrderSuccess',
+          component: () => import('@/views/OrderSuccess.vue'),
+        },
       ],
     },
     // 管理后台路由

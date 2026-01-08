@@ -178,20 +178,18 @@ const handleSubmit = async () => {
     const res = await mallApi.createOrder(orderData)
     
     if (res && res.orderId) {
-      // 模拟支付
-      await mallApi.pay({
-        orderId: res.orderId,
-        type: 'mall',
-        password: '123456'
-      })
-      
       // 清除购物车中已购买的商品
       const itemIds = checkoutItems.value.map(item => item.id).join(',')
       await mallApi.removeCartItem(itemIds)
       
-      alert('支付成功！')
+      // 清除结算缓存
       sessionStorage.removeItem('checkoutItems')
-      router.push('/profile')
+      
+      // 跳转到支付页面
+      router.push({
+        path: `/payment/${res.orderId}`,
+        query: { type: 'mall' }
+      })
     }
   } catch (e: any) {
     console.error('提交订单失败', e)

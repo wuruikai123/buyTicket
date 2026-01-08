@@ -4,7 +4,7 @@ import { useAuthStore } from '@/stores/auth'
 import router from '@/router'
 
 const request = axios.create({
-  baseURL: '/api/v1/admin',
+  baseURL: '',  // 不设置 baseURL，因为 API 路径已经是完整的
   timeout: 10000
 })
 
