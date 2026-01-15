@@ -8,11 +8,13 @@ import com.buyticket.entity.TicketOrder;
 import com.buyticket.service.MallOrderService;
 import com.buyticket.service.TicketOrderService;
 import com.buyticket.utils.JsonData;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/order")
 public class OrderController {
@@ -180,5 +182,41 @@ public class OrderController {
         order.setStatus(4); // 已取消
         mallOrderService.updateById(order);
         return JsonData.buildSuccess("取消成功");
+    }
+
+    /**
+     * 根据订单号获取门票订单详情
+     */
+    @GetMapping("/ticket/by-order-no/{orderNo}")
+    public JsonData getTicketOrderByOrderNo(@PathVariable String orderNo) {
+        com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<TicketOrder> queryWrapper = 
+            new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
+        queryWrapper.eq(TicketOrder::getOrderNo, orderNo);
+        TicketOrder order = ticketOrderService.getOne(queryWrapper);
+        if (order == null) {
+            return JsonData.buildError("订单不存在");
+        }
+        return JsonData.buildSuccess(order);
+    }
+
+    /**
+     * 根据订单号获取商城订单详情
+     */
+    @GetMapping("/mall/by-order-no/{orderNo}")
+    public JsonData getMallOrderByOrderNo(@PathVariable String orderNo) {
+        try {
+            com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<MallOrder> queryWrapper = 
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
+            queryWrapper.eq(MallOrder::getOrderNo, orderNo);
+            MallOrder order = mallOrderService.getOne(queryWrapper);
+            if (order == null) {
+                return JsonData.buildError("订单不存在");
+            }
+            return JsonData.buildSuccess(order);
+        } catch (Exception e) {
+            log.error("查询商城订单失败: orderNo={}", orderNo, e);
+            // 如果查询失败（可能是 order_no 列不存在），返回错误信息
+            return JsonData.buildError("查询订单失败，请确保数据库已执行迁移脚本");
+        }
     }
 }

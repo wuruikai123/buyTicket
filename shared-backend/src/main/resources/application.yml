@@ -1,0 +1,64 @@
+spring:
+  profiles:
+    active: dev  # 默认使用开发环境，部署时改为 prod
+
+---
+# 开发环境配置
+spring:
+  config:
+    activate:
+      on-profile: dev
+  datasource:
+    url: jdbc:mysql://localhost:3306/buyticket?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+alipay:
+  app-id: 9021000158671506
+  merchant-private-key: MIIEwAIBADANBgkqhkiG9w0BAQEFAASCBKowggSmAgEAAoIBAQCo4Nm2s5DrnO70IyKKKJxlgdf5yp4TWxL3Pn9Ghv8vXF7flcO/lK+L83lD8spw2Tn2Tu+cQnWSdgV29NUoNeuhvUvfDYR6P0h/DIkBaCXBoEKo3hYA8PycoigVoBTvo/fv+PXOnyPJi1xGthtS1yGUlnrbP0rAMjVGcs4hSg+zMUnd/qKHQG8ZQCSvM9fl1apSgUgqphSSkNF4VILNtzOydfqZNIX+shSdRcS+xX5xnhIv3+m8lyZ7c7N+Rr1WXo3M2Thuxe3YhhSqJWp9gnFjyaWEOfZ3LJByp/ul4oOswy7AQjRXyu489hEl0x5peVLiqNpsQivzW536qtiuRJwPAgMBAAECggEBAI0HIKjTMb2g02frg2eO3HRkR0EhdHrDfoYcmdsC103svInInqx5dVPRIj6dHXO55A6OAskiMt75Ujzx3qPyy3DJDPgbaLtR56+5fxw+pfEZbTFqLUPh+4KuY/0TLwikjGPJKzS+bvtbNtcSMqUuZKuaMsSvCTSReS34p6zjFVNVBIDQYmFZaPY4A5V/2WuhUPfXizggCoBAC2UY+D6aI6/Gu5LgRI2a+cNJ05UaHl+a3LEqGGsYXoRY0yXO7ZYpZsp5nJqfNxGnTQ4bMfX1MZB0cn/1GFQiiefRQdRsHy03Vs0ANEJKnSVb7hek8yw0IBMJqnFW9AESSlxF/P2gb+ECgYEA4Lez+2wjG3AG2u2UlsavIoz0fSjZdn1MKyuLvQozzjQjZ/rFAE3X1rcBGR+olswapLm1nLN1/jQhJBYBEIes3jni/gTBAjUueRNJ04Z4V2pXQKFgyTqQtpsL1xGL8YHCwHLBSnQ8gqOuoVLOIeQiSfM5ClC6kvdT/VJ2Age1Dp8CgYEAwGMxxF2R8nUr8G48vqDtSH4RvA3nV6RPo5FLltN54YGV5n6g9SwpJqyLQrQVfktdnzP22W7Hf8FvJIREZ9JjslDSzez1vjzqTGezqCK/BNtRg/eC3Bftf4aNGMK7E1tZ/1IRoemWGoIT7M/DgD7vpkGLNRP6arfinwDTkkVMLJECgYEAtEvwBhu/FzaM6X6RJ2AGCGybhQgPYngpcsGffm7/HcTLW5PiF9pdAJMYOHYkJ8le3yd5RV7fnrNom7Fj7UVON4auTyy1RvYwcUg+hY5wY4KYuuw/4XQxw7EmkMotQ/nerdXkq74TBqYZaKotZRfLQxX4gARBjcUPCELvF7XjWPUCgYEAnT+2ytjsVO/+xRtlnS6uI+Wfm0UGBXWw/nHhBdu+sFqZ6ncwGpVI4WqAvTmyo7L4SAtSRfCtMbgqnv9ZZj7p7DLxyw1W43Ko02Cj0NbtqQuWejYRiNIp9mVE6Ksp+61cRzuOW/gwD2So4pQDKMzIVu0V2oGE2juJCQvE4ravh3ECgYEAyjSotxY3oK6n085IhnooIr4iTY59n8pQkw1oef44AWX5Whbq1+4SotARqSBN1hWQ26nRrdGTurGKHSUKh21hHeRGCR1hFWdQ+yFXQdUqZxT8BWMU5jDo4FF3OA0fEt8BvvtEiE1Z2PK0GG+sX3FL0BImXOjUZcrR6nfiNbO5Fqg=
+  alipay-public-key: MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuTYl9i2N+ZH3eaHlqfdckMi/tDDnv77ztcnquz0bv7mf8mme58CAkvzF9tzM4eesE2yaE9tpRUvQ2mnvheacTsg0HTGPFq16BTRSQKfOkPEwDz1ffqq285FzuYvKFzIey1sXDTlpgkhM9KYKfi6AcE0sfFw6sCTCI7rTn8eaFeHdxRPPSfXoS75ckhOhGqQGvKzziQecGtTPdZOvN8p47Y+mX6naNqggrq25o0fyU9VrLkQkvErKgLv8d6n0+2Yb/Aa9MwtXAY0e9NVJXPkYRkmUHVC8gB+lp+7u3eRRqUaABfo1JZwGtZKicPLgMBNaLrgcsAFLZlQKyyDVInSEywIDAQAB
+  # 开发环境：使用 natapp 内网穿透地址
+  notify-url: http://p22294f8.natappfree.cc/api/v1/payment/alipay/notify
+  return-url: http://localhost:5173/order-success
+  gateway-url: https://openapi-sandbox.dl.alipaydev.com/gateway.do
+  sign-type: RSA2
+  charset: utf-8
+
+logging:
+  level:
+    root: INFO
+    com.buyticket: DEBUG
+    com.buyticket.controller.PaymentController: DEBUG
+
+---
+# 生产环境配置
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    url: jdbc:mysql://localhost:3306/buyticket?useUnicode=true&characterEncoding=utf8&useSSL=true&serverTimezone=Asia/Shanghai
+    username: buyticket
+    password: ${DB_PASSWORD:your_password}  # 使用环境变量或默认值
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+alipay:
+  # 生产环境：使用真实的支付宝配置
+  app-id: ${ALIPAY_APP_ID:your_prod_app_id}
+  merchant-private-key: ${ALIPAY_MERCHANT_PRIVATE_KEY:your_prod_private_key}
+  alipay-public-key: ${ALIPAY_PUBLIC_KEY:your_prod_public_key}
+  notify-url: https://www.yourdomain.com/api/v1/payment/alipay/notify
+  return-url: https://www.yourdomain.com/order-success
+  gateway-url: https://openapi.alipay.com/gateway.do
+  sign-type: RSA2
+  charset: utf-8
+
+logging:
+  level:
+    root: INFO
+    com.buyticket: INFO
+  file:
+    name: /var/log/buyticket/application.log
+    max-size: 100MB
+    max-history: 30

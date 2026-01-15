@@ -53,5 +53,10 @@ export const ticketApi = {
     // 核销订单（将待使用变为已使用）
     verifyOrder(id: number) {
         return request.put(`/order/ticket/${id}/verify`)
+    },
+
+    // 根据订单号获取订单详情
+    getOrderByOrderNo(orderNo: string) {
+        return request.get<any, any>(`/order/ticket/by-order-no/${orderNo}`)
     }
 }

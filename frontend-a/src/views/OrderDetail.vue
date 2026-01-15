@@ -176,7 +176,7 @@ const qrcodeData = computed(() => {
 const statusText = computed(() => {
   const map: Record<number, string> = {
     0: '待支付',
-    1: orderType.value === 'ticket' ? '待使用' : '待发货',
+    1: '已支付',
     2: orderType.value === 'ticket' ? '已使用' : '已发货',
     3: '已完成',
     4: '已取消'
@@ -187,7 +187,7 @@ const statusText = computed(() => {
 const statusDesc = computed(() => {
   const map: Record<number, string> = {
     0: '请在30分钟内完成支付',
-    1: orderType.value === 'ticket' ? '请按时到场使用' : '商家正在备货',
+    1: orderType.value === 'ticket' ? '门票待使用，请按时到场' : '商家正在备货',
     2: orderType.value === 'ticket' ? '感谢您的光临' : '商品已发出，请注意查收',
     3: '订单已完成',
     4: '订单已取消'
@@ -271,7 +271,37 @@ const copyOrderNo = async () => {
   }
 }
 
-onMounted(loadOrderDetail)
+onMounted(() => {
+  loadOrderDetail()
+  
+  // 如果订单状态为待支付，每隔2秒自动刷新一次，直到状态改变
+  const checkInterval = setInterval(async () => {
+    if (order.value.status === 0) {
+      try {
+        let res: any
+        if (orderType.value === 'ticket') {
+          res = await ticketApi.getOrderDetail(orderId.value)
+        } else {
+          res = await mallApi.getOrderDetail(orderId.value)
+        }
+        if (res && res.status !== 0) {
+          // 订单状态已改变，更新数据并停止轮询
+          order.value = res
+          clearInterval(checkInterval)
+          console.log('订单状态已更新:', res.status)
+        }
+      } catch (e) {
+        console.error('自动刷新订单失败:', e)
+      }
+    } else {
+      // 订单状态不是待支付，停止轮询
+      clearInterval(checkInterval)
+    }
+  }, 2000)
+  
+  // 组件卸载时清除定时器
+  return () => clearInterval(checkInterval)
+})
 </script>
 
 <style scoped>

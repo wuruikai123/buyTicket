@@ -44,9 +44,12 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { ElMessage } from 'element-plus';
+import { ticketApi } from '@/api/ticket';
+import { mallApi } from '@/api/mall';
 
 const route = useRoute();
 const router = useRouter();
@@ -54,26 +57,130 @@ const router = useRouter();
 const orderInfo = ref({
   orderNo: '',
   tradeNo: '',
-  totalAmount: ''
+  totalAmount: '',
+  orderId: 0,
+  orderType: 'ticket'
 });
 
-onMounted(() => {
+const loading = ref(false);
+
+onMounted(async () => {
   // 从URL参数中获取支付宝返回的信息
+  // 支付宝可能返回的参数：out_trade_no, trade_no, total_amount 等
+  const queryParams = route.query;
+  
   orderInfo.value = {
-    orderNo: route.query.out_trade_no || '',
-    tradeNo: route.query.trade_no || '',
-    totalAmount: route.query.total_amount || ''
+    orderNo: (queryParams.out_trade_no as string) || (queryParams.orderNo as string) || '',
+    tradeNo: (queryParams.trade_no as string) || (queryParams.tradeNo as string) || '',
+    totalAmount: (queryParams.total_amount as string) || (queryParams.totalAmount as string) || '',
+    orderId: 0,
+    orderType: 'ticket'
   };
 
-  // 如果没有订单信息，可能是直接访问，跳转到首页
+  console.log('OrderSuccess 页面加载，所有参数:', queryParams);
+  console.log('提取的订单信息:', {
+    orderNo: orderInfo.value.orderNo,
+    tradeNo: orderInfo.value.tradeNo,
+    totalAmount: orderInfo.value.totalAmount
+  });
+
+  // 如果没有订单号，可能是直接访问，显示提示
   if (!orderInfo.value.orderNo) {
     console.warn('没有订单信息，可能是直接访问');
+    return;
   }
+
+  // 自动跳转到订单详情页面
+  await autoRedirectToOrderDetail();
 });
 
+// 根据订单号查询订单详情并跳转
+const autoRedirectToOrderDetail = async () => {
+  loading.value = true;
+  try {
+    console.log('开始查询订单详情，订单号:', orderInfo.value.orderNo);
+    
+    // 先尝试查询门票订单
+    try {
+      console.log('尝试查询门票订单...');
+      const ticketOrder = await ticketApi.getOrderByOrderNo(orderInfo.value.orderNo);
+      console.log('门票订单查询结果:', ticketOrder);
+      
+      if (ticketOrder && ticketOrder.id) {
+        orderInfo.value.orderId = ticketOrder.id;
+        orderInfo.value.orderType = 'ticket';
+        console.log('找到门票订单，ID:', ticketOrder.id);
+        
+        // 延迟1.5秒后跳转，让用户看到成功页面
+        setTimeout(() => {
+          console.log('跳转到订单详情页面:', {
+            id: ticketOrder.id,
+            type: 'ticket'
+          });
+          router.push({
+            name: 'OrderDetail',
+            params: { id: String(ticketOrder.id) },
+            query: { type: 'ticket' }
+          });
+        }, 1500);
+        return;
+      }
+    } catch (e) {
+      console.warn('门票订单查询失败:', e);
+      // 门票订单查询失败，尝试查询商城订单
+    }
+
+    // 尝试查询商城订单
+    try {
+      console.log('尝试查询商城订单...');
+      const mallOrder = await mallApi.getOrderByOrderNo(orderInfo.value.orderNo);
+      console.log('商城订单查询结果:', mallOrder);
+      
+      if (mallOrder && mallOrder.id) {
+        orderInfo.value.orderId = mallOrder.id;
+        orderInfo.value.orderType = 'mall';
+        console.log('找到商城订单，ID:', mallOrder.id);
+        
+        // 延迟1.5秒后跳转，让用户看到成功页面
+        setTimeout(() => {
+          console.log('跳转到订单详情页面:', {
+            id: mallOrder.id,
+            type: 'mall'
+          });
+          router.push({
+            name: 'OrderDetail',
+            params: { id: String(mallOrder.id) },
+            query: { type: 'mall' }
+          });
+        }, 1500);
+        return;
+      }
+    } catch (e) {
+      console.warn('商城订单查询失败:', e);
+      // 商城订单查询失败
+    }
+
+    // 如果都没找到，显示错误信息
+    console.error('无法找到对应的订单');
+    ElMessage.warning('无法找到对应的订单，请稍后手动查看');
+  } catch (error) {
+    console.error('自动跳转失败:', error);
+    ElMessage.warning('订单查询失败，请稍后手动查看');
+  } finally {
+    loading.value = false;
+  }
+};
+
 const goToOrderDetail = () => {
-  if (orderInfo.value.orderNo) {
-    router.push(`/order/${orderInfo.value.orderNo}`);
+  if (orderInfo.value.orderId) {
+    router.push({
+      name: 'OrderDetail',
+      params: { id: String(orderInfo.value.orderId) },
+      query: { type: orderInfo.value.orderType }
+    });
+  } else if (orderInfo.value.orderNo) {
+    // 如果没有订单ID，尝试通过订单号查询
+    autoRedirectToOrderDetail();
   } else {
     router.push('/profile');
   }

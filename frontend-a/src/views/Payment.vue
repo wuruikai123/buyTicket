@@ -137,14 +137,25 @@ const handlePay = async () => {
         throw new Error('订单号不存在')
       }
 
-      // 使用模拟支付页面（支付宝沙箱环境存在资源加载和登录问题）
-      const params = new URLSearchParams({
-        out_trade_no: orderInfo.value.orderNo,
-        subject: `展览门票订单`,
-        total_amount: orderInfo.value.totalAmount.toString()
-      })
+      // 调用后端支付接口获取支付表单（PC网页端）
+      const response = await paymentApi.createAlipayPc({ orderNo: orderInfo.value.orderNo })
       
-      window.location.href = `/mock-alipay?${params.toString()}`
+      if (response && typeof response === 'string') {
+        // 后端返回支付表单HTML，直接提交
+        const form = document.createElement('div')
+        form.innerHTML = response
+        document.body.appendChild(form)
+        
+        // 自动提交表单
+        const submitForm = form.querySelector('form') as HTMLFormElement
+        if (submitForm) {
+          submitForm.submit()
+        } else {
+          throw new Error('支付表单生成失败')
+        }
+      } else {
+        throw new Error('获取支付表单失败')
+      }
     }
   } catch (error: any) {
     paying.value = false
