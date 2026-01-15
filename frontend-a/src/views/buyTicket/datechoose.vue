@@ -107,7 +107,7 @@ const now = new Date();
 const selectedYear = ref(now.getFullYear());
 const selectedMonth = ref(now.getMonth() + 1);
 const selectedDate = ref<Date | null>(now);
-const selectedTimeSlot = ref('12:00-14:00'); // 注意格式需与数据库一致
+const selectedTimeSlot = ref('09:00-12:00'); // 注意格式需与数据库一致
 const remainingTickets = ref(0);
 
 // 星期标签
@@ -116,8 +116,7 @@ const weekdays = ['一', '二', '三', '四', '五', '六', '日'];
 // 时间段选项 (需与数据库一致)
 const timeSlots = [
     '09:00-12:00',
-    '12:00-14:00',
-    '14:00-16:00'
+    '14:00-17:00'
 ];
 
 // 计算日历日期 (保持原有逻辑，略微调整)

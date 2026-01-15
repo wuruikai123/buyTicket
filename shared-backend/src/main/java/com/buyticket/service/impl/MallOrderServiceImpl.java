@@ -55,6 +55,11 @@ public class MallOrderServiceImpl extends ServiceImpl<MallOrderMapper, MallOrder
         order.setReceiverName(request.getReceiverName());
         order.setReceiverPhone(request.getReceiverPhone());
         order.setReceiverAddress(request.getReceiverAddress());
+        
+        // 生成安全的订单号: M + 时间戳(13位) + 随机6位字母数字
+        String orderNo = generateSecureOrderNo();
+        order.setOrderNo(orderNo);
+        
         this.save(order);
 
         // 3. 创建订单详情 & 清理购物车
@@ -80,5 +85,28 @@ public class MallOrderServiceImpl extends ServiceImpl<MallOrderMapper, MallOrder
         Map<String, Object> result = new HashMap<>();
         result.put("orderId", order.getId());
         return result;
+    }
+    
+    /**
+     * 生成安全的订单号
+     * 格式：M + 时间戳(13位) + 随机6位字母数字
+     */
+    private String generateSecureOrderNo() {
+        long timestamp = System.currentTimeMillis();
+        String randomStr = generateRandomString(6);
+        return "M" + timestamp + randomStr;
+    }
+    
+    /**
+     * 生成随机字符串
+     */
+    private String generateRandomString(int length) {
+        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        StringBuilder sb = new StringBuilder();
+        java.util.Random random = new java.util.Random();
+        for (int i = 0; i < length; i++) {
+            sb.append(chars.charAt(random.nextInt(chars.length())));
+        }
+        return sb.toString();
     }
 }

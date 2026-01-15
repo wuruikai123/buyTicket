@@ -31,4 +31,6 @@ public class TicketOrder {
     private String contactPhone;
 
     private LocalDateTime createTime;
+
+    private LocalDateTime payTime;
 }

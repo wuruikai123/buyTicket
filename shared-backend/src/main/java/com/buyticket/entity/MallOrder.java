@@ -15,6 +15,8 @@ public class MallOrder {
     @TableId(value = "id", type = IdType.AUTO)
     private Long id;
 
+    private String orderNo;
+
     private Long userId;
 
     private BigDecimal totalAmount;
@@ -31,4 +33,6 @@ public class MallOrder {
     private String receiverAddress;
 
     private LocalDateTime createTime;
+
+    private LocalDateTime payTime;
 }

@@ -73,5 +73,10 @@ export const mallApi = {
     // 支付订单
     pay(data: { orderId: string | number; type: string; password: string }) {
         return request.post('/order/pay', data)
+    },
+
+    // 根据订单号获取订单详情
+    getOrderByOrderNo(orderNo: string) {
+        return request.get<any, any>(`/order/mall/by-order-no/${orderNo}`)
     }
 }

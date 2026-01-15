@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS `ticket_order` (
     `contact_name` VARCHAR(50) DEFAULT NULL COMMENT '联系人姓名',
     `contact_phone` VARCHAR(20) DEFAULT NULL COMMENT '联系人电话',
     `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `pay_time` DATETIME DEFAULT NULL COMMENT '支付时间',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_order_no` (`order_no`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='门票订单表';
@@ -100,6 +101,7 @@ CREATE TABLE IF NOT EXISTS `cart_item` (
 -- 8. 商城订单表
 CREATE TABLE IF NOT EXISTS `mall_order` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `order_no` VARCHAR(32) UNIQUE COMMENT '订单号（唯一）',
     `user_id` BIGINT NOT NULL COMMENT '用户ID',
     `total_amount` DECIMAL(10, 2) NOT NULL COMMENT '订单总金额',
     `status` TINYINT DEFAULT 0 COMMENT '订单状态 (0:待支付, 1:待发货, 2:已发货, 3:已完成, 4:已取消)',
@@ -107,6 +109,7 @@ CREATE TABLE IF NOT EXISTS `mall_order` (
     `receiver_phone` VARCHAR(20) DEFAULT NULL COMMENT '收货人电话',
     `receiver_address` VARCHAR(255) DEFAULT NULL COMMENT '收货地址',
     `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `pay_time` DATETIME DEFAULT NULL COMMENT '支付时间',
     PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商城订单表';
 
