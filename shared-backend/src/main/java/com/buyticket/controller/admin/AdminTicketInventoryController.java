@@ -14,6 +14,9 @@ public class AdminTicketInventoryController {
 
     @Autowired
     private TicketInventoryService ticketInventoryService;
+    
+    @Autowired
+    private com.buyticket.service.ExhibitionService exhibitionService;
 
     /**
      * 库存列表
@@ -76,15 +79,39 @@ public class AdminTicketInventoryController {
         java.time.LocalDate startDate = java.time.LocalDate.parse(request.getStartDate());
         java.time.LocalDate endDate = java.time.LocalDate.parse(request.getEndDate());
         
+        // 获取展览信息
+        com.buyticket.entity.Exhibition exhibition = exhibitionService.getById(request.getExhibitionId());
+        if (exhibition == null) {
+            return JsonData.buildError("展览不存在");
+        }
+        
         int count = 0;
         java.time.LocalDate currentDate = startDate;
         while (!currentDate.isAfter(endDate)) {
             for (String timeSlot : request.getTimeSlots()) {
+                // 根据时间段确定门票数量
+                Integer ticketCount;
+                if ("09:00-12:00".equals(timeSlot)) {
+                    // 使用9-12点门票数量
+                    ticketCount = exhibition.getMorningTickets();
+                } else if ("14:00-17:00".equals(timeSlot)) {
+                    // 使用14-17点门票数量
+                    ticketCount = exhibition.getAfternoonTickets();
+                } else {
+                    // 其他时间段使用默认值100
+                    ticketCount = 100;
+                }
+                
+                // 如果没有设置，使用默认值100
+                if (ticketCount == null || ticketCount <= 0) {
+                    ticketCount = 100;
+                }
+                
                 TicketInventory inventory = new TicketInventory();
                 inventory.setExhibitionId(request.getExhibitionId());
                 inventory.setTicketDate(currentDate);
                 inventory.setTimeSlot(timeSlot);
-                inventory.setTotalCount(request.getTotalCount());
+                inventory.setTotalCount(ticketCount);
                 inventory.setSoldCount(0);
                 
                 // 检查是否已存在

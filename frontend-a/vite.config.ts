@@ -10,19 +10,25 @@ export default defineConfig({
     vue(),
     vueDevTools(),
   ],
+  base: '/',  // 用户端在根路径
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url))
     },
   },
   server: {
+    port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:8082',
+        target: 'http://localhost:8080',  // 开发环境使用本地后端
         changeOrigin: true,
-        // 如果后端接口包含 /api 前缀，则不需要 rewrite
-        // rewrite: (path) => path.replace(/^\/api/, '') 
       }
     }
+  },
+  build: {
+    outDir: 'dist',
+    assetsDir: 'assets',
+    sourcemap: false,
+    chunkSizeWarningLimit: 1500
   }
 })

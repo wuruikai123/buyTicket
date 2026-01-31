@@ -20,7 +20,7 @@
         <div class="result-title">查询结果</div>
         <template v-if="status === 'found' && order">
           <div class="text success">✓ 核销成功</div>
-          <div class="text">{{ order.exhibition }}</div>
+          <div class="text exhibition-name">{{ order.exhibition }}</div>
           <div class="text">有效时间：{{ order.validTime }}</div>
           <div class="text">购买账号：{{ order.buyer }}</div>
           <div class="text" v-if="order.verifyTime">核销时间：{{ order.verifyTime }}</div>
@@ -28,7 +28,7 @@
         </template>
         <template v-else-if="status === 'verified' && order">
           <div class="text warning">⚠ 该订单已核销</div>
-          <div class="text">{{ order.exhibition }}</div>
+          <div class="text exhibition-name">{{ order.exhibition }}</div>
           <div class="text">有效时间：{{ order.validTime }}</div>
           <div class="text">购买账号：{{ order.buyer }}</div>
           <div class="text" v-if="order.verifyTime">核销时间：{{ order.verifyTime }}</div>
@@ -220,6 +220,11 @@ async function handleVerify() {
 .text {
   font-size: 20px;
   color: #202020;
+}
+
+.exhibition-name {
+  color: #000000;
+  font-weight: 600;
 }
 
 .muted {

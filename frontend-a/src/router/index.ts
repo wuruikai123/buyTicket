@@ -84,6 +84,11 @@ const router = createRouter({
           name: 'OrderSuccess',
           component: () => import('@/views/OrderSuccess.vue'),
         },
+        {
+          path: 'about',
+          name: 'About',
+          component: () => import('@/views/About.vue'),
+        },
       ],
     },
     // 管理后台路由

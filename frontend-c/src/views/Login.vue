@@ -60,8 +60,8 @@ async function handleLogin() {
   errorMsg.value = ''
   
   try {
-    // 调用后端登录接口
-    const res = await request.post('/auth/login', {
+    // 调用后端管理员登录接口
+    const res = await request.post('/admin/auth/login', {
       username: form.account,
       password: form.password
     })

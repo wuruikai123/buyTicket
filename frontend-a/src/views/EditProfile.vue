@@ -20,8 +20,8 @@
 
       <!-- 表单 -->
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top" class="profile-form">
-        <el-form-item label="用户名" prop="username">
-          <el-input v-model="form.username" placeholder="请输入用户名" />
+        <el-form-item label="用户名">
+          <el-input v-model="form.username" disabled placeholder="用户名不可修改" />
         </el-form-item>
 
         <el-form-item label="手机号" prop="phone">
@@ -87,7 +87,6 @@ const pwdForm = reactive({
 })
 
 const rules: FormRules = {
-  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
   phone: [
     { pattern: /^1[3-9]\d{9}$/, message: '手机号格式不正确', trigger: 'blur' }
   ]
@@ -145,11 +144,18 @@ const handleSubmit = async () => {
   submitting.value = true
   try {
     await userApi.updateUserInfo({
-      username: form.username,
       phone: form.phone
     })
     ElMessage.success('修改成功')
-    router.back()
+    // 更新localStorage中的用户信息
+    const updatedUser = await userApi.getUserInfo()
+    if (updatedUser) {
+      localStorage.setItem('userInfo', JSON.stringify(updatedUser))
+    }
+    // 延迟返回，确保用户看到成功提示
+    setTimeout(() => {
+      router.back()
+    }, 500)
   } catch (e: any) {
     ElMessage.error(e.message || '修改失败')
   } finally {
@@ -168,8 +174,18 @@ const handleChangePassword = async () => {
       newPassword: pwdForm.newPassword
     })
     ElMessage.success('密码修改成功，请重新登录')
+    // 清除表单
+    pwdForm.oldPassword = ''
+    pwdForm.newPassword = ''
+    pwdForm.confirmPassword = ''
+    pwdFormRef.value?.resetFields()
+    // 清除token
     localStorage.removeItem('token')
-    router.push('/login')
+    localStorage.removeItem('userInfo')
+    // 延迟跳转
+    setTimeout(() => {
+      router.push('/login')
+    }, 1500)
   } catch (e: any) {
     ElMessage.error(e.message || '修改失败')
   } finally {

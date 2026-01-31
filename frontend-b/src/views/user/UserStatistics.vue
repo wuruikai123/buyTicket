@@ -92,20 +92,31 @@ const stats = ref({
 
 const consumptionRank = ref<any[]>([])
 
+const userGrowthData = ref<any[]>([])
+
 const userGrowthOption = computed<EChartsOption>(() => ({
   tooltip: {
     trigger: 'axis'
   },
   xAxis: {
     type: 'category',
-    data: [] as string[]
+    data: userGrowthData.value.map(item => {
+      // 显示完整日期：月-日
+      if (item.date) {
+        const parts = item.date.split('-')
+        return parts.length >= 2 ? `${parts[1]}月${parts[2]}日` : item.date
+      }
+      return ''
+    })
   },
   yAxis: {
-    type: 'value'
+    type: 'value',
+    name: '注册用户数',
+    minInterval: 1  // 用户数必须是整数
   },
   series: [
     {
-      data: [] as number[],
+      data: userGrowthData.value.map(item => item.value),
       type: 'line',
       smooth: true,
       areaStyle: {}
@@ -116,26 +127,24 @@ const userGrowthOption = computed<EChartsOption>(() => ({
 const loadData = async () => {
   try {
     const data = await statisticsApi.getUserAnalysis({})
+    console.log('用户统计API返回数据:', data)
     stats.value = {
-      totalUsers: data.totalUsers,
-      todayUsers: data.newUsers,
-      activeUsers: data.activeUsers
+      totalUsers: data.totalUsers || 0,
+      todayUsers: data.newUsers || 0,
+      activeUsers: data.activeUsers || 0
     }
-    consumptionRank.value = data.consumptionRank
-    
-    // 更新图表数据
-    userGrowthOption.value.xAxis = {
-      type: 'category',
-      data: data.userGrowth.map(item => item.date.split('-')[2])
-    } as any
-    userGrowthOption.value.series = [{
-      data: data.userGrowth.map(item => item.value),
-      type: 'line',
-      smooth: true,
-      areaStyle: {}
-    }] as any
+    consumptionRank.value = data.consumptionRank || []
+    userGrowthData.value = data.userGrowth || []
+    console.log('用户统计数据已更新:', { stats: stats.value, userGrowthData: userGrowthData.value })
   } catch (error) {
     console.error('加载数据失败', error)
+    stats.value = {
+      totalUsers: 0,
+      todayUsers: 0,
+      activeUsers: 0
+    }
+    consumptionRank.value = []
+    userGrowthData.value = []
   }
 }
 

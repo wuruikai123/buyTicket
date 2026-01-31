@@ -111,6 +111,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '基础设置', icon: 'Setting' }
       },
       {
+        path: 'system/about',
+        name: 'SystemAbout',
+        component: () => import('@/views/system/AboutManagement.vue'),
+        meta: { title: '关于展厅', icon: 'Setting' }
+      },
+      {
         path: 'system/content',
         name: 'SystemContent',
         component: () => import('@/views/system/ContentManagement.vue'),
@@ -127,7 +133,7 @@ const routes: RouteRecordRaw[] = [
 ]
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes
 })
 

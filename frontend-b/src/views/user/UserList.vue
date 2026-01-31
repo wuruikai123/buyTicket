@@ -4,7 +4,6 @@
       <template #header>
         <div class="card-header">
           <span class="title">用户列表</span>
-          <span class="user-count">当前用户{{ pagination.total }}人</span>
         </div>
       </template>
 
@@ -82,8 +81,12 @@
           </div>
         </div>
         <div class="user-actions">
-            <el-button @click="handleFreeze">冻结</el-button>
-            <el-button link type="danger" @click="handleLogout">注销</el-button>
+            <el-button 
+              :type="currentUser.status === 1 ? 'warning' : 'success'"
+              @click="handleFreeze"
+            >
+              {{ currentUser.status === 1 ? '冻结' : '解冻' }}
+            </el-button>
           </div>
 
         <!-- 用户门票订单部分 -->
@@ -268,42 +271,29 @@ const handleView = async (row: any) => {
 
 const handleFreeze = async () => {
   if (!currentUser.value) return
+  
+  const isFreeze = currentUser.value.status === 1
+  const action = isFreeze ? '冻结' : '解冻'
+  const newStatus = isFreeze ? 0 : 1
+  
   try {
     await ElMessageBox.confirm(
-      `确定要${currentUser.value.status === 1 ? '冻结' : '解冻'}该用户吗？`,
-      '提示',
+      `确定要${action}该用户吗？${isFreeze ? '冻结后用户将无法登录。' : ''}`,
+      `${action}用户`,
       {
         confirmButtonText: '确定',
         cancelButtonText: '取消',
         type: 'warning'
       }
     )
-    await userApi.updateStatus(currentUser.value.id, currentUser.value.status === 1 ? 0 : 1)
-    ElMessage.success('操作成功')
-    currentUser.value.status = currentUser.value.status === 1 ? 0 : 1
+    
+    await userApi.updateStatus(currentUser.value.id, newStatus)
+    ElMessage.success(`${action}成功`)
+    currentUser.value.status = newStatus
     loadData()
   } catch (error: any) {
     if (error !== 'cancel') {
-      ElMessage.error('操作失败')
-    }
-  }
-}
-
-const handleLogout = async () => {
-  if (!currentUser.value) return
-  try {
-    await ElMessageBox.confirm('确定要注销该用户吗？此操作不可恢复！', '警告', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning'
-    })
-    // TODO: 调用注销接口
-    ElMessage.success('注销成功')
-    detailDialogVisible.value = false
-    loadData()
-  } catch (error: any) {
-    if (error !== 'cancel') {
-      ElMessage.error('注销失败')
+      ElMessage.error(`${action}失败`)
     }
   }
 }
@@ -367,12 +357,6 @@ onMounted(() => {
 
     .title {
       font-size: 18px;
-    }
-
-    .user-count {
-      font-size: 14px;
-      font-weight: normal;
-      color: #666;
     }
   }
 

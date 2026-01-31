@@ -2,6 +2,7 @@ package com.buyticket.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.buyticket.context.UserContext;
 import com.buyticket.entity.SysUser;
 import com.buyticket.entity.UserAddress;
 import com.buyticket.service.SysUserService;
@@ -28,9 +29,9 @@ public class UserController {
     @Autowired
     private UserAddressService userAddressService;
 
-    // 模拟当前登录用户
+    // 从JWT上下文获取当前用户ID
     private Long getCurrentUserId() {
-        return 1L; // zhangsan
+        return UserContext.getUserId();
     }
 
     /**
@@ -45,6 +46,11 @@ public class UserController {
         SysUser user = sysUserService.getOne(queryWrapper);
 
         if (user != null && user.getPassword().equals(loginReq.getPassword())) {
+            // 检查用户状态
+            if (user.getStatus() != null && user.getStatus() == 0) {
+                return JsonData.buildError("账号已被冻结，请联系管理员");
+            }
+            
             // 登录成功
             // 使用 JWT 生成 Token
             String token = JwtUtils.generateToken(user);
@@ -86,20 +92,13 @@ public class UserController {
     }
 
     @GetMapping("/info")
-    public JsonData getUserInfo(@RequestHeader(value = "Authorization", required = false) String token) {
-        if (token == null) {
+    public JsonData getUserInfo() {
+        Long userId = getCurrentUserId();
+        if (userId == null) {
             return JsonData.buildError("未登录");
         }
-        
-        Claims claims = JwtUtils.getClaimsByToken(token);
-        if (claims != null) {
-            String userIdStr = claims.getSubject();
-            Long userId = Long.parseLong(userIdStr);
-            SysUser user = sysUserService.getById(userId);
-            return JsonData.buildSuccess(user);
-        }
-        
-        return JsonData.buildError("Token无效或已过期");
+        SysUser user = sysUserService.getById(userId);
+        return JsonData.buildSuccess(user);
     }
 
     @GetMapping("/hello")

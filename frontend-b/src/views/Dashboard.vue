@@ -18,20 +18,12 @@
     </div>
 
     <el-row :gutter="20" class="charts-row">
-      <el-col :xs="24" :lg="12">
+      <el-col :span="24">
         <el-card>
           <template #header>
             <span>用户增长趋势</span>
           </template>
           <v-chart class="chart" :option="userGrowthOption" />
-        </el-card>
-      </el-col>
-      <el-col :xs="24" :lg="12">
-        <el-card>
-          <template #header>
-            <span>订单趋势</span>
-          </template>
-          <v-chart class="chart" :option="orderTrendOption" />
         </el-card>
       </el-col>
     </el-row>
@@ -40,7 +32,7 @@
       <el-col :xs="24" :lg="12">
         <el-card>
           <template #header>
-            <span>销售额趋势</span>
+            <span>销售趋势</span>
           </template>
           <v-chart class="chart" :option="salesTrendOption" />
         </el-card>
@@ -48,9 +40,9 @@
       <el-col :xs="24" :lg="12">
         <el-card>
           <template #header>
-            <span>订单类型占比</span>
+            <span>订单趋势</span>
           </template>
-          <v-chart class="chart" :option="orderTypeOption" />
+          <v-chart class="chart" :option="orderTrendOption" />
         </el-card>
       </el-col>
     </el-row>
@@ -115,23 +107,37 @@ const updateTime = () => {
 
 const userGrowthOption = computed<EChartsOption>(() => {
   const growthData = dashboardData.value.userGrowth || []
+  const values = growthData.map((item: any) => item.value || 0)
+  const maxValue = Math.max(...values, 5) // 至少显示到5
+  
   return {
     tooltip: {
       trigger: 'axis'
     },
     xAxis: {
       type: 'category',
-      data: growthData.map((item: any) => item.date ? item.date.split('-')[2] : '')
+      data: growthData.map((item: any) => {
+        if (item.date) {
+          const parts = item.date.split('-')
+          return parts.length >= 2 ? `${parts[1]}月${parts[2]}日` : item.date
+        }
+        return ''
+      })
     },
     yAxis: {
-      type: 'value'
+      type: 'value',
+      name: '用户数',
+      minInterval: 1,
+      max: maxValue
     },
     series: [
       {
-        data: growthData.map((item: any) => item.value),
+        data: values,
         type: 'line',
         smooth: true,
-        areaStyle: {}
+        itemStyle: {
+          color: '#409eff'
+        }
       }
     ]
   }
@@ -139,32 +145,38 @@ const userGrowthOption = computed<EChartsOption>(() => {
 
 const orderTrendOption = computed<EChartsOption>(() => {
   const trendData = dashboardData.value.orderTrend || []
+  const values = trendData.map((item: any) => item.ticket || 0)
+  const maxValue = Math.max(...values, 5) // 至少显示到5
+  
   return {
     tooltip: {
       trigger: 'axis'
     },
-    legend: {
-      data: ['门票订单', '商城订单']
-    },
     xAxis: {
       type: 'category',
-      data: trendData.map((item: any) => item.date ? item.date.split('-')[2] : '')
+      data: trendData.map((item: any) => {
+        if (item.date) {
+          const parts = item.date.split('-')
+          return parts.length >= 2 ? `${parts[1]}月${parts[2]}日` : item.date
+        }
+        return ''
+      })
     },
     yAxis: {
-      type: 'value'
+      type: 'value',
+      name: '订单数',
+      minInterval: 1,
+      max: maxValue
     },
     series: [
       {
         name: '门票订单',
-        data: trendData.map((item: any) => item.ticket),
+        data: values,
         type: 'line',
-        smooth: true
-      },
-      {
-        name: '商城订单',
-        data: trendData.map((item: any) => item.mall),
-        type: 'line',
-        smooth: true
+        smooth: true,
+        itemStyle: {
+          color: '#409eff'
+        }
       }
     ]
   }
@@ -172,23 +184,36 @@ const orderTrendOption = computed<EChartsOption>(() => {
 
 const salesTrendOption = computed<EChartsOption>(() => {
   const salesData = dashboardData.value.salesTrend || []
+  const values = salesData.map((item: any) => item.value || 0)
+  const maxValue = Math.max(...values, 100) // 销售额至少显示到100
+  
   return {
     tooltip: {
       trigger: 'axis'
     },
     xAxis: {
       type: 'category',
-      data: salesData.map((item: any) => item.date ? item.date.split('-')[2] : '')
+      data: salesData.map((item: any) => {
+        if (item.date) {
+          const parts = item.date.split('-')
+          return parts.length >= 2 ? `${parts[1]}月${parts[2]}日` : item.date
+        }
+        return ''
+      })
     },
     yAxis: {
-      type: 'value'
+      type: 'value',
+      name: '销售额(元)',
+      minInterval: 1,
+      max: maxValue
     },
     series: [
       {
-        data: salesData.map((item: any) => item.value),
-        type: 'bar',
+        data: values,
+        type: 'line',
+        smooth: true,
         itemStyle: {
-          color: '#409eff'
+          color: '#67C23A'
         }
       }
     ]
@@ -222,23 +247,25 @@ const orderTypeOption = computed<EChartsOption>(() => ({
 const loadData = async () => {
   try {
     const data: any = await statisticsApi.getDashboardData()
-    // 后端返回的数据结构，需要适配前端
+    console.log('Dashboard API返回数据:', data)
+    // 使用后端返回的真实数据
     dashboardData.value = {
       todayTicketSales: data.todayTicketOrders || 0,
-      todayTicketVerified: 0, // 后端暂未提供核销数据
+      todayTicketVerified: data.todayVerified || 0,
       todayUsers: data.todayUsers || 0,
       todayOrders: data.todayOrders || 0,
-      todaySales: 0,
-      todayVisits: 0,
-      userGrowth: [],
-      orderTrend: [],
-      salesTrend: [],
+      todaySales: data.todaySales || 0,
+      todayVisits: data.todayVisits || 0,
+      userGrowth: data.userGrowth || [],
+      orderTrend: data.orderTrend || [],
+      salesTrend: data.salesTrend || [],
       orderTypeRatio: [
         { name: '门票订单', value: data.totalTicketOrders || 0 },
         { name: '商城订单', value: data.totalMallOrders || 0 }
       ],
-      orderStatusRatio: []
+      orderStatusRatio: data.orderStatusRatio || []
     }
+    console.log('Dashboard数据已更新:', dashboardData.value)
   } catch (error) {
     console.error('加载数据失败', error)
   }

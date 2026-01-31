@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>清除Token工具</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .info-box {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        
+        .info-box h3 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        
+        .info-box p {
+            color: #666;
+            line-height: 1.6;
+            font-size: 14px;
+        }
+        
+        .token-info {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        
+        .token-info pre {
+            background: #fff;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        button {
+            flex: 1;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-clear {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .btn-clear:hover {
+            background: #c82333;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(220, 53, 69, 0.4);
+        }
+        
+        .btn-check {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-check:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-reload {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-reload:hover {
+            background: #218838;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+        }
+        
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+        }
+        
+        .result.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            display: block;
+        }
+        
+        .result.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            display: block;
+        }
+        
+        .result.info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Token清除工具</h1>
+        <p class="subtitle">用于清除浏览器中无效或过期的JWT Token</p>
+        
+        <div class="info-box">
+            <h3>📋 使用说明</h3>
+            <p>
+                如果你遇到"Token无效或已过期"的错误，可以使用此工具清除浏览器中存储的Token。
+                清除后需要重新登录。
+            </p>
+        </div>
+        
+        <div id="tokenInfo" class="token-info" style="display: none;">
+            <h3>🔍 当前Token信息</h3>
+            <pre id="tokenDetails"></pre>
+        </div>
+        
+        <div class="button-group">
+            <button class="btn-check" onclick="checkToken()">检查Token</button>
+            <button class="btn-clear" onclick="clearToken()">清除Token</button>
+            <button class="btn-reload" onclick="reloadPage()">刷新页面</button>
+        </div>
+        
+        <div id="result" class="result"></div>
+    </div>
+    
+    <script>
+        function checkToken() {
+            const token = localStorage.getItem('token');
+            const userInfo = localStorage.getItem('userInfo');
+            const resultDiv = document.getElementById('result');
+            const tokenInfoDiv = document.getElementById('tokenInfo');
+            const tokenDetailsDiv = document.getElementById('tokenDetails');
+            
+            if (!token) {
+                resultDiv.className = 'result info';
+                resultDiv.textContent = '✓ 没有找到Token，localStorage是干净的';
+                tokenInfoDiv.style.display = 'none';
+                return;
+            }
+            
+            try {
+                const parts = token.split('.');
+                if (parts.length !== 3) {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = '✗ Token格式错误（不是有效的JWT格式）';
+                    tokenInfoDiv.style.display = 'none';
+                    return;
+                }
+                
+                const header = JSON.parse(atob(parts[0]));
+                const payload = JSON.parse(atob(parts[1]));
+                
+                const iatDate = new Date(payload.iat * 1000);
+                const expDate = new Date(payload.exp * 1000);
+                const now = new Date();
+                const isExpired = payload.exp * 1000 < Date.now();
+                
+                let details = '';
+                details += '用户ID: ' + payload.sub + '\n';
+                details += '用户名: ' + payload.username + '\n';
+                details += '角色: ' + payload.role + '\n';
+                details += '签发时间: ' + iatDate.toLocaleString('zh-CN') + '\n';
+                details += '过期时间: ' + expDate.toLocaleString('zh-CN') + '\n';
+                details += '当前时间: ' + now.toLocaleString('zh-CN') + '\n';
+                details += '状态: ' + (isExpired ? '已过期 ❌' : '有效 ✓') + '\n';
+                
+                if (userInfo) {
+                    details += '\n用户信息: 已保存';
+                }
+                
+                tokenDetailsDiv.textContent = details;
+                tokenInfoDiv.style.display = 'block';
+                
+                if (isExpired) {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = '✗ Token已过期，建议清除';
+                } else {
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = '✓ Token有效';
+                }
+            } catch (e) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = '✗ Token解析失败: ' + e.message;
+                tokenInfoDiv.style.display = 'none';
+            }
+        }
+        
+        function clearToken() {
+            const token = localStorage.getItem('token');
+            const userInfo = localStorage.getItem('userInfo');
+            const resultDiv = document.getElementById('result');
+            
+            if (!token && !userInfo) {
+                resultDiv.className = 'result info';
+                resultDiv.textContent = 'ℹ️ localStorage中没有Token，无需清除';
+                return;
+            }
+            
+            localStorage.removeItem('token');
+            localStorage.removeItem('userInfo');
+            
+            resultDiv.className = 'result success';
+            resultDiv.textContent = '✓ Token已清除！建议刷新页面或重新登录';
+            
+            document.getElementById('tokenInfo').style.display = 'none';
+        }
+        
+        function reloadPage() {
+            location.reload();
+        }
+        
+        // 页面加载时自动检查
+        window.onload = function() {
+            checkToken();
+        };
+    </script>
+</body>
+</html>

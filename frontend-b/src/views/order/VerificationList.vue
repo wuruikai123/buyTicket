@@ -45,7 +45,7 @@
           </template>
         </el-table-column>
         <el-table-column prop="createTime" label="下单时间" width="180" />
-        <el-table-column label="操作" width="150" fixed="right">
+        <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
             <el-button 
               v-if="row.status === 1" 
@@ -55,7 +55,15 @@
             >
               核销
             </el-button>
-            <el-button link type="info" @click="handleDetail(row)">详情</el-button>
+            <el-button 
+              v-if="row.status === 2" 
+              link 
+              type="warning" 
+              @click="handleReset(row)"
+            >
+              重置
+            </el-button>
+            <el-button link class="detail-btn" @click="handleDetail(row)">详情</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -142,11 +150,11 @@ const handleVerifyByOrderNo = async () => {
   }
   
   try {
-    await ElMessageBox.confirm('确定要核销订单 ' + verifyOrderNo.value + ' 吗？核销后将无法撤销。', '提示', {
+    await ElMessageBox.confirm('确定要核销订单 ' + verifyOrderNo.value + ' 吗？', '提示', {
       type: 'warning'
     })
     // 使用 admin 端点
-    await request.post('/api/v1/admin/order/ticket/verify', { orderNo: verifyOrderNo.value.trim() })
+    await request.post('/admin/order/ticket/verify', { orderNo: verifyOrderNo.value.trim() })
     ElMessage.success('核销成功')
     verifyOrderNo.value = ''
     fetchData()
@@ -159,7 +167,7 @@ const handleVerifyByOrderNo = async () => {
 
 const handleVerify = async (row: Order) => {
   try {
-    await ElMessageBox.confirm('确定要核销这个订单吗？核销后将无法撤销。', '提示', {
+    await ElMessageBox.confirm('确定要核销这个订单吗？', '提示', {
       type: 'warning'
     })
     await orderApi.verifyTicketOrder(row.id)
@@ -168,6 +176,21 @@ const handleVerify = async (row: Order) => {
   } catch (e: any) {
     if (e !== 'cancel') {
       ElMessage.error(e.message || '核销失败')
+    }
+  }
+}
+
+const handleReset = async (row: Order) => {
+  try {
+    await ElMessageBox.confirm('确定要重置这个订单的核销状态吗？订单将恢复为待使用状态。', '提示', {
+      type: 'warning'
+    })
+    await request.post(`/admin/order/ticket/${row.id}/reset`)
+    ElMessage.success('重置成功')
+    fetchData()
+  } catch (e: any) {
+    if (e !== 'cancel') {
+      ElMessage.error(e.message || '重置失败')
     }
   }
 }
@@ -201,5 +224,9 @@ onMounted(() => {
 .el-pagination {
   margin-top: 20px;
   justify-content: center;
+}
+
+.detail-btn {
+  color: #000000 !important;
 }
 </style>
