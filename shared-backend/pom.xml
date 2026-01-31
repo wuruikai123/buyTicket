@@ -27,7 +27,7 @@
 		<url/>
 	</scm>
 	<properties>
-		<java.version>21</java.version>
+		<java.version>17</java.version>
 	</properties>
 	<!--    java21 springboot3.x lombok swagger3.x mybaitsPlus配置文件如下：-->
     <dependencies>

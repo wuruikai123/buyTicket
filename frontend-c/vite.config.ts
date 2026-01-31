@@ -15,8 +15,8 @@ export default defineConfig({
     port: 5174,
     proxy: {
       '/api': {
-        // target: 'http://47.121.192.245:8089',
-        target: 'http://localhost:8080',  // 开发环境使用本地后端
+        target: 'http://47.121.192.245:8089',
+        // target: 'http://localhost:8080',  // 开发环境使用本地后端
         changeOrigin: true
       }
     }
