@@ -33,4 +33,6 @@ public class TicketOrder {
     private LocalDateTime createTime;
 
     private LocalDateTime payTime;
+
+    private LocalDateTime verifyTime;
 }

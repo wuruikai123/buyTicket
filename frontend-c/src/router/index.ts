@@ -43,7 +43,7 @@ const TOKEN_KEY = 'seller_token'
 
 export function createRouter() {
   const router = createVueRouter({
-    history: createWebHistory(),
+    history: createWebHistory(import.meta.env.BASE_URL),
     routes
   })
 

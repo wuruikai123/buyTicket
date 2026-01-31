@@ -121,14 +121,24 @@ public class AdminUserController {
     }
 
     /**
-     * 禁用/启用用户
+     * 冻结/解冻用户
      */
     @PutMapping("/{id}/status")
     public JsonData updateStatus(@PathVariable Long id, @RequestParam Integer status) {
-        SysUser user = new SysUser();
-        user.setId(id);
-        // 注意：SysUser实体需要添加status字段
+        SysUser user = sysUserService.getById(id);
+        if (user == null) {
+            return JsonData.buildError("用户不存在");
+        }
+        
+        // 验证status参数（0=冻结，1=正常）
+        if (status != 0 && status != 1) {
+            return JsonData.buildError("无效的状态值");
+        }
+        
+        user.setStatus(status);
         sysUserService.updateById(user);
-        return JsonData.buildSuccess("状态更新成功");
+        
+        String action = status == 1 ? "解冻" : "冻结";
+        return JsonData.buildSuccess(action + "成功");
     }
 }

@@ -27,5 +27,10 @@ public class SysUser {
 
     private BigDecimal balance;
 
+    /**
+     * 用户状态：0=冻结，1=正常
+     */
+    private Integer status;
+
     private LocalDateTime createTime;
 }

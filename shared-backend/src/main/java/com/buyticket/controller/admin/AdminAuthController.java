@@ -1,6 +1,7 @@
 package com.buyticket.controller.admin;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.buyticket.context.UserContext;
 import com.buyticket.entity.AdminUser;
 import com.buyticket.service.AdminUserService;
 import com.buyticket.utils.JsonData;
@@ -50,14 +51,13 @@ public class AdminAuthController {
     }
 
     @GetMapping("/info")
-    public JsonData getInfo(@RequestHeader("Authorization") String token) {
-        // 解析 Token 获取管理员信息
-         Long adminId = JwtUtils.getAdminIdByToken(token);
-         if (adminId == null) {
-             return JsonData.buildError("Token无效", -2);
-         }
-         AdminUser admin = adminUserService.getById(adminId);
-         return JsonData.buildSuccess(admin);
+    public JsonData getInfo() {
+        Long adminId = UserContext.getUserId();
+        if (adminId == null) {
+            return JsonData.buildError("未登录", -2);
+        }
+        AdminUser admin = adminUserService.getById(adminId);
+        return JsonData.buildSuccess(admin);
     }
     
     @PostMapping("/logout")

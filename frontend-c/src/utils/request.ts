@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const request = axios.create({
-  baseURL: '/api/v1/admin',
+  baseURL: '/api/v1',  // 修改为 /api/v1，不要包含 /admin
   timeout: 10000
 })
 

@@ -71,6 +71,10 @@ const handleSubmit = async () => {
         if (res && res.token) {
             console.log('Login Success, Token:', res.token)
             localStorage.setItem('token', res.token)
+            // 保存用户信息
+            if (res.user) {
+                localStorage.setItem('userInfo', JSON.stringify(res.user))
+            }
             // 简单的提示，实际可以用 ElMessage
             alert('登录成功')
             router.push('/')

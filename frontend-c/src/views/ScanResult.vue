@@ -118,6 +118,8 @@ function goHome() {
 
 .exhibition {
   font-size: 24px;
+  color: #ffffff;
+  font-weight: 600;
 }
 
 .buyer {

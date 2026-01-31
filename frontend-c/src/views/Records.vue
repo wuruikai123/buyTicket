@@ -20,6 +20,10 @@
     <div class="divider" />
 
     <div class="list">
+      <div v-if="records.length === 0" class="empty-state">
+        <div class="empty-icon">📋</div>
+        <div class="empty-text">该日期暂无核销记录</div>
+      </div>
       <div v-for="item in records" :key="item.id" class="card">
         <div class="line bold">{{ item.exhibition }}</div>
         <div class="line">有效时间：{{ item.validTime }}</div>
@@ -32,7 +36,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { listRecordsByDate } from '@/utils/orders'
 
@@ -45,8 +49,32 @@ const days = Array.from({ length: 31 }, (_v, i) => i + 1)
 const year = ref(now.getFullYear())
 const month = ref(now.getMonth() + 1)
 const day = ref(now.getDate())
+const records = ref<any[]>([])
+const loading = ref(false)
 
-const records = computed(() => listRecordsByDate(year.value, month.value, day.value))
+// 加载记录
+const loadRecords = async () => {
+  loading.value = true
+  try {
+    const data = await listRecordsByDate(year.value, month.value, day.value)
+    records.value = data
+  } catch (error) {
+    console.error('加载记录失败:', error)
+    records.value = []
+  } finally {
+    loading.value = false
+  }
+}
+
+// 监听日期变化
+watch([year, month, day], () => {
+  loadRecords()
+})
+
+// 初始加载
+onMounted(() => {
+  loadRecords()
+})
 
 function goBack() {
   router.back()
@@ -128,6 +156,25 @@ select {
 .bold {
   font-weight: 600;
   letter-spacing: 1px;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  gap: 16px;
+}
+
+.empty-icon {
+  font-size: 64px;
+  opacity: 0.3;
+}
+
+.empty-text {
+  font-size: 16px;
+  color: #999;
 }
 </style>
 

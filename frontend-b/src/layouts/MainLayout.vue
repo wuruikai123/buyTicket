@@ -40,28 +40,29 @@
             <el-icon><Ticket /></el-icon>
             <span>门票管理</span>
           </template>
-          <el-menu-item index="/ticket/inventory">库存管理</el-menu-item>
-          <el-menu-item index="/ticket/warning">库存预警</el-menu-item>
+          <el-menu-item index="/ticket/inventory">销售记录</el-menu-item>
           <el-menu-item index="/order/verification">订单核销</el-menu-item>
         </el-sub-menu>
 
-        <el-sub-menu index="product">
+        <!-- 商品管理 - 非本期开发内容，暂时隐藏 -->
+        <!-- <el-sub-menu index="product">
           <template #title>
             <el-icon><Goods /></el-icon>
             <span>商品管理</span>
           </template>
           <el-menu-item index="/product/list">商品列表</el-menu-item>
           <el-menu-item index="/product/create">创建商品</el-menu-item>
-        </el-sub-menu>
+        </el-sub-menu> -->
 
-        <el-sub-menu index="statistics">
+        <!-- 数据统计 - 非本期开发内容，暂时隐藏 -->
+        <!-- <el-sub-menu index="statistics">
           <template #title>
             <el-icon><DataAnalysis /></el-icon>
             <span>数据统计</span>
           </template>
           <el-menu-item index="/statistics/sales">销售报表</el-menu-item>
           <el-menu-item index="/statistics/user-analysis">用户分析</el-menu-item>
-        </el-sub-menu>
+        </el-sub-menu> -->
 
         <el-sub-menu index="system">
           <template #title>
@@ -69,6 +70,7 @@
             <span>系统设置</span>
           </template>
           <el-menu-item index="/system/basic">基础设置</el-menu-item>
+          <el-menu-item index="/system/about">关于展厅</el-menu-item>
           <el-menu-item index="/system/content">内容管理</el-menu-item>
           <el-menu-item index="/system/log">操作日志</el-menu-item>
         </el-sub-menu>

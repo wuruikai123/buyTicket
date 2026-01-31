@@ -34,7 +34,8 @@
       </el-form>
 
       <el-table :data="tableData" v-loading="loading" border>
-        <el-table-column type="selection" width="55" />
+        <!-- 删除复选框 - 不支持批量操作 -->
+        <!-- <el-table-column type="selection" width="55" /> -->
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="name" label="展览名称" width="200" />
         <el-table-column prop="shortDesc" label="简短描述" width="200" show-overflow-tooltip />
@@ -58,10 +59,11 @@
         <el-table-column prop="salesAmount" label="销售额" width="100">
           <template #default="{ row }">¥{{ row.salesAmount }}</template>
         </el-table-column>
-        <el-table-column label="操作" fixed="right" width="200">
+        <el-table-column label="操作" fixed="right" width="150">
           <template #default="{ row }">
             <el-button link type="primary" @click="handleView(row)">详情</el-button>
-            <el-button link type="primary" @click="handleEdit(row)">编辑</el-button>
+            <!-- 删除编辑按钮 - 点击详情即可查看和编辑 -->
+            <!-- <el-button link type="primary" @click="handleEdit(row)">编辑</el-button> -->
             <el-button link type="danger" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>

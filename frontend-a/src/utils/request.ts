@@ -9,10 +9,11 @@ const request = axios.create({
 // 请求拦截器
 request.interceptors.request.use(
     (config) => {
-        // 如果有 token，可以在这里添加
+        // 添加 token 到请求头
         const token = localStorage.getItem('token')
         if (token) {
-            config.headers.Authorization = token
+            // JWT拦截器期望的格式是 "Bearer <token>"
+            config.headers.Authorization = `Bearer ${token}`
         }
         return config
     },
@@ -30,12 +31,11 @@ request.interceptors.response.use(
         if (res.code === 0 || res.code === 200) {
             return res.data
         } else if (res.code === -2) {
-            // code -2 表示未登录或 Token 过期 (由 LoginInterceptor 返回)
+            // code -2 表示未登录或 Token 过期 (由 JwtInterceptor 返回)
             console.error('Auth Error:', res.msg)
             localStorage.removeItem('token')
-            // 强制跳转登录页
-            window.location.href = '/login'
-            return Promise.reject(new Error(res.msg || '请先登录'))
+            localStorage.removeItem('userInfo')
+            return Promise.reject(new Error(res.msg || 'Token无效或已过期'))
         } else {
             // 可以在这里统一处理错误提示，例如 ElMessage.error(res.msg)
             console.error('API Error:', res.msg)
@@ -45,9 +45,18 @@ request.interceptors.response.use(
     (error) => {
         console.error('Request Error:', error)
         // 处理 HTTP 状态码错误
-        if (error.response && error.response.status === 401) {
-             localStorage.removeItem('token')
-             window.location.href = '/login'
+        if (error.response) {
+            if (error.response.status === 401) {
+                // 401 未授权 - 尝试解析响应体
+                const data = error.response.data
+                localStorage.removeItem('token')
+                localStorage.removeItem('userInfo')
+                if (data && data.code === -2) {
+                    // JWT拦截器返回的401响应
+                    return Promise.reject(new Error(data.msg || 'Token无效或已过期'))
+                }
+                return Promise.reject(new Error('未授权，请重新登录'))
+            }
         }
         return Promise.reject(error)
     }

@@ -13,20 +13,28 @@
         class="exhibition-form-content"
       >
         <div class="form-layout">
-          <!-- 左侧：主图上传 -->
+          <!-- 左侧：封面图上传 -->
           <div class="main-image-section">
-            <el-form-item prop="coverImage">
-              <el-upload
-                class="main-image-uploader"
-                action="#"
-                :show-file-list="false"
-                :before-upload="beforeUpload"
-              >
-                <img v-if="form.coverImage" :src="form.coverImage" class="main-image" />
-                <div v-else class="main-image-placeholder">
-                  <el-icon class="upload-icon"><Plus /></el-icon>
-                </div>
-              </el-upload>
+            <!-- 封面图 -->
+            <el-form-item label="封面图" prop="coverImage">
+              <div class="image-upload-wrapper">
+                <el-upload
+                  class="square-image-uploader"
+                  action="#"
+                  :show-file-list="false"
+                  :before-upload="beforeCoverUpload"
+                >
+                  <div v-if="form.coverImage" class="image-preview">
+                    <img :src="form.coverImage" class="uploaded-image" />
+                    <div class="image-overlay">
+                      <el-icon class="delete-icon" @click.stop="handleRemoveCoverImage"><Close /></el-icon>
+                    </div>
+                  </div>
+                  <div v-else class="image-placeholder">
+                    <el-icon class="upload-icon"><Plus /></el-icon>
+                  </div>
+                </el-upload>
+              </div>
             </el-form-item>
             
             <!-- 门票价格 -->
@@ -40,6 +48,28 @@
                 />
                 <span class="price-unit">元/人次</span>
               </div>
+            </el-form-item>
+
+            <!-- 9-12点门票数量 -->
+            <el-form-item label="9-12点门票数" prop="morningTickets" class="tickets-item">
+              <el-input-number
+                v-model="form.morningTickets"
+                :min="1"
+                :max="10000"
+                class="tickets-input"
+                placeholder="9-12点时段门票数"
+              />
+            </el-form-item>
+
+            <!-- 14-17点门票数量 -->
+            <el-form-item label="14-17点门票数" prop="afternoonTickets" class="tickets-item">
+              <el-input-number
+                v-model="form.afternoonTickets"
+                :min="1"
+                :max="10000"
+                class="tickets-input"
+                placeholder="14-17点时段门票数"
+              />
             </el-form-item>
           </div>
 
@@ -95,20 +125,28 @@
         <!-- 介绍插图 -->
         <el-form-item label="介绍插图" class="detail-images-section">
           <div class="detail-images-list">
-            <el-upload
+            <div
               v-for="(item, index) in detailImagesList"
               :key="index"
               class="detail-image-item"
-              action="#"
-              :show-file-list="false"
-              :before-upload="(file: File) => handleDetailImageUpload(file, index)"
             >
-              <img v-if="item.url" :src="item.url" class="detail-image" />
-              <div v-else class="detail-image-placeholder">
-                <el-icon v-if="index < 2" class="add-icon"><Plus /></el-icon>
-                <el-icon v-else class="remove-icon" @click.stop="handleRemoveDetailImage(index)"><Close /></el-icon>
+              <el-upload
+                v-if="!item.url"
+                action="#"
+                :show-file-list="false"
+                :before-upload="(file: File) => handleDetailImageUpload(file, index)"
+              >
+                <div class="detail-image-placeholder">
+                  <el-icon class="add-icon"><Plus /></el-icon>
+                </div>
+              </el-upload>
+              <div v-else class="image-preview">
+                <img :src="item.url" class="detail-image" />
+                <div class="image-overlay">
+                  <el-icon class="delete-icon" @click="handleRemoveDetailImage(index)"><Close /></el-icon>
+                </div>
               </div>
-            </el-upload>
+            </div>
           </div>
         </el-form-item>
         
@@ -158,6 +196,8 @@ const form = reactive({
   startDate: '',
   endDate: '',
   price: 0,
+  morningTickets: 100,  // 9-12点门票数量
+  afternoonTickets: 100, // 14-17点门票数量
   coverImage: '',
   tags: [] as string[],
   status: 0
@@ -170,16 +210,22 @@ const rules: FormRules = {
   startDate: [{ required: true, message: '请选择开始时间', trigger: 'change' }],
   endDate: [{ required: true, message: '请选择结束时间', trigger: 'change' }],
   price: [{ required: true, message: '请输入门票价格', trigger: 'blur' }],
-  coverImage: [{ required: true, message: '请上传主图', trigger: 'change' }]
+  morningTickets: [{ required: true, message: '请输入9-12点门票数量', trigger: 'blur' }],
+  afternoonTickets: [{ required: true, message: '请输入14-17点门票数量', trigger: 'blur' }],
+  coverImage: [{ required: true, message: '请上传封面图', trigger: 'change' }]
 }
 
-const beforeUpload = (file: File) => {
+const beforeCoverUpload = (file: File) => {
   const reader = new FileReader()
   reader.onload = (e) => {
     form.coverImage = e.target?.result as string
   }
   reader.readAsDataURL(file)
   return false
+}
+
+const handleRemoveCoverImage = () => {
+  form.coverImage = ''
 }
 
 const handleDetailImageUpload = (file: File, index: number): boolean => {
@@ -207,6 +253,22 @@ const loadData = async () => {
         tagsArray = typeof data.tags === 'string' ? data.tags.split(',') : data.tags
     }
 
+    // 处理 detailImages: JSON字符串转数组
+    if (data.detailImages) {
+      try {
+        const imagesArray = JSON.parse(data.detailImages);
+        if (Array.isArray(imagesArray)) {
+          imagesArray.forEach((url, index) => {
+            if (index < detailImagesList.value.length) {
+              detailImagesList.value[index].url = url;
+            }
+          });
+        }
+      } catch (e) {
+        console.error('解析介绍插图失败:', e);
+      }
+    }
+
     Object.assign(form, {
       ...data,
       startDate: data.startDate,
@@ -225,10 +287,16 @@ const handleSubmit = async () => {
     if (valid) {
       loading.value = true
       try {
+        // 收集介绍插图
+        const detailImagesArray = detailImagesList.value
+          .filter(item => item.url)
+          .map(item => item.url);
+        
         // 转换 tags 数组为字符串，以匹配后端实体类类型
         const submitData = {
           ...form,
-          tags: Array.isArray(form.tags) ? form.tags.join(',') : form.tags
+          tags: Array.isArray(form.tags) ? form.tags.join(',') : form.tags,
+          detailImages: JSON.stringify(detailImagesArray) // 将介绍插图数组转为JSON字符串
         }
 
         if (isEdit.value) {
@@ -265,40 +333,78 @@ onMounted(() => {
         flex-shrink: 0;
         width: 300px;
 
-        .main-image-uploader {
-          :deep(.el-upload) {
-            width: 100%;
-            border: 1px solid #dcdfe6;
-            border-radius: 4px;
-            cursor: pointer;
-            position: relative;
-            overflow: hidden;
-            transition: all 0.3s;
-            background-color: #f5f7fa;
+        .image-upload-wrapper {
+          .square-image-uploader {
+            :deep(.el-upload) {
+              width: 200px;
+              height: 200px;
+              border: 1px dashed #dcdfe6;
+              border-radius: 6px;
+              cursor: pointer;
+              position: relative;
+              overflow: hidden;
+              transition: all 0.3s;
+              background-color: #fafafa;
+              display: block;
 
-            &:hover {
-              border-color: #409eff;
+              &:hover {
+                border-color: #409eff;
+              }
             }
-          }
 
-          .main-image {
-            width: 200px;
-            height: 400px;
-            object-fit: cover;
-            display: block;
-          }
+            .image-preview {
+              width: 200px;
+              height: 200px;
+              position: relative;
 
-          .main-image-placeholder {
-            width: 200px;
-            height: 400px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background-color: #f5f7fa;
+              .uploaded-image {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                display: block;
+              }
 
-            .upload-icon {
-              font-size: 48px;
-              color: #8c939d;
+              .image-overlay {
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background-color: rgba(0, 0, 0, 0.5);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                opacity: 0;
+                transition: opacity 0.3s;
+
+                &:hover {
+                  opacity: 1;
+                }
+
+                .delete-icon {
+                  font-size: 24px;
+                  color: #fff;
+                  cursor: pointer;
+
+                  &:hover {
+                    color: #f56c6c;
+                  }
+                }
+              }
+            }
+
+            .image-placeholder {
+              width: 200px;
+              height: 200px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              background-color: #fafafa;
+
+              .upload-icon {
+                font-size: 48px;
+                color: #8c939d;
+              }
             }
           }
         }
@@ -325,6 +431,19 @@ onMounted(() => {
               color: #606266;
               white-space: nowrap;
             }
+          }
+        }
+
+        .tickets-item {
+          margin-top: 20px;
+          margin-bottom: 0;
+
+          :deep(.el-form-item__label) {
+            font-weight: 500;
+          }
+
+          .tickets-input {
+            width: 100%;
           }
         }
       }
@@ -359,50 +478,78 @@ onMounted(() => {
         flex-wrap: wrap;
 
         .detail-image-item {
+          width: 120px;
+          height: 120px;
+          position: relative;
+
           :deep(.el-upload) {
             width: 120px;
             height: 120px;
-            border: 1px solid #dcdfe6;
-            border-radius: 4px;
+            border: 1px dashed #dcdfe6;
+            border-radius: 6px;
             cursor: pointer;
-            position: relative;
             overflow: hidden;
             transition: all 0.3s;
-            background-color: #f5f7fa;
+            background-color: #fafafa;
+            display: block;
 
             &:hover {
               border-color: #409eff;
             }
           }
 
-          .detail-image {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            display: block;
+          .image-preview {
+            width: 120px;
+            height: 120px;
+            position: relative;
+
+            .detail-image {
+              width: 100%;
+              height: 100%;
+              object-fit: cover;
+              display: block;
+            }
+
+            .image-overlay {
+              position: absolute;
+              top: 0;
+              left: 0;
+              right: 0;
+              bottom: 0;
+              background-color: rgba(0, 0, 0, 0.5);
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              opacity: 0;
+              transition: opacity 0.3s;
+
+              &:hover {
+                opacity: 1;
+              }
+
+              .delete-icon {
+                font-size: 24px;
+                color: #fff;
+                cursor: pointer;
+
+                &:hover {
+                  color: #f56c6c;
+                }
+              }
+            }
           }
 
           .detail-image-placeholder {
-            width: 100%;
-            height: 100%;
+            width: 120px;
+            height: 120px;
             display: flex;
             align-items: center;
             justify-content: center;
-            background-color: #f5f7fa;
+            background-color: #fafafa;
 
             .add-icon {
               font-size: 32px;
               color: #8c939d;
-            }
-
-            .remove-icon {
-              font-size: 32px;
-              color: #8c939d;
-              cursor: pointer;
-
-              &:hover {
-                color: #f56c6c;
-              }
             }
           }
         }

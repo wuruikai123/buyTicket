@@ -1,6 +1,6 @@
 <template>
     <div class="home">
-        <div class="menu-icon">
+        <div class="menu-icon" @click="goToAbout">
             <el-icon size="30">
                 <Expand />
             </el-icon>
@@ -11,13 +11,13 @@
             <el-carousel 
                 height="500px" 
                 :interval="5000" 
-                arrow="always"
+                arrow="hover"
                 :autoplay="true"
             >
                 <el-carousel-item v-for="banner in banners" :key="banner.id">
                     <div 
                         class="banner-item"
-                        :style="{ backgroundImage: `url(${banner.imageUrl})` }"
+                        :style="{ backgroundImage: `url(${banner.coverImage})` }"
                         @click="handleBannerClick(banner)"
                     >
                         <div class="banner-overlay"></div>
@@ -81,26 +81,19 @@ const router = useRouter();
 interface Banner {
     id: number;
     title: string;
-    imageUrl: string;
-    linkType: number;
-    linkId?: number;
-    linkUrl?: string;
+    exhibitionId: number;
+    exhibitionName: string;
+    coverImage: string;
+    sortOrder: number;
 }
 const banners = ref<Banner[]>([]);
-const currentBannerIndex = ref(0);
 
 // 近期展览列表
 const upcomingExhibitions = reactive<Exhibition[]>([]);
 
-// 处理轮播图点击
+// 处理轮播图点击 - 跳转到展览详情
 const handleBannerClick = (banner: Banner) => {
-    if (banner.linkType === 1 && banner.linkId) {
-        // 跳转到展览详情
-        router.push(`/ticket/${banner.linkId}`);
-    } else if (banner.linkType === 2 && banner.linkUrl) {
-        // 外部链接
-        window.open(banner.linkUrl, '_blank');
-    }
+    router.push(`/ticket/${banner.exhibitionId}`);
 };
 
 // 获取数据
@@ -131,6 +124,10 @@ onMounted(async () => {
 
 const goToExhibition = (exhibitionId: number) => {
     router.push(`/ticket/${exhibitionId}`)
+}
+
+const goToAbout = () => {
+    router.push('/about')
 }
 </script>
 
@@ -164,7 +161,7 @@ const goToExhibition = (exhibitionId: number) => {
     position: relative;
 }
 
-/* 隐藏 Element Plus 默认箭头，使用自定义样式 */
+/* 自定义轮播图箭头样式 */
 .banner-section :deep(.el-carousel__arrow) {
     background-color: rgba(255, 255, 255, 0.3);
     backdrop-filter: blur(10px);

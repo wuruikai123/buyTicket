@@ -33,7 +33,27 @@ public class Exhibition {
 
     private BigDecimal price;
 
+    /**
+     * 每小时门票数量
+     */
+    private Integer ticketsPerHour;
+
+    /**
+     * 9-12点时段门票数量
+     */
+    private Integer morningTickets;
+
+    /**
+     * 14-17点时段门票数量
+     */
+    private Integer afternoonTickets;
+
     private String coverImage;
+
+    /**
+     * 介绍插图（JSON数组格式存储多张图片）
+     */
+    private String detailImages;
 
     /**
      * 标签 (逗号分隔)

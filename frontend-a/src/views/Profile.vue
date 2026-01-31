@@ -21,15 +21,20 @@
                         <span>注册</span>
                     </button>
                 </template>
-                <!-- 已登录状态：显示地址簿和修改信息按钮 -->
+                <!-- 已登录状态：显示修改信息和退出登录按钮 -->
                 <template v-else>
-                    <button class="action-btn" @click="goToAddressBook">
+                    <!-- 隐藏地址簿按钮 - 非本期开发内容 -->
+                    <!-- <button class="action-btn" @click="goToAddressBook">
                         <el-icon><Location /></el-icon>
                         <span>地址簿</span>
-                    </button>
+                    </button> -->
                     <button class="action-btn" @click="goToEditProfile">
                         <el-icon><EditPen /></el-icon>
                         <span>修改信息</span>
+                    </button>
+                    <button class="action-btn logout-btn" @click="handleLogout">
+                        <el-icon><SwitchButton /></el-icon>
+                        <span>退出登录</span>
                     </button>
                 </template>
             </div>
@@ -47,17 +52,18 @@
             >
                 我的门票订单
             </div>
-            <div 
+            <!-- 隐藏商城订单标签页 - 非本期开发内容 -->
+            <!-- <div 
                 class="tab-item" 
                 :class="{ active: isMallActive, disabled: !isLoggedIn }"
                 @click="isLoggedIn && switchTab('mall')"
             >
                 我的商城订单
-            </div>
+            </div> -->
         </div>
 
-        <!-- 排序和筛选 -->
-        <div class="filter-bar">
+        <!-- 隐藏排序和筛选 - 非本期开发内容 -->
+        <!-- <div class="filter-bar">
             <div class="sort-options">
                 <span class="sort-label">排序</span>
                 <span class="sort-separator">|</span>
@@ -66,7 +72,7 @@
             <div class="filter-toggle">
                 <span>仅展示未核销的</span>
             </div>
-        </div>
+        </div> -->
 
         <!-- 订单列表 -->
         <div class="order-list">
@@ -82,7 +88,6 @@
                     class="order-card"
                     @click="goToOrderDetail(order)"
                 >
-                    <div class="order-image" :style="{ backgroundImage: order.coverImage ? `url(${order.coverImage})` : '' }"></div>
                     <div class="order-content">
                         <h3 class="order-title">{{ order.title }}</h3>
                         <div class="order-no-wrapper" v-if="order.orderNo">
@@ -99,6 +104,15 @@
                         <div class="status-badge" :class="'status-' + order.status">
                             {{ order.statusText }}
                         </div>
+                        <!-- 可删除订单的删除按钮 -->
+                        <button 
+                            v-if="canDeleteOrder(order.status)" 
+                            class="delete-btn" 
+                            @click.stop="handleDeleteOrder(order)"
+                            title="删除订单"
+                        >
+                            <el-icon><Delete /></el-icon>
+                        </button>
                     </div>
                 </div>
             </template>
@@ -107,10 +121,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onBeforeMount, onActivated } from 'vue';
+import { ref, reactive, computed, onMounted, onBeforeMount, onActivated, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
-import { Location, EditPen, CopyDocument } from '@element-plus/icons-vue';
-import { ElMessage } from 'element-plus';
+import { Location, EditPen, CopyDocument, SwitchButton, Delete } from '@element-plus/icons-vue';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import { userApi, type User } from '@/api/user';
 import { ticketApi } from '@/api/ticket';
 import { mallApi } from '@/api/mall';
@@ -135,7 +149,44 @@ const isLoggedIn = ref(false);
 // 检查是否有 token
 const checkLoginStatus = () => {
     const token = localStorage.getItem('token');
-    isLoggedIn.value = !!token;
+    if (!token) {
+        isLoggedIn.value = false;
+        return;
+    }
+    
+    try {
+        // 基本的token格式验证（JWT格式应该有两个点）
+        const parts = token.split('.');
+        if (parts.length !== 3) {
+            // token格式不正确，清除它
+            console.warn('Token格式无效，已清除');
+            localStorage.removeItem('token');
+            localStorage.removeItem('userInfo');
+            isLoggedIn.value = false;
+            return;
+        }
+        
+        // 尝试解析token的payload检查过期时间
+        const payload = JSON.parse(atob(parts[1]));
+        const exp = payload.exp;
+        if (exp && exp * 1000 < Date.now()) {
+            // token已过期
+            console.warn('Token已过期，已清除');
+            localStorage.removeItem('token');
+            localStorage.removeItem('userInfo');
+            isLoggedIn.value = false;
+            return;
+        }
+        
+        // token有效
+        isLoggedIn.value = true;
+    } catch (e) {
+        // 无法解析token，可能已损坏
+        console.warn('Token无法解析，已清除', e);
+        localStorage.removeItem('token');
+        localStorage.removeItem('userInfo');
+        isLoggedIn.value = false;
+    }
 };
 
 // 用户信息
@@ -235,8 +286,18 @@ const loadUserData = async () => {
                 coverImage: o.coverImage
             }));
         }
-    } catch (e) {
+    } catch (e: any) {
         console.error('获取数据失败', e);
+        // 如果是认证错误（token无效），跳转到登录页
+        const errorMsg = e?.message || '';
+        if (errorMsg.includes('Token') || errorMsg.includes('token') || errorMsg.includes('登录') || errorMsg.includes('授权')) {
+            // request.ts已经清除了localStorage
+            isLoggedIn.value = false;
+            // 使用nextTick确保在当前生命周期完成后跳转
+            nextTick(() => {
+                router.push('/login');
+            });
+        }
     }
 };
 
@@ -250,12 +311,21 @@ onMounted(async () => {
     await loadUserData();
 });
 
-// 当组件被激活时（从其他页面返回时）重新检查登录状态
+// 当组件被激活时（从其他页面返回时）重新检查登录状态和加载数据
 onActivated(() => {
     const wasLoggedIn = isLoggedIn.value;
     checkLoginStatus();
+    
+    // 如果没有token，直接返回，不尝试加载数据
+    if (!isLoggedIn.value) {
+        return;
+    }
+    
     // 如果之前未登录，现在已登录，则加载数据
     if (!wasLoggedIn && isLoggedIn.value) {
+        loadUserData();
+    } else if (isLoggedIn.value) {
+        // 如果已登录，也重新加载数据（可能信息已更新）
         loadUserData();
     }
 });
@@ -265,7 +335,8 @@ const getStatusText = (status: number) => {
         0: '待支付',
         1: '待使用',
         2: '已使用',
-        3: '已取消'
+        3: '已取消',
+        4: '已作废'
     };
     return map[status] || '未知';
 };
@@ -301,6 +372,74 @@ const copyOrderNo = async (orderNo: string) => {
             ElMessage.error('复制失败，请手动复制');
         }
         document.body.removeChild(textarea);
+    }
+};
+
+// 退出登录
+const handleLogout = async () => {
+    try {
+        await ElMessageBox.confirm('确定要退出登录吗？', '提示', {
+            confirmButtonText: '确定',
+            cancelButtonText: '取消',
+            type: 'warning'
+        });
+        
+        // 清除本地存储
+        localStorage.removeItem('token');
+        localStorage.removeItem('userInfo');
+        
+        // 重置状态
+        isLoggedIn.value = false;
+        ticketOrders.value = [];
+        mallOrders.value = [];
+        
+        ElMessage.success('已退出登录');
+        
+        // 跳转到登录页
+        router.push('/login');
+    } catch (e) {
+        // 用户取消
+    }
+};
+
+// 判断订单是否可以删除
+const canDeleteOrder = (status: number) => {
+    // 可删除的订单状态：0=待支付, 2=已使用, 3=已取消, 4=已作废
+    // 不可删除：1=待使用（未核销）
+    return status === 0 || status === 2 || status === 3 || status === 4;
+};
+
+// 删除订单
+const handleDeleteOrder = async (order: Order) => {
+    try {
+        const statusText = order.statusText;
+        await ElMessageBox.confirm(
+            `确定要删除这个${statusText}的订单吗？删除后将无法恢复。`,
+            '删除订单',
+            {
+                confirmButtonText: '确定删除',
+                cancelButtonText: '取消',
+                type: 'warning',
+                confirmButtonClass: 'el-button--danger'
+            }
+        );
+        
+        // 调用删除接口
+        const type = isTicketsActive.value ? 'ticket' : 'mall';
+        if (type === 'ticket') {
+            await ticketApi.deleteOrder(order.id);
+        } else {
+            await mallApi.deleteOrder(order.id);
+        }
+        
+        ElMessage.success('订单已删除');
+        
+        // 重新加载订单列表
+        await loadUserData();
+    } catch (e: any) {
+        if (e !== 'cancel') {
+            ElMessage.error(e.message || '删除失败');
+        }
     }
 };
 </script>
@@ -410,6 +549,19 @@ const copyOrderNo = async (orderNo: string) => {
     color: #333 !important;
 }
 
+/* 退出登录按钮样式 */
+.logout-btn {
+    background-color: #fef0f0 !important;
+    color: #f56c6c !important;
+    border-color: #fbc4c4 !important;
+}
+
+.logout-btn:hover {
+    background-color: #f56c6c !important;
+    color: white !important;
+    border-color: #f56c6c !important;
+}
+
 /* 标签页 */
 .tabs {
     display: flex;
@@ -509,6 +661,7 @@ const copyOrderNo = async (orderNo: string) => {
     background-color: white;
     border-radius: 12px;
     display: flex;
+    flex-direction: column;
     position: relative;
     overflow: hidden;
     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
@@ -516,6 +669,7 @@ const copyOrderNo = async (orderNo: string) => {
     margin-bottom: 16px;
     cursor: pointer;
     transition: transform 0.2s, box-shadow 0.2s;
+    padding: 16px;
 }
 
 .order-card:hover {
@@ -523,20 +677,8 @@ const copyOrderNo = async (orderNo: string) => {
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
 }
 
-.order-image {
-    width: 140px;
-    height: 140px;
-    background-color: #d0d0d0;
-    background-size: cover;
-    background-position: center;
-    flex-shrink: 0;
-    border-radius: 12px 0 0 12px;
-    margin: 8px 0 8px 8px;
-}
-
 .order-content {
     flex: 1;
-    padding: 20px 16px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -612,8 +754,10 @@ const copyOrderNo = async (orderNo: string) => {
 
 .order-action {
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 8px;
     padding: 16px 12px;
     flex-shrink: 0;
     width: 90px;
@@ -628,6 +772,34 @@ const copyOrderNo = async (orderNo: string) => {
     font-size: 14px;
     font-weight: 500;
     text-align: center;
+    width: 100%;
+}
+
+/* 删除按钮 */
+.delete-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background-color: #fef0f0;
+    border: 1px solid #fbc4c4;
+    border-radius: 50%;
+    color: #f56c6c;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    padding: 0;
+}
+
+.delete-btn:hover {
+    background-color: #f56c6c;
+    color: white;
+    border-color: #f56c6c;
+    transform: scale(1.1);
+}
+
+.delete-btn .el-icon {
+    font-size: 16px;
 }
 
 .status-0 {
@@ -724,16 +896,7 @@ const copyOrderNo = async (orderNo: string) => {
         overflow: hidden;
     }
 
-    .order-image {
-        width: 90px;
-        height: 90px;
-        border-radius: 8px 0 0 8px;
-        margin: 0;
-        flex-shrink: 0;
-    }
-
     .order-content {
-        padding: 12px 8px;
         min-width: 0;
         flex: 1;
     }
@@ -774,11 +937,6 @@ const copyOrderNo = async (orderNo: string) => {
 
 /* iPhone 14 Pro 优化 (390px) */
 @media (max-width: 390px) {
-    .order-image {
-        width: 80px;
-        height: 80px;
-    }
-
     .order-content {
         padding: 10px 6px;
     }

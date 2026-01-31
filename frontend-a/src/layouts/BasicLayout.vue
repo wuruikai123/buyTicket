@@ -31,7 +31,8 @@ const route = useRoute()
 const navItems = [
     { path: '/', label: '首页', icon: HomeFilled },
     { path: '/exhibitions', label: '近期展览', icon: Calendar },
-    { path: '/mall', label: '文创商城', icon: ShoppingBag },
+    // 隐藏文创商城 - 非本期开发内容，保留路由和页面代码
+    // { path: '/mall', label: '文创商城', icon: ShoppingBag },
     { path: '/profile', label: '我的', icon: User },
 ]
 

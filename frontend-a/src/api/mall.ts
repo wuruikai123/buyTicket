@@ -78,5 +78,10 @@ export const mallApi = {
     // 根据订单号获取订单详情
     getOrderByOrderNo(orderNo: string) {
         return request.get<any, any>(`/order/mall/by-order-no/${orderNo}`)
+    },
+
+    // 删除订单
+    deleteOrder(id: number) {
+        return request.delete(`/order/mall/${id}`)
     }
 }

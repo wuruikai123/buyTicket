@@ -5,12 +5,11 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.buyticket.dto.TicketOrderCreateRequest;
 import com.buyticket.entity.Exhibition;
 import com.buyticket.entity.OrderItem;
-import com.buyticket.entity.TicketInventory;
 import com.buyticket.entity.TicketOrder;
 import com.buyticket.mapper.OrderItemMapper;
-import com.buyticket.mapper.TicketInventoryMapper;
 import com.buyticket.mapper.TicketOrderMapper;
 import com.buyticket.service.ExhibitionService;
+import com.buyticket.service.ExhibitionTimeSlotInventoryService;
 import com.buyticket.service.TicketOrderService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -25,32 +24,35 @@ public class TicketOrderServiceImpl extends ServiceImpl<TicketOrderMapper, Ticke
     @Autowired
     private OrderItemMapper orderItemMapper;
     @Autowired
-    private TicketInventoryMapper ticketInventoryMapper;
-    @Autowired
     private ExhibitionService exhibitionService;
+    @Autowired
+    private ExhibitionTimeSlotInventoryService inventoryService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> createOrder(Long userId, TicketOrderCreateRequest request) {
-        // 1. 扣减库存 (简化版: 直接查出来改，高并发需用乐观锁或Redis)
+        // 1. 获取展览信息
         Exhibition exhibition = exhibitionService.getById(request.getExhibitionId());
+        if (exhibition == null) {
+            throw new RuntimeException("展览不存在");
+        }
         
+        // 2. 扣减库存（使用新的库存系统）
         for (TicketOrderCreateRequest.TicketItemRequest item : request.getItems()) {
-            LambdaQueryWrapper<TicketInventory> queryWrapper = new LambdaQueryWrapper<>();
-            queryWrapper.eq(TicketInventory::getExhibitionId, request.getExhibitionId())
-                        .eq(TicketInventory::getTicketDate, item.getDate())
-                        .eq(TicketInventory::getTimeSlot, item.getTimeSlot());
-            
-            TicketInventory inventory = ticketInventoryMapper.selectOne(queryWrapper);
-            if (inventory == null || inventory.getTotalCount() - inventory.getSoldCount() < item.getQuantity()) {
-                throw new RuntimeException("库存不足: " + item.getDate() + " " + item.getTimeSlot());
+            try {
+                inventoryService.decreaseInventory(
+                    request.getExhibitionId(),
+                    item.getDate(),
+                    item.getTimeSlot(),
+                    item.getQuantity()
+                );
+            } catch (RuntimeException e) {
+                // 库存不足或并发冲突，抛出异常回滚事务
+                throw new RuntimeException(item.getDate() + " " + item.getTimeSlot() + " " + e.getMessage());
             }
-            
-            inventory.setSoldCount(inventory.getSoldCount() + item.getQuantity());
-            ticketInventoryMapper.updateById(inventory);
         }
 
-        // 2. 创建订单
+        // 3. 创建订单
         TicketOrder order = new TicketOrder();
         order.setUserId(userId);
         order.setTotalAmount(request.getTotalAmount());
@@ -64,7 +66,7 @@ public class TicketOrderServiceImpl extends ServiceImpl<TicketOrderMapper, Ticke
         
         this.save(order);
 
-        // 3. 创建订单详情
+        // 4. 创建订单详情
         for (TicketOrderCreateRequest.TicketItemRequest item : request.getItems()) {
             OrderItem orderItem = new OrderItem();
             orderItem.setOrderId(order.getId());

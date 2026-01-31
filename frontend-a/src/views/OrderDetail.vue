@@ -107,6 +107,10 @@
       <div class="action-section" v-if="order.status === 0">
         <el-button type="primary" size="large" @click="handlePay">立即支付</el-button>
         <el-button size="large" @click="handleCancel">取消订单</el-button>
+        <el-button size="large" @click="loadOrderDetail">刷新状态</el-button>
+      </div>
+      <div class="action-section" v-else-if="order.status === 1 && orderType === 'ticket'">
+        <el-button type="primary" size="large" @click="loadOrderDetail">刷新状态</el-button>
       </div>
     </div>
   </div>
@@ -151,7 +155,11 @@ const router = useRouter()
 const route = useRoute()
 const loading = ref(false)
 
-const orderId = computed(() => Number(route.params.id))
+// 路由参数可能为空或非数字，这里兜底为 0 并避免 NaN 传到后端导致转换异常
+const orderId = computed(() => {
+  const id = Number(route.params.id)
+  return Number.isFinite(id) ? id : 0
+})
 const orderType = computed(() => route.query.type as string || 'ticket')
 
 const order = ref<OrderDetail>({
@@ -198,6 +206,10 @@ const statusDesc = computed(() => {
 const loadOrderDetail = async () => {
   loading.value = true
   try {
+    if (!orderId.value) {
+      ElMessage.error('订单ID无效')
+      return
+    }
     let res: any
     if (orderType.value === 'ticket') {
       res = await ticketApi.getOrderDetail(orderId.value)
@@ -219,18 +231,17 @@ const goBack = () => {
   router.back()
 }
 
-const handlePay = async () => {
-  try {
-    await mallApi.pay({
-      orderId: order.value.id,
-      type: orderType.value,
-      password: '123456'
-    })
-    ElMessage.success('支付成功')
-    loadOrderDetail()
-  } catch (e: any) {
-    ElMessage.error(e.message || '支付失败')
-  }
+const handlePay = () => {
+  // 跳转到支付页面进行真正的支付宝支付
+  router.push({
+    name: 'Payment',
+    params: {
+      orderId: order.value.id
+    },
+    query: {
+      type: orderType.value
+    }
+  })
 }
 
 const handleCancel = async () => {
@@ -275,32 +286,58 @@ onMounted(() => {
   loadOrderDetail()
   
   // 如果订单状态为待支付，每隔2秒自动刷新一次，直到状态改变
-  const checkInterval = setInterval(async () => {
-    if (order.value.status === 0) {
-      try {
-        let res: any
-        if (orderType.value === 'ticket') {
-          res = await ticketApi.getOrderDetail(orderId.value)
-        } else {
-          res = await mallApi.getOrderDetail(orderId.value)
-        }
-        if (res && res.status !== 0) {
-          // 订单状态已改变，更新数据并停止轮询
-          order.value = res
-          clearInterval(checkInterval)
-          console.log('订单状态已更新:', res.status)
-        }
-      } catch (e) {
-        console.error('自动刷新订单失败:', e)
-      }
-    } else {
-      // 订单状态不是待支付，停止轮询
-      clearInterval(checkInterval)
+  let checkInterval: number | undefined;
+  
+  const startPolling = () => {
+    if (checkInterval) {
+      clearInterval(checkInterval);
     }
-  }, 2000)
+    
+    checkInterval = setInterval(async () => {
+      if (order.value.status === 0) {
+        try {
+          if (!orderId.value) {
+            if (checkInterval) {
+              clearInterval(checkInterval);
+            }
+            return;
+          }
+          let res: any;
+          if (orderType.value === 'ticket') {
+            res = await ticketApi.getOrderDetail(orderId.value);
+          } else {
+            res = await mallApi.getOrderDetail(orderId.value);
+          }
+          if (res && res.status !== 0) {
+            // 订单状态已改变，更新数据并停止轮询
+            order.value = res;
+            if (checkInterval) {
+              clearInterval(checkInterval);
+            }
+            console.log('订单状态已更新:', res.status);
+            ElMessage.success('订单状态已更新');
+          }
+        } catch (e) {
+          console.error('自动刷新订单失败:', e);
+        }
+      } else {
+        // 订单状态不是待支付，停止轮询
+        if (checkInterval) {
+          clearInterval(checkInterval);
+        }
+      }
+    }, 2000);
+  };
+  
+  // 开始轮询
+  startPolling();
   
   // 组件卸载时清除定时器
-  return () => clearInterval(checkInterval)
+  return () => {
+    if (checkInterval) {
+      clearInterval(checkInterval);
+    }
+  };
 })
 </script>
 

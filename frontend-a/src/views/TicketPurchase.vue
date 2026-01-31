@@ -107,11 +107,22 @@ const loadExhibitionData = async (id: number) => {
     try {
         const data = await exhibitionApi.getDetail(id);
         if (data) {
+            // 解析介绍插图
+            let imagesArray: string[] = [];
+            if (data.detailImages) {
+                try {
+                    imagesArray = JSON.parse(data.detailImages);
+                } catch (e) {
+                    console.error('解析介绍插图失败:', e);
+                }
+            }
+            
             exhibition.value = {
                 ...data,
                 // 兼容前端字段名
                 shortDescription: data.shortDesc || '',
-                dateRange: data.startDate && data.endDate ? `${data.startDate} — ${data.endDate}` : '待定'
+                dateRange: data.startDate && data.endDate ? `${data.startDate} — ${data.endDate}` : '待定',
+                images: imagesArray
             };
         }
     } catch (e) {

@@ -19,14 +19,14 @@
         </div>
         <div class="nav-divider"></div>
 
-        <!-- 排序/筛选栏 -->
-        <div class="filter-bar">
+        <!-- 隐藏排序/筛选栏 - 非本期开发内容 -->
+        <!-- <div class="filter-bar">
             <div class="sort-options">
                 <span class="sort-label">排序</span>
                 <span class="sort-separator">|</span>
                 <span class="sort-value">开展时间最近优先</span>
             </div>
-        </div>
+        </div> -->
 
         <!-- 展览列表 -->
         <div class="exhibition-list">

@@ -12,13 +12,27 @@ import java.time.LocalDateTime;
 public class Banner {
     @TableId(type = IdType.AUTO)
     private Long id;
+    
+    /**
+     * 关联的展览ID
+     */
+    private Long exhibitionId;
+    
+    /**
+     * 轮播图标题
+     */
     private String title;
-    private String imageUrl;
-    private String linkUrl;
-    private Integer linkType;
-    private Long linkId;
+    
+    /**
+     * 排序号（数字越小越靠前）
+     */
     private Integer sortOrder;
+    
+    /**
+     * 状态（0:禁用, 1:启用）
+     */
     private Integer status;
+    
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

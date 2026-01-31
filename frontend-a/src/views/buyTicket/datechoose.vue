@@ -55,18 +55,39 @@
 
         <!-- 时间段选择 -->
         <div class="time-selector">
-            <div class="time-selector-item">
-                <span class="time-value">{{ selectedTimeSlot }}</span>
-                <div class="selector-arrows">
-                    <el-icon class="arrow-up" @click="changeTimeSlot(1)"><ArrowUp /></el-icon>
-                    <el-icon class="arrow-down" @click="changeTimeSlot(-1)"><ArrowDown /></el-icon>
+            <h3 class="section-title">选择时间段</h3>
+            <div class="time-slots-grid">
+                <div 
+                    v-for="slot in timeSlots" 
+                    :key="slot"
+                    class="time-slot-card"
+                    :class="{ 
+                        'selected': selectedTimeSlot === slot,
+                        'sold-out': getSlotInventory(slot) === 0
+                    }"
+                    @click="selectTimeSlot(slot)"
+                >
+                    <div class="time-slot-time">{{ slot }}</div>
+                    <div class="time-slot-name">{{ getSlotName(slot) }}</div>
+                    <div class="time-slot-availability">
+                        <span v-if="getSlotInventory(slot) > 0" class="available">
+                            剩余 {{ getSlotInventory(slot) }} 张
+                        </span>
+                        <span v-else class="sold-out-text">已售罄</span>
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- 剩余票数 -->
-        <div class="availability">
-            <span class="availability-text">剩余{{ remainingTickets }}张</span>
+        <div class="availability" v-if="selectedTimeSlot">
+            <span class="availability-text">
+                已选择：{{ getSlotName(selectedTimeSlot) }} 
+                <span v-if="remainingTickets > 0" class="tickets-count">
+                    (剩余{{ remainingTickets }}张)
+                </span>
+                <span v-else class="tickets-sold-out">(已售罄)</span>
+            </span>
         </div>
 
         <!-- 确认按钮 -->
@@ -107,17 +128,43 @@ const now = new Date();
 const selectedYear = ref(now.getFullYear());
 const selectedMonth = ref(now.getMonth() + 1);
 const selectedDate = ref<Date | null>(now);
-const selectedTimeSlot = ref('09:00-12:00'); // 注意格式需与数据库一致
+const selectedTimeSlot = ref('09:00-12:00');
 const remainingTickets = ref(0);
+
+// 存储所有时间段的库存
+const slotsInventory = ref<Map<string, number>>(new Map());
 
 // 星期标签
 const weekdays = ['一', '二', '三', '四', '五', '六', '日'];
 
-// 时间段选项 (需与数据库一致)
+// 时间段选项 (只保留两个时间段)
 const timeSlots = [
     '09:00-12:00',
     '14:00-17:00'
 ];
+
+// 获取时间段名称
+const getSlotName = (slot: string) => {
+    if (slot === '09:00-12:00') return '上午场';
+    if (slot === '14:00-17:00') return '下午场';
+    return slot;
+};
+
+// 获取时间段库存
+const getSlotInventory = (slot: string) => {
+    return slotsInventory.value.get(slot) || 0;
+};
+
+// 选择时间段
+const selectTimeSlot = (slot: string) => {
+    const inventory = getSlotInventory(slot);
+    if (inventory <= 0) {
+        alert('该时间段已售罄，请选择其他时间段');
+        return;
+    }
+    selectedTimeSlot.value = slot;
+    remainingTickets.value = inventory;
+};
 
 // 计算日历日期 (保持原有逻辑，略微调整)
 const calendarDates = computed(() => {
@@ -210,20 +257,53 @@ const changeMonth = (delta: number) => {
 const selectDate = (dateInfo: CalendarDate) => {
     if (!dateInfo.otherMonth && !dateInfo.disabled) {
         selectedDate.value = dateInfo.date;
-        updateRemainingTickets();
+        // 加载所有时间段的库存
+        loadAllSlotsInventory();
     }
 };
 
-// 改变时间段
+// 改变时间段（已废弃，改用点击选择）
 const changeTimeSlot = (delta: number) => {
     const currentIndex = timeSlots.indexOf(selectedTimeSlot.value);
     if (currentIndex !== -1) {
         let newIndex = currentIndex + delta;
         if (newIndex < 0) newIndex = timeSlots.length - 1;
         if (newIndex >= timeSlots.length) newIndex = 0;
-        selectedTimeSlot.value = timeSlots[newIndex];
-        updateRemainingTickets();
+        selectTimeSlot(timeSlots[newIndex]);
     }
+};
+
+// 加载所有时间段的库存
+const loadAllSlotsInventory = async () => {
+    if (!selectedDate.value || !exhibition.value.id) return;
+    
+    const dateStr = formatDate(selectedDate.value);
+    const inventoryMap = new Map<string, number>();
+    
+    // 并发加载所有时间段的库存
+    const promises = timeSlots.map(async (slot) => {
+        try {
+            const res = await ticketApi.getAvailability({
+                exhibitionId: exhibition.value.id,
+                date: dateStr,
+                timeSlot: slot
+            });
+            if (res) {
+                inventoryMap.set(slot, res.remainingCount || 0);
+            } else {
+                inventoryMap.set(slot, 0);
+            }
+        } catch (e) {
+            console.error(`加载时间段 ${slot} 库存失败:`, e);
+            inventoryMap.set(slot, 0);
+        }
+    });
+    
+    await Promise.all(promises);
+    slotsInventory.value = inventoryMap;
+    
+    // 更新当前选中时间段的库存
+    remainingTickets.value = getSlotInventory(selectedTimeSlot.value);
 };
 
 // 格式化日期 YYYY-MM-DD
@@ -234,23 +314,9 @@ const formatDate = (date: Date) => {
     return `${y}-${m}-${d}`;
 };
 
-// 更新剩余票数
+// 更新剩余票数（保留用于兼容）
 const updateRemainingTickets = async () => {
-    if (!selectedDate.value || !exhibition.value.id) return;
-    
-    try {
-        const res = await ticketApi.getAvailability({
-            exhibitionId: exhibition.value.id,
-            date: formatDate(selectedDate.value),
-            timeSlot: selectedTimeSlot.value
-        });
-        if (res) {
-            remainingTickets.value = res.remainingCount;
-        }
-    } catch (e) {
-        console.error(e);
-        remainingTickets.value = 0;
-    }
+    await loadAllSlotsInventory();
 };
 
 // 返回上一页
@@ -289,8 +355,8 @@ const loadExhibitionInfo = async (id: number) => {
         if (data) {
             exhibition.value.id = data.id;
             exhibition.value.name = data.name;
-            // 加载完展览信息后，获取一次余票
-            updateRemainingTickets();
+            // 加载完展览信息后，获取所有时间段的库存
+            loadAllSlotsInventory();
         }
     } catch (e) {
         console.error(e);
@@ -503,6 +569,81 @@ onMounted(() => {
     margin-bottom: 12px;
 }
 
+.section-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+    margin: 0 0 16px 0;
+}
+
+.time-slots-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+}
+
+.time-slot-card {
+    padding: 16px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background-color: white;
+    text-align: center;
+}
+
+.time-slot-card:hover:not(.sold-out) {
+    border-color: #409eff;
+    background-color: #f0f7ff;
+}
+
+.time-slot-card.selected {
+    border-color: #409eff;
+    background-color: #e6f2ff;
+}
+
+.time-slot-card.sold-out {
+    border-color: #dcdcdc;
+    background-color: #f5f5f5;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.time-slot-time {
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 4px;
+}
+
+.time-slot-card.sold-out .time-slot-time {
+    color: #999;
+}
+
+.time-slot-name {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 8px;
+}
+
+.time-slot-card.sold-out .time-slot-name {
+    color: #999;
+}
+
+.time-slot-availability {
+    font-size: 13px;
+}
+
+.time-slot-availability .available {
+    color: #67c23a;
+    font-weight: 500;
+}
+
+.time-slot-availability .sold-out-text {
+    color: #f56c6c;
+    font-weight: 500;
+}
+
 .time-selector-item {
     display: flex;
     align-items: center;
@@ -529,6 +670,16 @@ onMounted(() => {
 .availability-text {
     font-size: 16px;
     color: #333;
+}
+
+.tickets-count {
+    color: #67c23a;
+    font-weight: 600;
+}
+
+.tickets-sold-out {
+    color: #f56c6c;
+    font-weight: 600;
 }
 
 /* 确认按钮 */
@@ -570,6 +721,10 @@ onMounted(() => {
 
     .calendar-date {
         font-size: 13px;
+    }
+    
+    .time-slots-grid {
+        grid-template-columns: 1fr;
     }
 }
 </style>
