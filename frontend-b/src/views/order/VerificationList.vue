@@ -3,7 +3,7 @@
     <el-card>
       <template #header>
         <div class="card-header">
-          <span>订单核销管理</span>
+          <span>订单管理</span>
         </div>
       </template>
 
@@ -15,9 +15,13 @@
           <el-button type="primary" @click="handleVerifyByOrderNo">核销订单</el-button>
         </el-form-item>
         <el-form-item label="订单状态">
-          <el-select v-model="searchForm.status" placeholder="全部" clearable>
+          <el-select v-model="searchForm.status" placeholder="请选择状态" clearable>
+            <el-option label="全部" :value="undefined" />
             <el-option label="待使用" :value="1" />
             <el-option label="已使用" :value="2" />
+            <el-option label="已取消" :value="3" />
+            <el-option label="退款中" :value="5" />
+            <el-option label="已退款" :value="6" />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -29,23 +33,33 @@
         <el-table-column prop="id" label="订单ID" width="80" />
         <el-table-column prop="orderNo" label="订单号" width="180" />
         <el-table-column prop="exhibitionName" label="展览名称" />
-        <el-table-column prop="contactName" label="联系人" width="100" />
-        <el-table-column prop="contactPhone" label="联系电话" width="120" />
+        <el-table-column prop="contactName" label="真实姓名" width="100" />
+        <el-table-column prop="contactPhone" label="身份证号" width="180" />
         <el-table-column prop="totalAmount" label="金额" width="100">
           <template #default="{ row }">
             ¥{{ row.totalAmount }}
           </template>
         </el-table-column>
-        <el-table-column label="状态" width="100">
+        <el-table-column label="状态" width="120">
           <template #default="{ row }">
             <el-tag v-if="row.status === 0" type="info">待支付</el-tag>
             <el-tag v-else-if="row.status === 1" type="warning">待使用</el-tag>
             <el-tag v-else-if="row.status === 2" type="success">已使用</el-tag>
             <el-tag v-else-if="row.status === 3" type="danger">已取消</el-tag>
+            <el-tag v-else-if="row.status === 5" type="warning">退款中</el-tag>
+            <el-tag v-else-if="row.status === 6" type="info">已退款</el-tag>
+            <div v-if="row.status === 5" style="color: #e6a23c; font-size: 12px; margin-top: 4px;">
+              申请退款
+            </div>
           </template>
         </el-table-column>
         <el-table-column prop="createTime" label="下单时间" width="180" />
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column prop="refundTime" label="退款时间" width="180">
+          <template #default="{ row }">
+            {{ row.refundTime || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="250" fixed="right">
           <template #default="{ row }">
             <el-button 
               v-if="row.status === 1" 
@@ -63,6 +77,14 @@
             >
               重置
             </el-button>
+            <el-button 
+              v-if="row.status === 1 || row.status === 5" 
+              link 
+              type="danger" 
+              @click="handleRefund(row)"
+            >
+              退款
+            </el-button>
             <el-button link class="detail-btn" @click="handleDetail(row)">详情</el-button>
           </template>
         </el-table-column>
@@ -72,8 +94,11 @@
         v-model:current-page="currentPage"
         v-model:page-size="pageSize"
         :total="total"
-        layout="total, prev, pager, next"
+        :page-sizes="[10, 20, 50, 100]"
+        layout="total, sizes, prev, pager, next, jumper"
+        @size-change="fetchData"
         @current-change="fetchData"
+        style="margin-top: 20px; justify-content: flex-end"
       />
     </el-card>
 
@@ -86,13 +111,16 @@
           <el-tag v-else-if="detailData.status === 1" type="warning">待使用</el-tag>
           <el-tag v-else-if="detailData.status === 2" type="success">已使用</el-tag>
           <el-tag v-else-if="detailData.status === 3" type="danger">已取消</el-tag>
+          <el-tag v-else-if="detailData.status === 5" type="warning">退款中</el-tag>
+          <el-tag v-else-if="detailData.status === 6" type="info">已退款</el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="展览名称">{{ detailData.exhibitionName }}</el-descriptions-item>
-        <el-descriptions-item label="联系人">{{ detailData.contactName }}</el-descriptions-item>
-        <el-descriptions-item label="联系电话">{{ detailData.contactPhone }}</el-descriptions-item>
+        <el-descriptions-item label="真实姓名">{{ detailData.contactName }}</el-descriptions-item>
+        <el-descriptions-item label="身份证号">{{ detailData.contactPhone }}</el-descriptions-item>
         <el-descriptions-item label="订单金额">¥{{ detailData.totalAmount }}</el-descriptions-item>
         <el-descriptions-item label="下单时间">{{ detailData.createTime }}</el-descriptions-item>
         <el-descriptions-item label="核销时间">{{ detailData.verifyTime || '未核销' }}</el-descriptions-item>
+        <el-descriptions-item label="退款时间">{{ detailData.refundTime || '-' }}</el-descriptions-item>
       </el-descriptions>
     </el-dialog>
   </div>
@@ -202,6 +230,21 @@ const handleDetail = async (row: Order) => {
     detailVisible.value = true
   } catch (e: any) {
     ElMessage.error(e.message || '获取详情失败')
+  }
+}
+
+const handleRefund = async (row: Order) => {
+  try {
+    await ElMessageBox.confirm('确定要退款这个订单吗？退款后将恢复库存。', '提示', {
+      type: 'warning'
+    })
+    await request.post(`/admin/order/ticket/${row.id}/refund`)
+    ElMessage.success('退款成功')
+    fetchData()
+  } catch (e: any) {
+    if (e !== 'cancel') {
+      ElMessage.error(e.message || '退款失败')
+    }
   }
 }
 

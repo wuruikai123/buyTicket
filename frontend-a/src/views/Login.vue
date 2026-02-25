@@ -1,221 +1,342 @@
 <template>
-  <div class="login-container">
-    <div class="login-card">
-      <div class="login-header">
-        <h2 class="title">{{ isLogin ? '欢迎登录' : '注册账号' }}</h2>
-        <p class="subtitle">{{ isLogin ? '登录以访问您的购票信息' : '创建新账号开启艺术之旅' }}</p>
-      </div>
-      
-      <form @submit.prevent="handleSubmit" class="login-form">
-        <div class="form-group">
-          <label class="form-label">用户名</label>
-          <input v-model="form.username" type="text" class="form-input" placeholder="请输入用户名" required />
-        </div>
-        
-        <div class="form-group">
-          <label class="form-label">密码</label>
-          <input v-model="form.password" type="password" class="form-input" placeholder="请输入密码" required />
+    <div class="login-page">
+        <!-- 关闭按钮 -->
+        <button class="close-btn" @click="handleClose">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path d="M15 5L5 15M5 5L15 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+        </button>
+
+        <!-- Logo -->
+        <div class="logo-section">
+            <img src="/pageAssets/logo-header.svg" alt="AI+艺术馆" class="logo" />
         </div>
 
-        <div class="form-group" v-if="!isLogin">
-          <label class="form-label">手机号</label>
-          <input v-model="form.phone" type="tel" class="form-input" placeholder="请输入手机号" required />
-        </div>
-        
-        <button type="submit" class="submit-btn">{{ isLogin ? '登 录' : '注 册' }}</button>
-      </form>
-      
-      <div class="login-footer">
-        <span class="footer-text">{{ isLogin ? '还没有账号？' : '已有账号？' }}</span>
-        <span class="toggle-btn" @click="toggleMode">{{ isLogin ? '立即注册' : '立即登录' }}</span>
-      </div>
+        <!-- 表单区域 -->
+        <div class="form-section">
+            <!-- 手机号 -->
+            <input 
+                v-model="phone" 
+                type="tel" 
+                placeholder="手机号" 
+                maxlength="11"
+                class="input-field"
+            />
 
-      <!-- 为了测试方便 -->
-      <div class="debug-info" v-if="isLogin">
-        <p>测试账号: zhangsan / 123456</p>
-      </div>
+            <!-- 验证码 -->
+            <div class="code-row">
+                <input 
+                    v-model="code" 
+                    type="text" 
+                    placeholder="短信验证码" 
+                    maxlength="6"
+                    class="input-field code-input"
+                />
+                <button 
+                    class="code-btn" 
+                    :disabled="countdown > 0"
+                    @click="sendCode"
+                >
+                    {{ countdown > 0 ? `${countdown}s` : '获取验证码' }}
+                </button>
+            </div>
+
+            <!-- 协议 -->
+            <div class="agreement-row">
+                <el-checkbox v-model="agreed" />
+                <span class="agreement-text">
+                    我已阅读并同意
+                    <router-link to="/service-terms" class="link">服务协议</router-link>
+                </span>
+            </div>
+
+            <!-- 登录按钮 -->
+            <button class="login-btn" @click="handleLogin">登录</button>
+
+            <!-- 提示 -->
+            <div class="tip">未注册的手机号点击登录后会自动注册</div>
+        </div>
     </div>
-  </div>
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import request from '@/utils/request'
+import { ref } from 'vue';
+import { useRouter } from 'vue-router';
+import { ElMessage } from 'element-plus';
+import { userApi } from '@/api/user';
 
-const router = useRouter()
-const isLogin = ref(true)
+const router = useRouter();
 
-const form = reactive({
-  username: '',
-  password: '',
-  phone: ''
-})
+const phone = ref('');
+const code = ref('');
+const agreed = ref(false);
+const countdown = ref(0);
 
-const toggleMode = () => {
-  isLogin.value = !isLogin.value
-  // 清空表单
-  form.username = ''
-  form.password = ''
-  form.phone = ''
-}
+let countdownTimer: number | null = null;
 
-const handleSubmit = async () => {
-  try {
-    if (isLogin.value) {
-        // 登录
-        const res: any = await request.post('/user/login', {
-            username: form.username,
-            password: form.password
-        })
-        if (res && res.token) {
-            console.log('Login Success, Token:', res.token)
-            localStorage.setItem('token', res.token)
-            // 保存用户信息
-            if (res.user) {
-                localStorage.setItem('userInfo', JSON.stringify(res.user))
-            }
-            // 简单的提示，实际可以用 ElMessage
-            alert('登录成功')
-            router.push('/')
-        } else {
-             console.error('Login Failed: No token in response', res)
-        }
-    } else {
-        // 注册
-        await request.post('/user/register', {
-            username: form.username,
-            password: form.password,
-            phone: form.phone
-        })
-        alert('注册成功，请登录')
-        isLogin.value = true
+const sendCode = async () => {
+    if (!phone.value) {
+        ElMessage.warning('请输入手机号');
+        return;
     }
-  } catch (error: any) {
-    alert(error.message || '操作失败')
-  }
-}
+
+    if (!/^1[3-9]\d{9}$/.test(phone.value)) {
+        ElMessage.warning('请输入正确的手机号');
+        return;
+    }
+
+    try {
+        await userApi.sendSmsCode(phone.value);
+        ElMessage.success('验证码已发送');
+        
+        countdown.value = 60;
+        countdownTimer = window.setInterval(() => {
+            countdown.value--;
+            if (countdown.value <= 0 && countdownTimer) {
+                clearInterval(countdownTimer);
+                countdownTimer = null;
+            }
+        }, 1000);
+    } catch (e: any) {
+        ElMessage.error(e.message || '发送验证码失败');
+    }
+};
+
+const handleLogin = async () => {
+    if (!phone.value) {
+        ElMessage.warning('请输入手机号');
+        return;
+    }
+
+    if (!/^1[3-9]\d{9}$/.test(phone.value)) {
+        ElMessage.warning('请输入正确的手机号');
+        return;
+    }
+
+    if (!code.value) {
+        ElMessage.warning('请输入验证码');
+        return;
+    }
+
+    if (!agreed.value) {
+        ElMessage.warning('请阅读并同意服务协议');
+        return;
+    }
+
+    try {
+        const res = await userApi.loginWithSms(phone.value, code.value);
+        if (res && res.token) {
+            localStorage.setItem('token', res.token);
+            if (res.userInfo) {
+                localStorage.setItem('userInfo', JSON.stringify(res.userInfo));
+            }
+            ElMessage.success('登录成功');
+            router.push('/');
+        }
+    } catch (e: any) {
+        ElMessage.error(e.message || '登录失败');
+    }
+};
+
+const handleClose = () => {
+    router.push('/');
+};
 </script>
 
 <style scoped>
-.login-container {
-  min-height: 100vh;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background-color: #f5f5f5;
-  padding: 20px;
+* {
+    box-sizing: border-box;
 }
 
-.login-card {
-  width: 100%;
-  max-width: 360px;
-  background: white;
-  border-radius: 12px;
-  padding: 32px 24px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.05);
+.login-page {
+    min-height: 100vh;
+    background: #ffffff;
+    padding: 0 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
 }
 
-.login-header {
-  text-align: center;
-  margin-bottom: 32px;
+/* 关闭按钮 */
+.close-btn {
+    position: absolute;
+    top: 24px;
+    right: 24px;
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #000000;
 }
 
-.title {
-  font-size: 24px;
-  font-weight: bold;
-  color: #333;
-  margin: 0 0 8px;
+.close-btn:hover {
+    opacity: 0.7;
 }
 
-.subtitle {
-  font-size: 14px;
-  color: #999;
-  margin: 0;
+/* Logo区域 */
+.logo-section {
+    margin-top: 252px;
+    margin-bottom: 144px;
 }
 
-.login-form {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+.logo {
+    height: 34px;
+    width: auto;
 }
 
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+/* 表单区域 */
+.form-section {
+    width: 100%;
+    max-width: 360px;
 }
 
-.form-label {
-  font-size: 14px;
-  color: #333;
-  font-weight: 500;
-}
-
-.form-input {
-  width: 100%;
-  padding: 12px;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  font-size: 14px;
-  color: #333;
-  background-color: #f9f9f9;
-  transition: all 0.3s ease;
-  box-sizing: border-box;
-}
-
-.form-input:focus {
-  outline: none;
-  border-color: #409eff;
-  background-color: white;
-}
-
-.submit-btn {
-  width: 100%;
-  padding: 12px;
-  background-color: #333;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 16px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
-  margin-top: 12px;
-}
-
-.submit-btn:hover {
-  background-color: #000;
-}
-
-.login-footer {
-  margin-top: 24px;
-  text-align: center;
-  font-size: 14px;
-}
-
-.footer-text {
-  color: #999;
-}
-
-.toggle-btn {
-  color: #409eff;
-  cursor: pointer;
-  margin-left: 6px;
-  font-weight: 500;
-}
-
-.toggle-btn:hover {
-  text-decoration: underline;
-}
-
-.debug-info {
-    margin-top: 20px;
-    padding: 10px;
-    background-color: #f0f0f0;
+/* 输入框 */
+.input-field {
+    width: 100%;
+    height: 48px;
+    padding: 0 16px;
+    border: 1px solid #d9d9d9;
     border-radius: 4px;
-    font-size: 12px;
-    color: #666;
+    font-size: 15px;
+    outline: none;
+    background: #ffffff;
+    margin-bottom: 16px;
+}
+
+.input-field::placeholder {
+    color: #bfbfbf;
+}
+
+.input-field:focus {
+    border-color: #5b8ff9;
+}
+
+/* 验证码行 */
+.code-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.code-input {
+    flex: 1;
+    margin-bottom: 0;
+}
+
+.code-btn {
+    width: 110px;
+    height: 48px;
+    background: #5b8ff9;
+    color: #ffffff;
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.code-btn:hover:not(:disabled) {
+    background: #4a7de8;
+}
+
+.code-btn:disabled {
+    background: #d9d9d9;
+    cursor: not-allowed;
+}
+
+/* 协议行 */
+.agreement-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 24px;
+}
+
+.agreement-text {
+    font-size: 14px;
+    color: #666666;
+}
+
+.link {
+    color: #5b8ff9;
+    text-decoration: none;
+}
+
+.link:hover {
+    text-decoration: underline;
+}
+
+/* 登录按钮 */
+.login-btn {
+    width: 100%;
+    height: 48px;
+    background: #5b8ff9;
+    color: #ffffff;
+    border: none;
+    border-radius: 4px;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    margin-bottom: 16px;
+}
+
+.login-btn:hover {
+    background: #4a7de8;
+}
+
+.login-btn:active {
+    transform: scale(0.98);
+}
+
+/* 提示文字 */
+.tip {
     text-align: center;
+    font-size: 13px;
+    color: #999999;
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+    .logo-section {
+        margin-top: 180px;
+        margin-bottom: 108px;
+    }
+    
+    .logo {
+        height: 31px;
+    }
+}
+
+@media (max-width: 480px) {
+    .close-btn {
+        top: 20px;
+        right: 20px;
+    }
+    
+    .logo-section {
+        margin-top: 144px;
+        margin-bottom: 90px;
+    }
+    
+    .logo {
+        height: 29px;
+    }
+    
+    .input-field,
+    .code-btn,
+    .login-btn {
+        height: 46px;
+    }
+    
+    .code-btn {
+        width: 100px;
+        font-size: 13px;
+    }
 }
 </style>

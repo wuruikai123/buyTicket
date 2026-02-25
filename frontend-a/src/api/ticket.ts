@@ -63,5 +63,15 @@ export const ticketApi = {
     // 删除订单
     deleteOrder(id: number) {
         return request.delete(`/order/ticket/${id}`)
+    },
+
+    // 申请退款
+    requestRefund(id: number) {
+        return request.post(`/order/ticket/${id}/request-refund`)
+    },
+
+    // 取消退款申请
+    cancelRefund(id: number) {
+        return request.post(`/order/ticket/${id}/cancel-refund`)
     }
 }

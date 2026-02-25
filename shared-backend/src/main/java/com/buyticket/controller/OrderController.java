@@ -32,6 +32,8 @@ public class OrderController {
     @Autowired
     private ExhibitionTimeSlotInventoryService inventoryService;
     @Autowired
+    private com.buyticket.service.ExhibitionService exhibitionService;
+    @Autowired
     private com.buyticket.service.OrderItemService orderItemService;
 
     // 从JWT上下文获取当前用户ID
@@ -65,12 +67,52 @@ public class OrderController {
     @GetMapping("/ticket/list")
     public JsonData listTicketOrders() {
         Long userId = getCurrentUserId();
-        // 简单查询，实际可能需要分页
-        return JsonData.buildSuccess(ticketOrderService.list(
+        java.util.List<TicketOrder> orders = ticketOrderService.list(
             new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<TicketOrder>()
                 .eq(TicketOrder::getUserId, userId)
                 .orderByDesc(TicketOrder::getCreateTime)
-        ));
+        );
+        
+        // 为每个订单添加展览信息
+        java.util.List<java.util.Map<String, Object>> result = new java.util.ArrayList<>();
+        for (TicketOrder order : orders) {
+            java.util.Map<String, Object> orderMap = new java.util.HashMap<>();
+            orderMap.put("id", order.getId());
+            orderMap.put("orderNo", order.getOrderNo());
+            orderMap.put("userId", order.getUserId());
+            orderMap.put("totalAmount", order.getTotalAmount());
+            orderMap.put("status", order.getStatus());
+            orderMap.put("contactName", order.getContactName());
+            orderMap.put("contactPhone", order.getContactPhone());
+            orderMap.put("createTime", order.getCreateTime());
+            orderMap.put("payTime", order.getPayTime());
+            orderMap.put("verifyTime", order.getVerifyTime());
+            orderMap.put("refundRequestTime", order.getRefundRequestTime());
+            orderMap.put("refundTime", order.getRefundTime());
+            
+            // 查询订单项获取展览信息
+            java.util.List<OrderItem> items = orderItemService.list(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OrderItem>()
+                    .eq(OrderItem::getOrderId, order.getId())
+            );
+            
+            if (!items.isEmpty()) {
+                OrderItem firstItem = items.get(0);
+                Long exhibitionId = firstItem.getExhibitionId();
+                if (exhibitionId != null) {
+                    // 查询展览信息
+                    com.buyticket.entity.Exhibition exhibition = exhibitionService.getById(exhibitionId);
+                    if (exhibition != null) {
+                        orderMap.put("exhibitionName", exhibition.getName());
+                        orderMap.put("coverImage", exhibition.getCoverImage());
+                    }
+                }
+            }
+            
+            result.add(orderMap);
+        }
+        
+        return JsonData.buildSuccess(result);
     }
 
     /**
@@ -155,10 +197,88 @@ public class OrderController {
         if (order.getStatus() != 1) {
             return JsonData.buildError("只有待使用的订单才能核销");
         }
+        
+        // 验证核销时间是否符合规则
+        String timeValidationError = validateVerificationTime(order.getId());
+        if (timeValidationError != null) {
+            return JsonData.buildError(timeValidationError);
+        }
+        
         order.setStatus(2); // 已使用
         order.setVerifyTime(java.time.LocalDateTime.now()); // 设置核销时间
         ticketOrderService.updateById(order);
         return JsonData.buildSuccess("核销成功");
+    }
+    
+    /**
+     * 验证核销时间是否符合规则
+     * 规则：
+     * - 上午票（时间段开始时间 < 12:00）：只能在当天开始时间到12:00之前核销
+     * - 下午票（时间段开始时间 >= 12:00）：只能在12:00到当天结束时间核销
+     * 
+     * @param orderId 订单ID
+     * @return 错误信息，如果验证通过返回null
+     */
+    private String validateVerificationTime(Long orderId) {
+        try {
+            // 查询订单项获取时间段信息
+            LambdaQueryWrapper<OrderItem> itemQuery = new LambdaQueryWrapper<>();
+            itemQuery.eq(OrderItem::getOrderId, orderId);
+            java.util.List<OrderItem> orderItems = orderItemService.list(itemQuery);
+            
+            if (orderItems == null || orderItems.isEmpty()) {
+                return "订单信息异常，无法核销";
+            }
+            
+            // 获取当前时间
+            java.time.LocalTime currentTime = java.time.LocalTime.now();
+            java.time.LocalDate currentDate = java.time.LocalDate.now();
+            
+            // 检查每个订单项的时间段
+            for (OrderItem item : orderItems) {
+                // 检查是否是今天的票
+                if (!item.getTicketDate().equals(currentDate)) {
+                    return "只能核销今天的门票";
+                }
+                
+                String timeSlot = item.getTimeSlot();
+                if (timeSlot == null || timeSlot.trim().isEmpty()) {
+                    continue;
+                }
+                
+                // 解析时间段，格式如 "09:00-12:00"
+                String[] times = timeSlot.split("-");
+                if (times.length != 2) {
+                    continue;
+                }
+                
+                try {
+                    java.time.LocalTime startTime = java.time.LocalTime.parse(times[0].trim());
+                    java.time.LocalTime noonTime = java.time.LocalTime.of(12, 0);
+                    
+                    // 判断是上午票还是下午票
+                    if (startTime.isBefore(noonTime)) {
+                        // 上午票：只能在开始时间到12:00之前核销
+                        if (currentTime.isBefore(startTime) || currentTime.isAfter(noonTime) || currentTime.equals(noonTime)) {
+                            return "上午票只能在" + times[0].trim() + "-12:00之间核销";
+                        }
+                    } else {
+                        // 下午票：只能在12:00到结束时间核销
+                        if (currentTime.isBefore(noonTime)) {
+                            return "下午票只能在12:00之后核销";
+                        }
+                    }
+                } catch (Exception e) {
+                    // 时间解析失败，跳过验证
+                    log.error("时间段解析失败: {}", timeSlot);
+                }
+            }
+            
+            return null; // 验证通过
+        } catch (Exception e) {
+            log.error("验证核销时间失败", e);
+            return "验证核销时间失败";
+        }
     }
 
     /**
@@ -346,7 +466,7 @@ public class OrderController {
 
     /**
      * 删除门票订单
-     * 只能删除：待支付(0)、已使用(2)、已取消(3) 状态的订单
+     * 只能删除：待支付(0)、已使用(2)、已取消(3)、已退款(6) 状态的订单
      */
     @DeleteMapping("/ticket/{id}")
     public JsonData deleteTicketOrder(@PathVariable Long id) {
@@ -355,9 +475,13 @@ public class OrderController {
             return JsonData.buildError("订单不存在");
         }
         
+        // 记录订单状态用于调试
+        log.info("尝试删除订单 ID: {}, 当前状态: {}", id, order.getStatus());
+        
         // 检查订单状态，只能删除特定状态的订单
-        if (order.getStatus() != 0 && order.getStatus() != 2 && order.getStatus() != 3) {
-            return JsonData.buildError("不可删除待使用的订单");
+        if (order.getStatus() != 0 && order.getStatus() != 2 && order.getStatus() != 3 && order.getStatus() != 6) {
+            log.warn("订单 {} 状态为 {}，不允许删除", id, order.getStatus());
+            return JsonData.buildError("不可删除待使用或退款中的订单（当前状态：" + order.getStatus() + "）");
         }
         
         // 验证订单所有权
@@ -406,5 +530,65 @@ public class OrderController {
         } else {
             return JsonData.buildError("删除失败");
         }
+    }
+
+    /**
+     * 用户申请退款
+     */
+    @PostMapping("/ticket/{id}/request-refund")
+    public JsonData requestRefund(@PathVariable Long id) {
+        Long userId = getCurrentUserId();
+        TicketOrder order = ticketOrderService.getById(id);
+        
+        if (order == null) {
+            return JsonData.buildError("订单不存在");
+        }
+        
+        if (!order.getUserId().equals(userId)) {
+            return JsonData.buildError("无权操作此订单");
+        }
+        
+        // 只有待使用状态的订单可以申请退款
+        if (order.getStatus() != 1) {
+            return JsonData.buildError("只有待使用的订单可以申请退款");
+        }
+        
+        // 更新订单状态为退款中
+        order.setStatus(5);
+        order.setRefundRequestTime(java.time.LocalDateTime.now());
+        ticketOrderService.updateById(order);
+        
+        log.info("用户 {} 申请退款订单 {}", userId, id);
+        return JsonData.buildSuccess("退款申请已提交");
+    }
+
+    /**
+     * 用户取消退款申请
+     */
+    @PostMapping("/ticket/{id}/cancel-refund")
+    public JsonData cancelRefund(@PathVariable Long id) {
+        Long userId = getCurrentUserId();
+        TicketOrder order = ticketOrderService.getById(id);
+        
+        if (order == null) {
+            return JsonData.buildError("订单不存在");
+        }
+        
+        if (!order.getUserId().equals(userId)) {
+            return JsonData.buildError("无权操作此订单");
+        }
+        
+        // 只有退款中状态的订单可以取消退款
+        if (order.getStatus() != 5) {
+            return JsonData.buildError("只有退款中的订单可以取消退款");
+        }
+        
+        // 恢复订单状态为待使用
+        order.setStatus(1);
+        order.setRefundRequestTime(null);
+        ticketOrderService.updateById(order);
+        
+        log.info("用户 {} 取消退款申请订单 {}", userId, id);
+        return JsonData.buildSuccess("已取消退款申请");
     }
 }

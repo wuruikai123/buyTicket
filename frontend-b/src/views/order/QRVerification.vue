@@ -51,7 +51,7 @@
         <el-table :data="records" style="width: 100%">
           <el-table-column prop="orderNo" label="订单号" width="200" />
           <el-table-column prop="exhibitionName" label="展览名称" />
-          <el-table-column prop="contactName" label="联系人" width="120" />
+          <el-table-column prop="contactName" label="真实姓名" width="120" />
           <el-table-column prop="verifyTime" label="核销时间" width="180" />
           <el-table-column label="状态" width="100">
             <template #default="{ row }">

@@ -120,7 +120,10 @@ const route = useRoute();
 // 展览信息
 const exhibition = ref({
     id: 0,
-    name: ''
+    name: '',
+    dailyStartTime: '09:00',
+    dailyEndTime: '17:00',
+    ticketsPerHour: 0
 });
 
 // 选中的日期和时间
@@ -128,7 +131,7 @@ const now = new Date();
 const selectedYear = ref(now.getFullYear());
 const selectedMonth = ref(now.getMonth() + 1);
 const selectedDate = ref<Date | null>(now);
-const selectedTimeSlot = ref('09:00-12:00');
+const selectedTimeSlot = ref('');
 const remainingTickets = ref(0);
 
 // 存储所有时间段的库存
@@ -137,16 +140,31 @@ const slotsInventory = ref<Map<string, number>>(new Map());
 // 星期标签
 const weekdays = ['一', '二', '三', '四', '五', '六', '日'];
 
-// 时间段选项 (只保留两个时间段)
-const timeSlots = [
-    '09:00-12:00',
-    '14:00-17:00'
-];
+// 时间段选项（生成上午和下午两个时段）
+const timeSlots = computed(() => {
+    const startTime = exhibition.value.dailyStartTime || '10:00';
+    const endTime = exhibition.value.dailyEndTime || '18:00';
+    const noonTime = '12:00'; // 固定的上午/下午分界点
+    
+    const slots: string[] = [];
+    
+    // 上午时段：开始时间-12:00
+    slots.push(`${startTime}-${noonTime}`);
+    
+    // 下午时段：12:00-结束时间
+    slots.push(`${noonTime}-${endTime}`);
+    
+    return slots;
+});
 
 // 获取时间段名称
 const getSlotName = (slot: string) => {
-    if (slot === '09:00-12:00') return '上午场';
-    if (slot === '14:00-17:00') return '下午场';
+    // 判断是上午还是下午
+    if (slot.includes('-12:00')) {
+        return '上午';
+    } else if (slot.startsWith('12:00-')) {
+        return '下午';
+    }
     return slot;
 };
 
@@ -200,6 +218,8 @@ const calendarDates = computed(() => {
             date.getMonth() === today.getMonth() &&
             date.getDate() === today.getDate();
         const isPast = date < todayStart;
+        // 周一闭馆：周一的 getDay() 返回 1
+        const isMonday = date.getDay() === 1;
         
         dates.push({
             key: `${year}-${month + 1}-${day}`,
@@ -208,7 +228,7 @@ const calendarDates = computed(() => {
             otherMonth: false,
             selected: isSelected || false,
             isToday,
-            disabled: isPast
+            disabled: isPast || isMonday  // 过去的日期或周一都禁用
         });
     }
     return dates;
@@ -264,12 +284,13 @@ const selectDate = (dateInfo: CalendarDate) => {
 
 // 改变时间段（已废弃，改用点击选择）
 const changeTimeSlot = (delta: number) => {
-    const currentIndex = timeSlots.indexOf(selectedTimeSlot.value);
+    const currentSlots = timeSlots.value;
+    const currentIndex = currentSlots.indexOf(selectedTimeSlot.value);
     if (currentIndex !== -1) {
         let newIndex = currentIndex + delta;
-        if (newIndex < 0) newIndex = timeSlots.length - 1;
-        if (newIndex >= timeSlots.length) newIndex = 0;
-        selectTimeSlot(timeSlots[newIndex]);
+        if (newIndex < 0) newIndex = currentSlots.length - 1;
+        if (newIndex >= currentSlots.length) newIndex = 0;
+        selectTimeSlot(currentSlots[newIndex]);
     }
 };
 
@@ -279,9 +300,10 @@ const loadAllSlotsInventory = async () => {
     
     const dateStr = formatDate(selectedDate.value);
     const inventoryMap = new Map<string, number>();
+    const currentSlots = timeSlots.value;
     
     // 并发加载所有时间段的库存
-    const promises = timeSlots.map(async (slot) => {
+    const promises = currentSlots.map(async (slot) => {
         try {
             const res = await ticketApi.getAvailability({
                 exhibitionId: exhibition.value.id,
@@ -301,6 +323,11 @@ const loadAllSlotsInventory = async () => {
     
     await Promise.all(promises);
     slotsInventory.value = inventoryMap;
+    
+    // 如果还没有选中时间段，默认选中第一个
+    if (!selectedTimeSlot.value && currentSlots.length > 0) {
+        selectedTimeSlot.value = currentSlots[0];
+    }
     
     // 更新当前选中时间段的库存
     remainingTickets.value = getSlotInventory(selectedTimeSlot.value);
@@ -355,6 +382,14 @@ const loadExhibitionInfo = async (id: number) => {
         if (data) {
             exhibition.value.id = data.id;
             exhibition.value.name = data.name;
+            exhibition.value.dailyStartTime = data.dailyStartTime || '09:00';
+            exhibition.value.dailyEndTime = data.dailyEndTime || '17:00';
+            exhibition.value.ticketsPerHour = data.ticketsPerHour || 100;
+            
+            // 设置默认选中的时间段
+            const defaultSlot = `${exhibition.value.dailyStartTime}-${exhibition.value.dailyEndTime}`;
+            selectedTimeSlot.value = defaultSlot;
+            
             // 加载完展览信息后，获取所有时间段的库存
             loadAllSlotsInventory();
         }
@@ -375,7 +410,7 @@ onMounted(() => {
 
 <style scoped>
 .date-choose {
-    padding-bottom: 20px;
+    padding-bottom: 140px; /* 为底部确认按钮和导航栏预留空间 */
 }
 
 /* 顶部导航栏 */
@@ -686,15 +721,19 @@ onMounted(() => {
 .confirm-section {
     padding: 20px;
     background-color: white;
-    position: sticky;
-    bottom: 0;
+    position: fixed;
+    bottom: 60px; /* 抬高到导航栏上方 */
+    left: 0;
+    right: 0;
+    z-index: 999;
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .confirm-button {
     width: 100%;
     padding: 16px;
-    background-color: #e8e8e8;
-    color: #333;
+    background-color: #213d7c;
+    color: #ffffff;
     border: none;
     border-radius: 8px;
     font-size: 16px;
@@ -704,11 +743,11 @@ onMounted(() => {
 }
 
 .confirm-button:hover {
-    background-color: #d8d8d8;
+    background-color: #1a2f63;
 }
 
 .confirm-button:active {
-    background-color: #c8c8c8;
+    background-color: #152749;
 }
 
 /* 响应式设计 */

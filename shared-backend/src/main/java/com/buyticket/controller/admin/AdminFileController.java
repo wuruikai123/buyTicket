@@ -81,4 +81,33 @@ public class AdminFileController {
             return JsonData.buildError("删除失败：" + e.getMessage());
         }
     }
+
+    /**
+     * 测试接口 - 检查上传目录和文件
+     */
+    @GetMapping("/test")
+    public JsonData testUpload() {
+        Map<String, Object> result = new HashMap<>();
+        
+        // 检查上传目录
+        File uploadDir = new File(uploadPath);
+        result.put("uploadPath", uploadDir.getAbsolutePath());
+        result.put("uploadDirExists", uploadDir.exists());
+        result.put("uploadDirIsDirectory", uploadDir.isDirectory());
+        
+        // 列出目录中的文件
+        if (uploadDir.exists() && uploadDir.isDirectory()) {
+            File[] files = uploadDir.listFiles();
+            result.put("fileCount", files != null ? files.length : 0);
+            if (files != null && files.length > 0) {
+                String[] fileNames = new String[Math.min(files.length, 10)];
+                for (int i = 0; i < fileNames.length; i++) {
+                    fileNames[i] = files[i].getName();
+                }
+                result.put("recentFiles", fileNames);
+            }
+        }
+        
+        return JsonData.buildSuccess(result);
+    }
 }

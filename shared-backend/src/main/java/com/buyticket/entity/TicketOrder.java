@@ -22,7 +22,7 @@ public class TicketOrder {
     private BigDecimal totalAmount;
 
     /**
-     * 订单状态 (0:待支付, 1:待使用, 2:已使用, 3:已取消)
+     * 订单状态 (0:待支付, 1:待使用, 2:已使用, 3:已取消, 4:已作废, 5:退款中, 6:已退款)
      */
     private Integer status;
 
@@ -35,4 +35,8 @@ public class TicketOrder {
     private LocalDateTime payTime;
 
     private LocalDateTime verifyTime;
+
+    private LocalDateTime refundRequestTime;
+
+    private LocalDateTime refundTime;
 }

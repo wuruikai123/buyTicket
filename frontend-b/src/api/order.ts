@@ -18,6 +18,14 @@ export const orderApi = {
     return request.post(`/admin/order/ticket/${id}/verify`, {})
   },
 
+  voidTicketOrder(id: number) {
+    return request.post(`/admin/order/ticket/${id}/void`, {})
+  },
+
+  deleteTicketOrder(id: number) {
+    return request.delete(`/admin/order/ticket/${id}`)
+  },
+
   // 商城订单 - 管理端
   getMallOrderList(params: any) {
     return request.get('/admin/order/mall/list', { params })

@@ -27,6 +27,9 @@ public class AdminOrderController {
     
     @Autowired
     private ExhibitionTimeSlotInventoryService inventoryService;
+    
+    @Autowired
+    private com.buyticket.service.AlipayService alipayService;
 
     // ============ 门票订单 ============
 
@@ -80,6 +83,8 @@ public class AdminOrderController {
             map.put("createTime", order.getCreateTime());
             map.put("payTime", order.getPayTime());
             map.put("verifyTime", order.getVerifyTime());
+            map.put("refundRequestTime", order.getRefundRequestTime());
+            map.put("refundTime", order.getRefundTime());
             
             // 查询订单项获取展览名称
             LambdaQueryWrapper<com.buyticket.entity.OrderItem> itemWrapper = new LambdaQueryWrapper<>();
@@ -126,6 +131,8 @@ public class AdminOrderController {
         result.put("createTime", order.getCreateTime());
         result.put("payTime", order.getPayTime());
         result.put("verifyTime", order.getVerifyTime());
+        result.put("refundRequestTime", order.getRefundRequestTime());
+        result.put("refundTime", order.getRefundTime());
         
         // 查询订单项获取展览名称
         LambdaQueryWrapper<com.buyticket.entity.OrderItem> itemWrapper = new LambdaQueryWrapper<>();
@@ -167,6 +174,13 @@ public class AdminOrderController {
         if (order.getStatus() != 1) {
             return JsonData.buildError("只有待使用的订单才能核销");
         }
+        
+        // 验证核销时间是否符合规则
+        String timeValidationError = validateVerificationTime(order.getId());
+        if (timeValidationError != null) {
+            return JsonData.buildError(timeValidationError);
+        }
+        
         order.setStatus(2); // 已使用
         order.setVerifyTime(java.time.LocalDateTime.now()); // 设置核销时间
         ticketOrderService.updateById(order);
@@ -211,6 +225,27 @@ public class AdminOrderController {
         order.setStatus(4); // 设置为已作废
         ticketOrderService.updateById(order);
         return JsonData.buildSuccess("作废成功");
+    }
+
+    /**
+     * 删除订单（从数据库中永久删除）
+     */
+    @DeleteMapping("/ticket/{id}")
+    public JsonData deleteTicketOrder(@PathVariable Long id) {
+        TicketOrder order = ticketOrderService.getById(id);
+        if (order == null) {
+            return JsonData.buildError("订单不存在");
+        }
+        
+        // 删除订单项
+        LambdaQueryWrapper<OrderItem> itemQuery = new LambdaQueryWrapper<>();
+        itemQuery.eq(OrderItem::getOrderId, id);
+        orderItemService.remove(itemQuery);
+        
+        // 删除订单
+        ticketOrderService.removeById(id);
+        
+        return JsonData.buildSuccess("删除成功");
     }
     
     /**
@@ -270,6 +305,12 @@ public class AdminOrderController {
                 return JsonData.buildError("订单状态异常，无法核销");
             }
             
+            // 验证核销时间是否符合规则
+            String timeValidationError = validateVerificationTime(order.getId());
+            if (timeValidationError != null) {
+                return JsonData.buildError(timeValidationError);
+            }
+            
             // 更新订单状态为已使用
             order.setStatus(2);
             order.setVerifyTime(java.time.LocalDateTime.now()); // 设置核销时间
@@ -278,6 +319,78 @@ public class AdminOrderController {
         } catch (Exception e) {
             e.printStackTrace();
             return JsonData.buildError("核销失败: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 验证核销时间是否符合规则
+     * 规则：
+     * - 上午票（时间段开始时间 < 12:00）：只能在当天开始时间到12:00之前核销
+     * - 下午票（时间段开始时间 >= 12:00）：只能在12:00到当天结束时间核销
+     * 
+     * @param orderId 订单ID
+     * @return 错误信息，如果验证通过返回null
+     */
+    private String validateVerificationTime(Long orderId) {
+        try {
+            // 查询订单项获取时间段信息
+            LambdaQueryWrapper<OrderItem> itemQuery = new LambdaQueryWrapper<>();
+            itemQuery.eq(OrderItem::getOrderId, orderId);
+            java.util.List<OrderItem> orderItems = orderItemService.list(itemQuery);
+            
+            if (orderItems == null || orderItems.isEmpty()) {
+                return "订单信息异常，无法核销";
+            }
+            
+            // 获取当前时间
+            java.time.LocalTime currentTime = java.time.LocalTime.now();
+            java.time.LocalDate currentDate = java.time.LocalDate.now();
+            
+            // 检查每个订单项的时间段
+            for (OrderItem item : orderItems) {
+                // 检查是否是今天的票
+                if (!item.getTicketDate().equals(currentDate)) {
+                    return "只能核销今天的门票";
+                }
+                
+                String timeSlot = item.getTimeSlot();
+                if (timeSlot == null || timeSlot.trim().isEmpty()) {
+                    continue;
+                }
+                
+                // 解析时间段，格式如 "09:00-12:00"
+                String[] times = timeSlot.split("-");
+                if (times.length != 2) {
+                    continue;
+                }
+                
+                try {
+                    java.time.LocalTime startTime = java.time.LocalTime.parse(times[0].trim());
+                    java.time.LocalTime noonTime = java.time.LocalTime.of(12, 0);
+                    
+                    // 判断是上午票还是下午票
+                    if (startTime.isBefore(noonTime)) {
+                        // 上午票：只能在开始时间到12:00之前核销
+                        if (currentTime.isBefore(startTime) || currentTime.isAfter(noonTime) || currentTime.equals(noonTime)) {
+                            return "上午票只能在" + times[0].trim() + "-12:00之间核销";
+                        }
+                    } else {
+                        // 下午票：只能在12:00到结束时间核销
+                        if (currentTime.isBefore(noonTime)) {
+                            return "下午票只能在12:00之后核销";
+                        }
+                    }
+                } catch (Exception e) {
+                    // 时间解析失败，跳过验证
+                    System.err.println("时间段解析失败: " + timeSlot);
+                }
+            }
+            
+            return null; // 验证通过
+        } catch (Exception e) {
+            System.err.println("验证核销时间失败: " + e.getMessage());
+            e.printStackTrace();
+            return "验证核销时间失败";
         }
     }
 
@@ -375,5 +488,64 @@ public class AdminOrderController {
         order.setStatus(3); // 已完成
         mallOrderService.updateById(order);
         return JsonData.buildSuccess("订单完成");
+    }
+
+    /**
+     * 管理员完成退款
+     * 调用支付宝退款接口，原路返回款项
+     */
+    @PostMapping("/ticket/{id}/refund")
+    public JsonData refundTicketOrder(@PathVariable Long id) {
+        TicketOrder order = ticketOrderService.getById(id);
+        if (order == null) {
+            return JsonData.buildError("订单不存在");
+        }
+        
+        // 只有待使用或退款中状态的订单可以退款
+        if (order.getStatus() != 1 && order.getStatus() != 5) {
+            return JsonData.buildError("只有待使用或退款中的订单可以退款");
+        }
+        
+        // 检查订单是否已支付
+        if (order.getPayTime() == null) {
+            return JsonData.buildError("订单未支付，无需退款");
+        }
+        
+        try {
+            // 调用支付宝退款接口
+            String refundAmount = order.getTotalAmount().toString();
+            String refundReason = order.getStatus() == 5 ? "用户申请退款" : "管理员退款";
+            
+            java.util.Map<String, String> refundResult = alipayService.refund(
+                order.getOrderNo(), 
+                refundAmount, 
+                refundReason
+            );
+            
+            // 检查退款是否成功
+            if (!"10000".equals(refundResult.get("code"))) {
+                return JsonData.buildError("支付宝退款失败: " + refundResult.get("msg"));
+            }
+            
+            // 退款成功，恢复库存
+            restoreInventory(id);
+            
+            // 更新订单状态为已退款
+            order.setStatus(6);
+            order.setRefundTime(java.time.LocalDateTime.now());
+            // 如果之前没有退款申请时间，设置为当前时间
+            if (order.getRefundRequestTime() == null) {
+                order.setRefundRequestTime(java.time.LocalDateTime.now());
+            }
+            ticketOrderService.updateById(order);
+            
+            return JsonData.buildSuccess("退款成功，款项已原路返回");
+            
+        } catch (Exception e) {
+            // 记录错误日志
+            System.err.println("退款失败: " + e.getMessage());
+            e.printStackTrace();
+            return JsonData.buildError("退款失败: " + e.getMessage());
+        }
     }
 }

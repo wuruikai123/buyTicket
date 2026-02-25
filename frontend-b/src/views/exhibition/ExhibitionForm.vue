@@ -50,25 +50,14 @@
               </div>
             </el-form-item>
 
-            <!-- 9-12点门票数量 -->
-            <el-form-item label="9-12点门票数" prop="morningTickets" class="tickets-item">
+            <!-- 每时段门票数统一设置 -->
+            <el-form-item label="每时段门票数" prop="ticketsPerPeriod" class="tickets-item">
               <el-input-number
-                v-model="form.morningTickets"
+                v-model="form.ticketsPerPeriod"
                 :min="1"
                 :max="10000"
                 class="tickets-input"
-                placeholder="9-12点时段门票数"
-              />
-            </el-form-item>
-
-            <!-- 14-17点门票数量 -->
-            <el-form-item label="14-17点门票数" prop="afternoonTickets" class="tickets-item">
-              <el-input-number
-                v-model="form.afternoonTickets"
-                :min="1"
-                :max="10000"
-                class="tickets-input"
-                placeholder="14-17点时段门票数"
+                placeholder="每时段门票数（上午/下午各一个时段）"
               />
             </el-form-item>
           </div>
@@ -109,6 +98,36 @@
                 v-model="form.shortDesc"
                 placeholder="请输入展览副标题"
               />
+            </el-form-item>
+
+            <!-- 每日开始时间 -->
+            <el-form-item label="每日开始时间" prop="dailyStartTime">
+              <el-time-picker
+                v-model="form.dailyStartTime"
+                format="HH:mm"
+                value-format="HH:mm"
+                placeholder="选择每日开始时间"
+                :clearable="false"
+                style="width: 100%"
+              />
+              <div style="color: #909399; font-size: 12px; margin-top: 5px;">
+                买家只能购买此时间之后的票
+              </div>
+            </el-form-item>
+
+            <!-- 每日结束时间 -->
+            <el-form-item label="每日结束时间" prop="dailyEndTime">
+              <el-time-picker
+                v-model="form.dailyEndTime"
+                format="HH:mm"
+                value-format="HH:mm"
+                placeholder="选择每日结束时间"
+                :clearable="false"
+                style="width: 100%"
+              />
+              <div style="color: #909399; font-size: 12px; margin-top: 5px;">
+                买家只能购买此时间之前的票
+              </div>
             </el-form-item>
             
             <el-form-item label="展览介绍" prop="description">
@@ -172,6 +191,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { Plus, Close } from '@element-plus/icons-vue'
 import { exhibitionApi } from '@/api/exhibition'
+import request from '@/utils/request'
 
 const route = useRoute()
 const router = useRouter()
@@ -196,8 +216,9 @@ const form = reactive({
   startDate: '',
   endDate: '',
   price: 0,
-  morningTickets: 100,  // 9-12点门票数量
-  afternoonTickets: 100, // 14-17点门票数量
+  ticketsPerPeriod: 100,     // 每时段门票数量（上午/下午）
+  dailyStartTime: '10:00', // 每日开始时间
+  dailyEndTime: '18:00',   // 每日结束时间
   coverImage: '',
   tags: [] as string[],
   status: 0
@@ -210,17 +231,42 @@ const rules: FormRules = {
   startDate: [{ required: true, message: '请选择开始时间', trigger: 'change' }],
   endDate: [{ required: true, message: '请选择结束时间', trigger: 'change' }],
   price: [{ required: true, message: '请输入门票价格', trigger: 'blur' }],
-  morningTickets: [{ required: true, message: '请输入9-12点门票数量', trigger: 'blur' }],
-  afternoonTickets: [{ required: true, message: '请输入14-17点门票数量', trigger: 'blur' }],
+  ticketsPerPeriod: [{ required: true, message: '请输入每时段门票数量', trigger: 'blur' }],
+  dailyStartTime: [{ required: true, message: '请选择每日开始时间', trigger: 'change' }],
+  dailyEndTime: [{ required: true, message: '请选择每日结束时间', trigger: 'change' }],
   coverImage: [{ required: true, message: '请上传封面图', trigger: 'change' }]
 }
 
-const beforeCoverUpload = (file: File) => {
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    form.coverImage = e.target?.result as string
+const beforeCoverUpload = async (file: File) => {
+  const isImage = file.type.startsWith('image/')
+  if (!isImage) {
+    ElMessage.error('只能上传图片文件')
+    return false
   }
-  reader.readAsDataURL(file)
+
+  const isLt10M = file.size / 1024 / 1024 < 10
+  if (!isLt10M) {
+    ElMessage.error('图片大小不能超过10MB')
+    return false
+  }
+
+  const formData = new FormData()
+  formData.append('file', file)
+
+  try {
+    const result: any = await request.post('/admin/file/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    
+    if (result && result.url) {
+      // 直接使用返回的URL，不要拼接origin
+      form.coverImage = result.url
+      ElMessage.success('封面图上传成功')
+    }
+  } catch (error: any) {
+    ElMessage.error(error.message || '上传失败')
+  }
+
   return false
 }
 
@@ -228,12 +274,36 @@ const handleRemoveCoverImage = () => {
   form.coverImage = ''
 }
 
-const handleDetailImageUpload = (file: File, index: number): boolean => {
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    detailImagesList.value[index].url = e.target?.result as string
+const handleDetailImageUpload = async (file: File, index: number): Promise<boolean> => {
+  const isImage = file.type.startsWith('image/')
+  if (!isImage) {
+    ElMessage.error('只能上传图片文件')
+    return false
   }
-  reader.readAsDataURL(file)
+
+  const isLt10M = file.size / 1024 / 1024 < 10
+  if (!isLt10M) {
+    ElMessage.error('图片大小不能超过10MB')
+    return false
+  }
+
+  const formData = new FormData()
+  formData.append('file', file)
+
+  try {
+    const result: any = await request.post('/admin/file/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    
+    if (result && result.url) {
+      // 直接使用返回的URL，不要拼接origin
+      detailImagesList.value[index].url = result.url
+      ElMessage.success('图片上传成功')
+    }
+  } catch (error: any) {
+    ElMessage.error(error.message || '上传失败')
+  }
+
   return false
 }
 
@@ -292,9 +362,21 @@ const handleSubmit = async () => {
           .filter(item => item.url)
           .map(item => item.url);
         
+        // 格式化日期为 YYYY-MM-DD 格式，避免时区问题
+        const formatDate = (date: any) => {
+          if (!date) return null
+          const d = new Date(date)
+          const year = d.getFullYear()
+          const month = String(d.getMonth() + 1).padStart(2, '0')
+          const day = String(d.getDate()).padStart(2, '0')
+          return `${year}-${month}-${day}`
+        }
+        
         // 转换 tags 数组为字符串，以匹配后端实体类类型
         const submitData = {
           ...form,
+          startDate: formatDate(form.startDate),
+          endDate: formatDate(form.endDate),
           tags: Array.isArray(form.tags) ? form.tags.join(',') : form.tags,
           detailImages: JSON.stringify(detailImagesArray) // 将介绍插图数组转为JSON字符串
         }

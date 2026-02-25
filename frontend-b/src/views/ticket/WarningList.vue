@@ -19,6 +19,18 @@
             style="width: 300px"
           />
         </el-form-item>
+        <el-form-item label="订单状态">
+          <el-select v-model="searchForm.status" placeholder="请选择状态" clearable style="width: 150px">
+            <el-option label="全部" :value="undefined" />
+            <el-option label="待支付" :value="0" />
+            <el-option label="待使用" :value="1" />
+            <el-option label="已使用" :value="2" />
+            <el-option label="已取消" :value="3" />
+            <el-option label="已作废" :value="4" />
+            <el-option label="退款中" :value="5" />
+            <el-option label="已退款" :value="6" />
+          </el-select>
+        </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="handleSearch">搜索</el-button>
         </el-form-item>
@@ -35,6 +47,8 @@
             </div>
           </template>
         </el-table-column>
+        <el-table-column prop="contactName" label="真实姓名" width="120" />
+        <el-table-column prop="contactPhone" label="身份证号" width="180" />
         <el-table-column label="用户账号" min-width="150">
           <template #default="{ row }">
             {{ row.uid || row.userId || '-' }}
@@ -65,9 +79,28 @@
             {{ formatDateTime(row.createTime) }}
           </template>
         </el-table-column>
+        <el-table-column label="状态" width="120" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="row.status === 0" type="info">待支付</el-tag>
+            <el-tag v-else-if="row.status === 1" type="warning">待使用</el-tag>
+            <el-tag v-else-if="row.status === 2" type="success">已使用</el-tag>
+            <el-tag v-else-if="row.status === 3" type="danger">已取消</el-tag>
+            <el-tag v-else-if="row.status === 4" type="danger">已作废</el-tag>
+            <el-tag v-else-if="row.status === 5" type="warning">退款中</el-tag>
+            <el-tag v-else-if="row.status === 6" type="info">已退款</el-tag>
+            <div v-if="row.status === 5" style="color: #e6a23c; font-size: 12px; margin-top: 4px;">
+              申请退款
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="退款时间" width="180">
+          <template #default="{ row }">
+            {{ row.refundTime ? formatDateTime(row.refundTime) : '-' }}
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="150" align="center">
           <template #default="{ row }">
-            <el-button link type="primary" @click="handleReset(row)">重置</el-button>
+            <el-button link type="warning" @click="handleVoid(row)">作废</el-button>
             <el-button link type="danger" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
@@ -97,7 +130,8 @@ const tableData = ref<any[]>([])
 const totalSales = ref(0)
 
 const searchForm = reactive({
-  orderNo: ''
+  orderNo: '',
+  status: undefined as number | undefined
 })
 
 const pagination = reactive({
@@ -137,16 +171,16 @@ const loadData = async () => {
     const params: any = {
       page: pagination.page,
       size: pagination.size
-      // 销售记录：显示所有已支付的订单（状态0:待支付 或 1:待使用 或 2:已使用）
-      // 这里不限制状态，显示所有订单，或者可以根据需要筛选已支付的订单
     }
     if (searchForm.orderNo) {
       params.orderNo = searchForm.orderNo
     }
+    if (searchForm.status !== undefined) {
+      params.status = searchForm.status
+    }
     const data: any = await orderApi.getTicketOrderList(params)
     tableData.value = data.records || []
     pagination.total = data.total || 0
-    // 计算总计销售数量（所有订单的票数总和，或者直接使用订单总数）
     totalSales.value = pagination.total
   } catch (error) {
     ElMessage.error('加载数据失败')
@@ -166,40 +200,36 @@ const handleSearch = () => {
 const handleSizeChange = () => loadData()
 const handlePageChange = () => loadData()
 
-const handleReset = async (row: any) => {
+const handleVoid = async (row: any) => {
   try {
-    await ElMessageBox.confirm('确定要重置该销售记录吗？重置后订单将恢复为待支付状态。', '提示', {
+    await ElMessageBox.confirm('确定要作废该订单吗？作废后订单将无法使用，库存将恢复。', '提示', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
       type: 'warning'
     })
-    // TODO: 调用重置订单接口
-    // await orderApi.resetOrder(row.id)
-    void row // 标记参数使用，待接口实现后删除此行
-    ElMessage.success('重置成功')
+    await orderApi.voidTicketOrder(row.id)
+    ElMessage.success('作废成功')
     loadData()
   } catch (error: any) {
     if (error !== 'cancel') {
-      ElMessage.error('重置失败')
+      ElMessage.error(error.message || '作废失败')
     }
   }
 }
 
 const handleDelete = async (row: any) => {
   try {
-    await ElMessageBox.confirm('确定要删除该销售记录吗？此操作不可恢复！', '警告', {
+    await ElMessageBox.confirm('确定要删除该销售记录吗？此操作将从数据库中永久删除，不可恢复！', '警告', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
-      type: 'warning'
+      type: 'error'
     })
-    // TODO: 调用删除订单接口
-    // await orderApi.deleteOrder(row.id)
-    void row // 标记参数使用，待接口实现后删除此行
+    await orderApi.deleteTicketOrder(row.id)
     ElMessage.success('删除成功')
     loadData()
   } catch (error: any) {
     if (error !== 'cancel') {
-      ElMessage.error('删除失败')
+      ElMessage.error(error.message || '删除失败')
     }
   }
 }

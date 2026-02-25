@@ -72,7 +72,7 @@ const routes: RouteRecordRaw[] = [
         path: 'order/verification',
         name: 'OrderVerification',
         component: () => import('@/views/order/VerificationList.vue'),
-        meta: { title: '订单核销', icon: 'Checked' }
+        meta: { title: '订单管理', icon: 'Checked' }
       },
       {
         path: 'product/list',
@@ -104,29 +104,35 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/statistics/UserAnalysis.vue'),
         meta: { title: '用户分析', icon: 'DataAnalysis' }
       },
-      {
-        path: 'system/basic',
-        name: 'SystemBasic',
-        component: () => import('@/views/system/BasicSettings.vue'),
-        meta: { title: '基础设置', icon: 'Setting' }
-      },
+      // {
+      //   path: 'system/basic',
+      //   name: 'SystemBasic',
+      //   component: () => import('@/views/system/BasicSettings.vue'),
+      //   meta: { title: '基础设置', icon: 'Setting' }
+      // },
       {
         path: 'system/about',
         name: 'SystemAbout',
         component: () => import('@/views/system/AboutManagement.vue'),
         meta: { title: '关于展厅', icon: 'Setting' }
       },
-      {
-        path: 'system/content',
-        name: 'SystemContent',
-        component: () => import('@/views/system/ContentManagement.vue'),
-        meta: { title: '内容管理', icon: 'Setting' }
-      },
+      // {
+      //   path: 'system/content',
+      //   name: 'SystemContent',
+      //   component: () => import('@/views/system/ContentManagement.vue'),
+      //   meta: { title: '内容管理', icon: 'Setting' }
+      // },
       {
         path: 'system/log',
         name: 'SystemLog',
         component: () => import('@/views/system/OperationLog.vue'),
         meta: { title: '操作日志', icon: 'Setting' }
+      },
+      {
+        path: 'system/profile',
+        name: 'SystemProfile',
+        component: () => import('@/views/system/ProfileSettings.vue'),
+        meta: { title: '个人设置', icon: 'User' }
       }
     ]
   }

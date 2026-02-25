@@ -44,23 +44,7 @@
             </div>
           </div>
 
-          <div 
-            class="method-item disabled" 
-            title="暂不支持"
-          >
-            <div class="method-icon wechat-icon">
-              <svg viewBox="0 0 1024 1024" width="32" height="32">
-                <path d="M1024 640c0 176-160 320-352 320-32 0-64-8-96-16l-160 96 32-128c-96-64-160-160-160-272 0-176 160-320 352-320s384 144 384 320z" fill="#09BB07"/>
-                <path d="M736 576c-16 0-32-16-32-32s16-32 32-32 32 16 32 32-16 32-32 32z m128 0c-16 0-32-16-32-32s16-32 32-32 32 16 32 32-16 32-32 32z" fill="#FFFFFF"/>
-                <path d="M416 0C192 0 0 160 0 352c0 112 64 208 160 272l-32 128 160-96c32 8 64 16 96 16 16 0 32 0 48-8-16-32-16-64-16-96 0-176 160-320 352-320 16 0 32 0 48 8C784 96 608 0 416 0z" fill="#09BB07"/>
-                <path d="M288 224c-24 0-40-16-40-40s16-40 40-40 40 16 40 40-16 40-40 40z m256 0c-24 0-40-16-40-40s16-40 40-40 40 16 40 40-16 40-40 40z" fill="#FFFFFF"/>
-              </svg>
-            </div>
-            <div class="method-info">
-              <div class="method-name">微信支付</div>
-              <div class="method-desc">暂不支持</div>
-            </div>
-          </div>
+
         </div>
       </div>
 
@@ -137,7 +121,8 @@ const handlePay = async () => {
         throw new Error('订单号不存在')
       }
 
-      // 调用后端支付接口获取支付表单（PC网页端）
+      // 统一使用PC网页支付（因为手机网站支付未开通）
+      // 注意：如需开通手机端支付，需要在支付宝开放平台开通"手机网站支付"产品
       const response = await paymentApi.createAlipayPc({ orderNo: orderInfo.value.orderNo })
       
       if (response && typeof response === 'string') {
@@ -361,13 +346,13 @@ onMounted(() => {
 }
 
 .btn-pay {
-  background: #1890ff;
-  color: white;
+  background: #213d7c;
+  color: #ffffff;
   font-weight: 500;
 }
 
 .btn-pay:hover:not(:disabled) {
-  background: #40a9ff;
+  background: #1a2f63;
 }
 
 .btn-pay:disabled {

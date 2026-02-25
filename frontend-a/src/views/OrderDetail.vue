@@ -26,13 +26,13 @@
 
       <!-- 联系人/收货信息 -->
       <div class="info-section">
-        <h3 class="section-title">{{ orderType === 'ticket' ? '联系人信息' : '收货信息' }}</h3>
+        <h3 class="section-title">{{ orderType === 'ticket' ? '持票人信息' : '收货信息' }}</h3>
         <div class="info-row">
-          <span class="label">{{ orderType === 'ticket' ? '联系人' : '收货人' }}</span>
+          <span class="label">{{ orderType === 'ticket' ? '真实姓名' : '收货人' }}</span>
           <span class="value">{{ order.contactName || order.receiverName }}</span>
         </div>
         <div class="info-row">
-          <span class="label">联系电话</span>
+          <span class="label">{{ orderType === 'ticket' ? '身份证号' : '联系电话' }}</span>
           <span class="value">{{ order.contactPhone || order.receiverPhone }}</span>
         </div>
         <div class="info-row" v-if="orderType === 'mall'">
@@ -101,6 +101,16 @@
           <span>订单总额</span>
           <span class="total-amount">¥{{ order.totalAmount?.toFixed(2) }}</span>
         </div>
+        
+        <!-- 退款按钮 - 待使用状态 -->
+        <div class="refund-button-container" v-if="order.status === 1 && orderType === 'ticket'">
+          <button class="refund-button" @click="handleRequestRefund">申请退款</button>
+        </div>
+        
+        <!-- 取消退款按钮 - 退款中状态 -->
+        <div class="refund-button-container" v-if="order.status === 5 && orderType === 'ticket'">
+          <button class="cancel-refund-button" @click="handleCancelRefund">取消退款</button>
+        </div>
       </div>
 
       <!-- 操作按钮 -->
@@ -108,9 +118,6 @@
         <el-button type="primary" size="large" @click="handlePay">立即支付</el-button>
         <el-button size="large" @click="handleCancel">取消订单</el-button>
         <el-button size="large" @click="loadOrderDetail">刷新状态</el-button>
-      </div>
-      <div class="action-section" v-else-if="order.status === 1 && orderType === 'ticket'">
-        <el-button type="primary" size="large" @click="loadOrderDetail">刷新状态</el-button>
       </div>
     </div>
   </div>
@@ -187,7 +194,9 @@ const statusText = computed(() => {
     1: '已支付',
     2: orderType.value === 'ticket' ? '已使用' : '已发货',
     3: '已完成',
-    4: '已取消'
+    4: '已取消',
+    5: '退款中',
+    6: '已退款'
   }
   return map[order.value.status] || '未知'
 })
@@ -198,7 +207,9 @@ const statusDesc = computed(() => {
     1: orderType.value === 'ticket' ? '门票待使用，请按时到场' : '商家正在备货',
     2: orderType.value === 'ticket' ? '感谢您的光临' : '商品已发出，请注意查收',
     3: '订单已完成',
-    4: '订单已取消'
+    4: '订单已取消',
+    5: '退款申请已提交，等待管理员处理',
+    6: '退款已完成，款项已原路返回'
   }
   return map[order.value.status] || ''
 })
@@ -279,6 +290,52 @@ const copyOrderNo = async () => {
       ElMessage.error('复制失败，请手动复制')
     }
     document.body.removeChild(textarea)
+  }
+}
+
+// 申请退款
+const handleRequestRefund = async () => {
+  try {
+    await ElMessageBox.confirm(
+      '确定要申请退款吗？提交后需要等待管理员处理。',
+      '申请退款',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    await ticketApi.requestRefund(orderId.value)
+    ElMessage.success('退款申请已提交')
+    await loadOrderDetail()
+  } catch (e: any) {
+    if (e !== 'cancel') {
+      ElMessage.error(e.message || '申请退款失败')
+    }
+  }
+}
+
+// 取消退款申请
+const handleCancelRefund = async () => {
+  try {
+    await ElMessageBox.confirm(
+      '确定要取消退款申请吗？',
+      '取消退款',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    await ticketApi.cancelRefund(orderId.value)
+    ElMessage.success('已取消退款申请')
+    await loadOrderDetail()
+  } catch (e: any) {
+    if (e !== 'cancel') {
+      ElMessage.error(e.message || '取消退款失败')
+    }
   }
 }
 
@@ -604,6 +661,59 @@ onMounted(() => {
 
 .action-section .el-button {
   flex: 1;
+}
+
+/* 退款按钮容器 - 在金额信息下方 */
+.refund-button-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #f0f0f0;
+}
+
+/* 申请退款按钮 - 黑色背景 */
+.refund-button {
+  width: 80%;
+  padding: 16px;
+  background-color: #333;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.refund-button:hover {
+  background-color: #555;
+}
+
+.refund-button:active {
+  background-color: #222;
+}
+
+/* 取消退款按钮 - 红色边框 */
+.cancel-refund-button {
+  width: 80%;
+  padding: 16px;
+  background-color: white;
+  color: #e53327;
+  border: 2px solid #e53327;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.cancel-refund-button:hover {
+  background-color: #fff5f5;
+}
+
+.cancel-refund-button:active {
+  background-color: #ffe5e5;
 }
 
 .qrcode-section {

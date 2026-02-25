@@ -41,7 +41,7 @@
             <span>门票管理</span>
           </template>
           <el-menu-item index="/ticket/inventory">销售记录</el-menu-item>
-          <el-menu-item index="/order/verification">订单核销</el-menu-item>
+          <el-menu-item index="/order/verification">订单管理</el-menu-item>
         </el-sub-menu>
 
         <!-- 商品管理 - 非本期开发内容，暂时隐藏 -->
@@ -69,9 +69,9 @@
             <el-icon><Setting /></el-icon>
             <span>系统设置</span>
           </template>
-          <el-menu-item index="/system/basic">基础设置</el-menu-item>
+          <el-menu-item index="/system/admin-list">管理员列表</el-menu-item>
+          <el-menu-item index="/system/profile">个人设置</el-menu-item>
           <el-menu-item index="/system/about">关于展厅</el-menu-item>
-          <el-menu-item index="/system/content">内容管理</el-menu-item>
           <el-menu-item index="/system/log">操作日志</el-menu-item>
         </el-sub-menu>
       </el-menu>
@@ -155,9 +155,11 @@ const activeMenu = computed(() => {
     return path.includes('/user-analysis') ? '/statistics/user-analysis' : '/statistics/sales'
   }
   if (path.startsWith('/system')) {
-    if (path.includes('/content')) return '/system/content'
+    if (path.includes('/admin-list')) return '/system/admin-list'
+    if (path.includes('/profile')) return '/system/profile'
     if (path.includes('/log')) return '/system/log'
-    return '/system/basic'
+    if (path.includes('/about')) return '/system/about'
+    return path
   }
   return path
 })
@@ -167,7 +169,9 @@ const toggleCollapse = () => {
 }
 
 const handleCommand = async (command: string) => {
-  if (command === 'logout') {
+  if (command === 'profile') {
+    router.push('/system/profile')
+  } else if (command === 'logout') {
     await ElMessageBox.confirm('确定要退出登录吗？', '提示', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
@@ -343,6 +347,19 @@ const handleCommand = async (command: string) => {
 :deep(.el-menu--collapse) {
   .el-sub-menu__title {
     padding-left: 20px !important;
+  }
+}
+
+/* 退出登录按钮样式 */
+:deep(.el-dropdown-menu__item) {
+  &:last-child {
+    background-color: #f58080;
+    color: #ffffff;
+    
+    &:hover {
+      background-color: #f56c6c;
+      color: #ffffff;
+    }
   }
 }
 </style>
