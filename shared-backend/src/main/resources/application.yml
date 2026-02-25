@@ -77,13 +77,13 @@
 
 server:
   port: 8089
-#  生产环境配置https 本地测试注释掉
-  ssl:
-        enabled: true
-        key-store: classpath:ai-yishuguan.com.pfx
-        key-store-password: 16n03wu5
-        key-store-type: PKCS12
-        key-alias: ai-yishuguan.com
+#  生产环境配置https 本地测试注释掉 - 由Nginx处理HTTPS，后端使用HTTP
+  # ssl:
+  #     enabled: true
+  #     key-store: classpath:ai-yishuguan.com.pfx
+  #     key-store-password: 16n03wu5
+  #     key-store-type: PKCS12
+  #     key-alias: ai-yishuguan.com
 # 生产环境配置
 spring:
   web:
@@ -107,6 +107,11 @@ spring:
       max-file-size: 10MB
       max-request-size: 10MB
 
+# 文件上传路径配置
+file:
+  upload:
+    path: uploads
+
 # MyBatis-Plus配置
 mybatis-plus:
   mapper-locations: classpath:mapper/*.xml
@@ -121,11 +126,25 @@ alipay:
   merchant-private-key: "MIIEwAIBADANBgkqhkiG9w0BAQEFAASCBKowggSmAgEAAoIBAQCo4Nm2s5DrnO70IyKKKJxlgdf5yp4TWxL3Pn9Ghv8vXF7flcO/lK+L83lD8spw2Tn2Tu+cQnWSdgV29NUoNeuhvUvfDYR6P0h/DIkBaCXBoEKo3hYA8PycoigVoBTvo/fv+PXOnyPJi1xGthtS1yGUlnrbP0rAMjVGcs4hSg+zMUnd/qKHQG8ZQCSvM9fl1apSgUgqphSSkNF4VILNtzOydfqZNIX+shSdRcS+xX5xnhIv3+m8lyZ7c7N+Rr1WXo3M2Thuxe3YhhSqJWp9gnFjyaWEOfZ3LJByp/ul4oOswy7AQjRXyu489hEl0x5peVLiqNpsQivzW536qtiuRJwPAgMBAAECggEBAI0HIKjTMb2g02frg2eO3HRkR0EhdHrDfoYcmdsC103svInInqx5dVPRIj6dHXO55A6OAskiMt75Ujzx3qPyy3DJDPgbaLtR56+5fxw+pfEZbTFqLUPh+4KuY/0TLwikjGPJKzS+bvtbNtcSMqUuZKuaMsSvCTSReS34p6zjFVNVBIDQYmFZaPY4A5V/2WuhUPfXizggCoBAC2UY+D6aI6/Gu5LgRI2a+cNJ05UaHl+a3LEqGGsYXoRY0yXO7ZYpZsp5nJqfNxGnTQ4bMfX1MZB0cn/1GFQiiefRQdRsHy03Vs0ANEJKnSVb7hek8yw0IBMJqnFW9AESSlxF/P2gb+ECgYEA4Lez+2wjG3AG2u2UlsavIoz0fSjZdn1MKyuLvQozzjQjZ/rFAE3X1rcBGR+olswapLm1nLN1/jQhJBYBEIes3jni/gTBAjUueRNJ04Z4V2pXQKFgyTqQtpsL1xGL8YHCwHLBSnQ8gqOuoVLOIeQiSfM5ClC6kvdT/VJ2Age1Dp8CgYEAwGMxxF2R8nUr8G48vqDtSH4RvA3nV6RPo5FLltN54YGV5n6g9SwpJqyLQrQVfktdnzP22W7Hf8FvJIREZ9JjslDSzez1vjzqTGezqCK/BNtRg/eC3Bftf4aNGMK7E1tZ/1IRoemWGoIT7M/DgD7vpkGLNRP6arfinwDTkkVMLJECgYEAtEvwBhu/FzaM6X6RJ2AGCGybhQgPYngpcsGffm7/HcTLW5PiF9pdAJMYOHYkJ8le3yd5RV7fnrNom7Fj7UVON4auTyy1RvYwcUg+hY5wY4KYuuw/4XQxw7EmkMotQ/nerdXkq74TBqYZaKotZRfLQxX4gARBjcUPCELvF7XjWPUCgYEAnT+2ytjsVO/+xRtlnS6uI+Wfm0UGBXWw/nHhBdu+sFqZ6ncwGpVI4WqAvTmyo7L4SAtSRfCtMbgqnv9ZZj7p7DLxyw1W43Ko02Cj0NbtqQuWejYRiNIp9mVE6Ksp+61cRzuOW/gwD2So4pQDKMzIVu0V2oGE2juJCQvE4ravh3ECgYEAyjSotxY3oK6n085IhnooIr4iTY59n8pQkw1oef44AWX5Whbq1+4SotARqSBN1hWQ26nRrdGTurGKHSUKh21hHeRGCR1hFWdQ+yFXQdUqZxT8BWMU5jDo4FF3OA0fEt8BvvtEiE1Z2PK0GG+sX3FL0BImXOjUZcrR6nfiNbO5Fqg="
   # 支付宝公钥
   alipay-public-key: "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA3buUX4ZG1cWCNT/SddGj+RVcmm/PWUGX2wkzhL5qt346vjArTLXuEAVXcGiywDFPfaroq9RGUtO95fIesiKo2K1g90U6Mhzk1h/s3tO41A3EZww0dBwMVJebmAqy/xZc7LD4rhhlLJBiyMSebsFLG0+e17JnscalaeW7wy8VUKCPx6rbQnVvFULd9MgTu5vVawgOmRt6DYX8vFM5DyBYLcBH5Bjjfg35nMnPiVHXGqgSfwZsEiGz+TAtQHTsHakJtX5h3G/kvA6lVXrlJl75nsQIwYlG2ff50u9pssTKwBBIJqBdgtB0uFf5jQqBoJb8kyvFXcdKv+Z3xwgOOJ/3rQIDAQAB"
-  notify-url: http://ai-yishuguan.com/api/v1/payment/alipay/notify
-  return-url: http://ai-yishuguan.com/order-success
+  notify-url: https://ai-yishuguan.com/api/v1/payment/alipay/notify
+  return-url: https://ai-yishuguan.com/order-success
   gateway-url: https://openapi.alipay.com/gateway.do  # 正式环境网关
   sign-type: RSA2
   charset: utf-8
+
+# 阿里云短信配置
+aliyun:
+  sms:
+    # 是否启用真实短信发送（true=生产环境，false=开发环境）
+    enabled: true
+    # 阿里云AccessKey ID（请替换为你的真实值）
+    accessKeyId: YOUR_ACCESS_KEY_ID
+    # 阿里云AccessKey Secret（请替换为你的真实值）
+    accessKeySecret: YOUR_ACCESS_KEY_SECRET
+    # 短信签名（已从截图中获取）
+    signName: 元星河文化
+    # 短信模板CODE（已从截图中获取）
+    templateCode: SMS_501865326
 
 logging:
   level:

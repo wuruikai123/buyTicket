@@ -12,7 +12,7 @@
         <!-- 联系人信息 -->
         <div class="contact-section">
             <div class="contact-item">
-                <label class="contact-label">购票联系人姓名</label>
+                <label class="contact-label">持票入场人真实姓名</label>
                 <input 
                     v-model="contactName" 
                     type="text" 
@@ -21,12 +21,13 @@
                 />
             </div>
             <div class="contact-item">
-                <label class="contact-label">联系电话</label>
+                <label class="contact-label">持票入场人身份证号</label>
                 <input 
                     v-model="contactPhone" 
-                    type="tel" 
+                    type="text" 
                     class="contact-input" 
-                    placeholder="请输入电话"
+                    placeholder="请输入身份证号"
+                    maxlength="18"
                 />
             </div>
         </div>
@@ -39,21 +40,9 @@
                 class="ticket-item"
             >
                 <div class="ticket-date">{{ ticket.dateTime }}</div>
-                <div class="ticket-quantity">
-                    <button 
-                        class="quantity-btn minus" 
-                        @click="decreaseQuantity(index)"
-                        :disabled="ticket.quantity <= 1"
-                    >
-                        <el-icon><Minus /></el-icon>
-                    </button>
-                    <span class="quantity-number">{{ ticket.quantity }}</span>
-                    <button 
-                        class="quantity-btn plus" 
-                        @click="increaseQuantity(index)"
-                    >
-                        <el-icon><Plus /></el-icon>
-                    </button>
+                <div class="ticket-quantity-fixed">
+                    <span class="quantity-label">数量：</span>
+                    <span class="quantity-number-fixed">1张</span>
                 </div>
                 <div class="ticket-price">¥{{ ticket.totalPrice }}</div>
             </div>
@@ -117,8 +106,7 @@ const agreementLines = ref([
     '1. 购票须知：所有门票一经售出，非不可抗力因素不退不换。',
     '2. 入场要求：请携带本人身份证原件，凭电子票二维码扫码入场。',
     '3. 禁止携带：严禁携带易燃易爆物品、管制刀具等危险品入场。',
-    '4. 知识产权：展馆内部分区域禁止拍照，请留意现场标识。',
-    '5. 儿童说明：1.2米以下儿童免票，需由成人陪同。'
+    '4. 知识产权：展馆内部分区域禁止拍照，请留意现场标识。'
 ]);
 
 // 计算总金额
@@ -126,35 +114,63 @@ const totalAmount = computed(() => {
     return selectedTickets.value.reduce((sum, ticket) => sum + ticket.totalPrice, 0);
 });
 
-// 减少数量
-const decreaseQuantity = (index: number) => {
-    const ticket = selectedTickets.value[index];
-    if (ticket && ticket.quantity > 1) {
-        ticket.quantity--;
-        ticket.totalPrice = ticket.quantity * ticket.unitPrice;
-    }
-};
-
-// 增加数量
-const increaseQuantity = (index: number) => {
-    const ticket = selectedTickets.value[index];
-    if (ticket) {
-        ticket.quantity++;
-        ticket.totalPrice = ticket.quantity * ticket.unitPrice;
-    }
-};
-
-
+// 注意：数量固定为1，不再提供增减功能
 
 // 返回上一页
 const goBack = () => {
     router.back();
 };
 
+// 验证身份证号码
+const validateIdCard = (idCard: string): boolean => {
+    // 去除空格
+    idCard = idCard.trim();
+    
+    // 15位或18位身份证号码正则
+    const idCardPattern = /^[1-9]\d{5}(18|19|20)\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\d{3}[\dXx]$/;
+    
+    // 基本格式验证
+    if (!idCardPattern.test(idCard)) {
+        return false;
+    }
+    
+    // 18位身份证校验码验证
+    if (idCard.length === 18) {
+        const factors = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2];
+        const checkCodes = ['1', '0', 'X', '9', '8', '7', '6', '5', '4', '3', '2'];
+        
+        let sum = 0;
+        for (let i = 0; i < 17; i++) {
+            sum += parseInt(idCard[i]) * factors[i];
+        }
+        
+        const checkCode = checkCodes[sum % 11];
+        const lastChar = idCard[17].toUpperCase();
+        
+        if (lastChar !== checkCode) {
+            return false;
+        }
+    }
+    
+    return true;
+};
+
 // 处理支付
 const handlePayment = async () => {
     if (!contactName.value || !contactPhone.value) {
         alert('请填写联系人信息');
+        return;
+    }
+    
+    // 验证姓名
+    if (contactName.value.trim().length < 2) {
+        alert('请输入正确的姓名');
+        return;
+    }
+    
+    // 验证身份证号码
+    if (!validateIdCard(contactPhone.value)) {
+        alert('请输入正确的身份证号码');
         return;
     }
 
@@ -250,6 +266,7 @@ onMounted(() => {
 .ticket-info {
     min-height: 100vh;
     background-color: #f5f5f5;
+    padding-bottom: 140px; /* 为底部支付栏和导航栏预留空间 */
 }
 
 /* 顶部导航栏 */
@@ -367,46 +384,24 @@ onMounted(() => {
     min-width: 0;
 }
 
-.ticket-quantity {
+.ticket-quantity-fixed {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 8px;
 }
 
-.quantity-btn {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    border: 1px solid #e0e0e0;
-    background-color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    padding: 0;
-}
-
-.quantity-btn:hover:not(:disabled) {
-    background-color: #f0f0f0;
-    border-color: #d0d0d0;
-}
-
-.quantity-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.quantity-btn .el-icon {
-    font-size: 16px;
+.quantity-label {
+    font-size: 14px;
     color: #666;
 }
 
-.quantity-number {
+.quantity-number-fixed {
     font-size: 16px;
     color: #333;
-    min-width: 24px;
-    text-align: center;
+    font-weight: 500;
+    padding: 6px 12px;
+    background-color: #f5f5f5;
+    border-radius: 4px;
 }
 
 .ticket-price {
@@ -447,7 +442,7 @@ onMounted(() => {
 /* 底部支付栏 */
 .payment-bar {
     position: fixed;
-    bottom: 0;
+    bottom: 60px; /* 抬高到导航栏上方 */
     left: 0;
     right: 0;
     width: 100%;
@@ -457,8 +452,9 @@ onMounted(() => {
     padding: 16px 20px;
     background-color: white;
     border-top: 1px solid #e0e0e0;
-    z-index: 1000;
+    z-index: 999;
     box-sizing: border-box;
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .total-info {
@@ -480,8 +476,8 @@ onMounted(() => {
 
 .pay-button {
     padding: 12px 32px;
-    background-color: #e8e8e8;
-    color: #333;
+    background-color: #213d7c;
+    color: #ffffff;
     border: none;
     border-radius: 6px;
     font-size: 16px;
@@ -492,11 +488,11 @@ onMounted(() => {
 }
 
 .pay-button:hover {
-    background-color: #d8d8d8;
+    background-color: #1a2f63;
 }
 
 .pay-button:active {
-    background-color: #c8c8c8;
+    background-color: #152749;
 }
 
 /* 响应式设计 */

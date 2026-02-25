@@ -8,6 +8,7 @@ import com.buyticket.entity.OrderItem;
 import com.buyticket.entity.TicketOrder;
 import com.buyticket.mapper.OrderItemMapper;
 import com.buyticket.mapper.TicketOrderMapper;
+import com.buyticket.entity.ExhibitionTimeSlotInventory;
 import com.buyticket.service.ExhibitionService;
 import com.buyticket.service.ExhibitionTimeSlotInventoryService;
 import com.buyticket.service.TicketOrderService;
@@ -37,22 +38,28 @@ public class TicketOrderServiceImpl extends ServiceImpl<TicketOrderMapper, Ticke
             throw new RuntimeException("展览不存在");
         }
         
-        // 2. 扣减库存（使用新的库存系统）
+        // 2. 检查库存是否充足（不扣减，只检查）
         for (TicketOrderCreateRequest.TicketItemRequest item : request.getItems()) {
             try {
-                inventoryService.decreaseInventory(
+                ExhibitionTimeSlotInventory inventory = inventoryService.getAvailableInventory(
                     request.getExhibitionId(),
                     item.getDate(),
-                    item.getTimeSlot(),
-                    item.getQuantity()
+                    item.getTimeSlot()
                 );
+                
+                if (inventory == null) {
+                    throw new RuntimeException("库存记录不存在");
+                }
+                
+                if (inventory.getAvailableTickets() < item.getQuantity()) {
+                    throw new RuntimeException(item.getDate() + " " + item.getTimeSlot() + " 库存不足，剩余" + inventory.getAvailableTickets() + "张");
+                }
             } catch (RuntimeException e) {
-                // 库存不足或并发冲突，抛出异常回滚事务
                 throw new RuntimeException(item.getDate() + " " + item.getTimeSlot() + " " + e.getMessage());
             }
         }
 
-        // 3. 创建订单
+        // 3. 创建订单（库存将在支付成功后扣减）
         TicketOrder order = new TicketOrder();
         order.setUserId(userId);
         order.setTotalAmount(request.getTotalAmount());

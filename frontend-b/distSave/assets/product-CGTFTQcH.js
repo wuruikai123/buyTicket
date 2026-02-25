@@ -1,0 +1,1 @@
+import{v as e}from"./index-cFvFNVEA.js";const p={getList(t){return e.get("/product/list",{params:t})},getDetail(t){return e.get(`/product/${t}`)},create(t){return e.post("/product/create",t)},update(t){return e.post("/product/update",t)},delete(t){return e.delete(`/product/${t}`)},updateStatus(t,r){return e.put(`/product/${t}/status/${r}`)}};export{p};

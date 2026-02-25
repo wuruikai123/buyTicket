@@ -30,8 +30,6 @@
       <button class="primary" type="submit" :disabled="loading">
         {{ loading ? '登录中...' : '登录' }}
       </button>
-      
-      <div class="tip">默认账号：admin / 密码：123456</div>
     </form>
   </div>
 </template>
@@ -44,8 +42,8 @@ import request from '@/utils/request'
 
 const router = useRouter()
 const form = reactive({
-  account: 'admin',
-  password: '123456'
+  account: '',
+  password: ''
 })
 const loading = ref(false)
 const errorMsg = ref('')
@@ -136,14 +134,20 @@ async function handleLogin() {
   height: 60px;
   border: none;
   border-radius: 12px;
-  background: #d7d7d7;
-  color: #2d2d2d;
+  background: #213d7c;
+  color: #ffffff;
   font-size: 22px;
   letter-spacing: 2px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
 }
 
-.primary:active {
-  background: #cfcfcf;
+.primary:hover:not(:disabled) {
+  background: #1a2f63;
+}
+
+.primary:active:not(:disabled) {
+  background: #152749;
 }
 
 .primary:disabled {
@@ -159,13 +163,6 @@ async function handleLogin() {
   color: #c33;
   font-size: 16px;
   text-align: center;
-}
-
-.tip {
-  margin-top: 20px;
-  text-align: center;
-  font-size: 14px;
-  color: #909399;
 }
 </style>
 

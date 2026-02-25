@@ -11,6 +11,11 @@ const router = createRouter({
       component: () => import('@/views/Login.vue')
     },
     {
+      path: '/service-terms',
+      name: 'ServiceTerms',
+      component: () => import('@/views/ServiceTerms.vue')
+    },
+    {
       path: '/',
       component: BasicLayout,
       children: [
@@ -162,16 +167,24 @@ const router = createRouter({
 // 路由守卫
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('token')
-  console.log('Router Guard Debug:')
-  console.log('  To:', to.name, to.path)
-  console.log('  From:', from.name, from.path)
-  console.log('  Token:', token)
 
-  if (to.name !== 'Login' && !token) {
-    console.log('  Action: Redirect to Login')
+  // 不需要登录就能访问的页面（公开页面）
+  const publicPages = [
+    'Login',
+    'ServiceTerms',
+    'Home',
+    'Exhibitions',
+    'Mall',
+    'About'
+  ]
+
+  // 需要登录才能访问的页面
+  const requiresAuth = !publicPages.includes(to.name as string)
+
+  if (requiresAuth && !token) {
+    // 需要登录但未登录，跳转到登录页
     next({ name: 'Login' })
   } else {
-    console.log('  Action: Allow')
     next()
   }
 })

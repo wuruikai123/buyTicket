@@ -18,6 +18,10 @@ export default defineConfig({
          target: 'http://47.121.192.245:8089',
         // target: 'http://localhost:8080',  // 开发环境使用本地后端
         changeOrigin: true
+      },
+      '/uploads': {
+         target: 'http://47.121.192.245:8089',
+        changeOrigin: true
       }
     }
   },

@@ -14,14 +14,19 @@ public class Banner {
     private Long id;
     
     /**
-     * 关联的展览ID
+     * 轮播图图片URL
      */
-    private Long exhibitionId;
+    private String imageUrl;
     
     /**
-     * 轮播图标题
+     * 轮播图标题（最多25字）
      */
     private String title;
+    
+    /**
+     * 跳转链接
+     */
+    private String linkUrl;
     
     /**
      * 排序号（数字越小越靠前）

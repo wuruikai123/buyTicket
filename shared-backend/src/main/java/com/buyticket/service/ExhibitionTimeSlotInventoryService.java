@@ -9,10 +9,10 @@ import java.util.List;
 public interface ExhibitionTimeSlotInventoryService extends IService<ExhibitionTimeSlotInventory> {
 
     /**
-     * 初始化展览库存
+     * 初始化展览库存（上午和下午两个时段）
      */
     void initializeInventory(Long exhibitionId, LocalDate startDate, LocalDate endDate, 
-                            Integer morningTickets, Integer afternoonTickets);
+                            String dailyStartTime, String dailyEndTime, Integer ticketsPerPeriod);
 
     /**
      * 查询指定日期和时间段的可用库存

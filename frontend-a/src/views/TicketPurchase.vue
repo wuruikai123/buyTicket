@@ -33,12 +33,13 @@
             <h3 class="details-title">展览详情</h3>
             <p class="details-description">{{ exhibition.description }}</p>
             <div class="details-content-blocks" v-if="exhibition.images?.length">
-                <div 
+                <img 
                     v-for="(img, index) in exhibition.images" 
                     :key="index" 
-                    class="content-block"
-                    :style="{ backgroundImage: `url(${img})` }"
-                ></div>
+                    :src="img"
+                    class="content-image"
+                    alt="展览详情图"
+                />
             </div>
             <div class="details-content-blocks" v-else>
                 <div class="content-block placeholder">
@@ -300,13 +301,11 @@ onMounted(() => {
     gap: 12px;
 }
 
-.content-block {
+.content-image {
     width: 100%;
-    height: 200px;
-    background-color: #d0d0d0;
-    background-size: cover;
-    background-position: center;
+    height: auto;
     border-radius: 8px;
+    display: block;
 }
 
 .content-block.placeholder {
@@ -315,6 +314,9 @@ onMounted(() => {
     justify-content: center;
     color: #999;
     font-size: 14px;
+    height: 200px;
+    background-color: #f5f5f5;
+    border-radius: 8px;
 }
 
 /* 底部固定购票栏 */
@@ -350,8 +352,8 @@ onMounted(() => {
 
 .purchase-button {
     padding: 12px 32px;
-    background-color: #e8e8e8;
-    color: #333;
+    background-color: #213d7c;
+    color: #ffffff;
     border: none;
     border-radius: 6px;
     font-size: 16px;
@@ -363,11 +365,11 @@ onMounted(() => {
 }
 
 .purchase-button:hover {
-    background-color: #d8d8d8;
+    background-color: #1a2f63;
 }
 
 .purchase-button:active {
-    background-color: #c8c8c8;
+    background-color: #152749;
 }
 
 /* 响应式设计 */

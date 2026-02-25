@@ -21,37 +21,43 @@ public class ExhibitionTimeSlotInventoryServiceImpl
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void initializeInventory(Long exhibitionId, LocalDate startDate, LocalDate endDate,
-                                   Integer morningTickets, Integer afternoonTickets) {
+                                   String dailyStartTime, String dailyEndTime, Integer ticketsPerPeriod) {
+        
+        if (ticketsPerPeriod == null || ticketsPerPeriod <= 0) {
+            ticketsPerPeriod = 100; // 默认值
+        }
+        
+        // 解析开始和结束时间
+        String morningStart = dailyStartTime != null ? dailyStartTime : "10:00";
+        String afternoonEnd = dailyEndTime != null ? dailyEndTime : "18:00";
+        String noonTime = "12:00"; // 中午12点作为上午和下午的分界点
+        
         List<ExhibitionTimeSlotInventory> inventoryList = new ArrayList<>();
         
         // 遍历每一天
         LocalDate currentDate = startDate;
         while (!currentDate.isAfter(endDate)) {
-            // 上午场 09:00-12:00
-            if (morningTickets != null && morningTickets > 0) {
-                ExhibitionTimeSlotInventory morningInventory = new ExhibitionTimeSlotInventory();
-                morningInventory.setExhibitionId(exhibitionId);
-                morningInventory.setTicketDate(currentDate);
-                morningInventory.setTimeSlot("09:00-12:00");
-                morningInventory.setTotalTickets(morningTickets);
-                morningInventory.setSoldTickets(0);
-                morningInventory.setAvailableTickets(morningTickets);
-                morningInventory.setVersion(0);
-                inventoryList.add(morningInventory);
-            }
+            // 创建上午时段库存
+            ExhibitionTimeSlotInventory morningInventory = new ExhibitionTimeSlotInventory();
+            morningInventory.setExhibitionId(exhibitionId);
+            morningInventory.setTicketDate(currentDate);
+            morningInventory.setTimeSlot(morningStart + "-" + noonTime); // 例如：10:00-12:00
+            morningInventory.setTotalTickets(ticketsPerPeriod);
+            morningInventory.setSoldTickets(0);
+            morningInventory.setAvailableTickets(ticketsPerPeriod);
+            morningInventory.setVersion(0);
+            inventoryList.add(morningInventory);
             
-            // 下午场 14:00-17:00
-            if (afternoonTickets != null && afternoonTickets > 0) {
-                ExhibitionTimeSlotInventory afternoonInventory = new ExhibitionTimeSlotInventory();
-                afternoonInventory.setExhibitionId(exhibitionId);
-                afternoonInventory.setTicketDate(currentDate);
-                afternoonInventory.setTimeSlot("14:00-17:00");
-                afternoonInventory.setTotalTickets(afternoonTickets);
-                afternoonInventory.setSoldTickets(0);
-                afternoonInventory.setAvailableTickets(afternoonTickets);
-                afternoonInventory.setVersion(0);
-                inventoryList.add(afternoonInventory);
-            }
+            // 创建下午时段库存
+            ExhibitionTimeSlotInventory afternoonInventory = new ExhibitionTimeSlotInventory();
+            afternoonInventory.setExhibitionId(exhibitionId);
+            afternoonInventory.setTicketDate(currentDate);
+            afternoonInventory.setTimeSlot(noonTime + "-" + afternoonEnd); // 例如：12:00-18:00
+            afternoonInventory.setTotalTickets(ticketsPerPeriod);
+            afternoonInventory.setSoldTickets(0);
+            afternoonInventory.setAvailableTickets(ticketsPerPeriod);
+            afternoonInventory.setVersion(0);
+            inventoryList.add(afternoonInventory);
             
             currentDate = currentDate.plusDays(1);
         }

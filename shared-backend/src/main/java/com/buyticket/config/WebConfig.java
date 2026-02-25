@@ -23,17 +23,30 @@ public class WebConfig implements WebMvcConfigurer {
                         "/api/v1/user/login",
                         "/api/v1/user/register",
                         "/api/v1/user/hello",
+                        // 短信验证码登录
+                        "/api/v1/user/sms/send",
+                        "/api/v1/user/login/sms",
                         // 管理员登录
                         "/api/v1/admin/auth/login",
                         // 公开接口 - 展览
                         "/api/v1/exhibition/list",
                         "/api/v1/exhibition/detail/**",
+                        // 公开接口 - 商城
+                        "/api/v1/mall/product/list",
+                        "/api/v1/mall/product/detail/**",
                         // 公开接口 - 轮播图
                         "/api/v1/banner/list",
-                        // 公开接口 - 关于我们
-                        "/api/v1/about/info",
+                        // 公开接口 - 关于展厅
+                        "/api/v1/about/**",
                         // 公开接口 - 票务查询
                         "/api/v1/ticket/availability",
+                        // 公开接口 - 系统配置
+                        "/api/v1/system-config/**",
+                        // 支付宝回调接口（重要：支付宝服务器调用时没有Token）
+                        "/api/v1/payment/alipay/notify",
+                        "/api/v1/payment/alipay/return",
+                        // 静态资源 - 上传的图片文件
+                        "/uploads/**",
                         // Swagger文档
                         "/swagger-ui/**",
                         "/v3/api-docs/**",

@@ -3,7 +3,7 @@
     <div class="login-wrapper">
       <!-- 左侧欢迎区域 -->
       <div class="welcome-section">
-        <h1 class="welcome-text">欢迎登陆XXX管理平台</h1>
+        <h1 class="welcome-text">欢迎登录元星河AI艺术馆售票系统管理平台</h1>
       </div>
 
       <!-- 右侧登录表单区域 -->
@@ -43,9 +43,6 @@
             </el-button>
           </el-form-item>
         </el-form>
-        <div class="login-tip">
-          <p>测试账号：admin / 密码：123456</p>
-        </div>
       </div>
     </div>
   </div>
@@ -64,8 +61,8 @@ const loginFormRef = ref<FormInstance>()
 const loading = ref(false)
 
 const loginForm = reactive({
-  username: 'admin',
-  password: '123456',
+  username: '',
+  password: '',
   remember: false
 })
 
@@ -103,10 +100,35 @@ const handleLogin = async () => {
 .login-container {
   width: 100%;
   height: 100vh;
-  background-color: #f5f5f5;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
+  overflow: hidden;
+
+  // 添加装饰性背景元素
+  &::before {
+    content: '';
+    position: absolute;
+    width: 500px;
+    height: 500px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    top: -200px;
+    left: -200px;
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    width: 400px;
+    height: 400px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 50%;
+    bottom: -150px;
+    right: -150px;
+  }
 }
 
 .login-wrapper {
@@ -117,6 +139,8 @@ const handleLogin = async () => {
   align-items: center;
   justify-content: center;
   padding: 0 40px;
+  position: relative;
+  z-index: 1;
 }
 
 .welcome-section {
@@ -127,62 +151,73 @@ const handleLogin = async () => {
   padding-right: 60px;
 
   .welcome-text {
-    font-size: 60px;
-    font-weight: 500;
-    color: #303133;
+    font-size: 48px;
+    font-weight: 600;
+    color: #ffffff;
     margin: 0;
-    line-height: 1.5;
+    line-height: 1.4;
+    text-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+    letter-spacing: 1px;
   }
 }
 
 .login-section {
   flex: 1;
-  max-width: 400px;
-  padding: 40px;
-  border-radius: 8px;
+  max-width: 420px;
+  padding: 48px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
 }
 
 .login-form {
   :deep(.el-form-item) {
-    margin-bottom: 24px;
+    margin-bottom: 28px;
   }
 
   :deep(.el-form-item__label) {
-    font-size: 16px;
-    color: #303133;
-    font-weight: 500;
+    font-size: 15px;
+    color: #4a5568 !important;
+    font-weight: 600;
     padding: 0;
-    margin-bottom: 10px;
+    margin-bottom: 12px;
     line-height: 1.5;
     height: auto;
   }
 
   :deep(.el-input__wrapper) {
     padding: 0;
-    height: 48px;
-    border-radius: 4px;
+    height: 52px;
+    border-radius: 8px;
     box-shadow: none !important;
-    border: 1px solid #dcdfe6;
-    background-color: #fff;
+    border: 2px solid #e2e8f0;
+    background-color: #ffffff;
+    transition: all 0.3s ease;
 
     &:hover {
       box-shadow: none !important;
-      border-color: #c0c4cc;
+      border-color: #cbd5e0;
     }
 
     &.is-focus {
-      box-shadow: none !important;
-      border-color: #409eff;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1) !important;
+      border-color: #667eea;
     }
   }
 
   :deep(.el-input__inner) {
-    height: 48px;
-    line-height: 48px;
-    font-size: 16px;
-    padding: 0 16px;
+    height: 52px;
+    line-height: 52px;
+    font-size: 15px;
+    padding: 0 18px;
     border: none;
     background-color: transparent;
+    color: #2d3748;
+
+    &::placeholder {
+      color: #a0aec0;
+    }
 
     &:focus {
       outline: none;
@@ -191,37 +226,69 @@ const handleLogin = async () => {
 
   .login-button {
     width: 100%;
-    height: 48px;
-    background-color: #e4e7ed;
-    border-color: #dcdfe6;
-    color: #303133;
-    font-size: 16px;
-    border-radius: 4px;
-    margin-top: 8px;
+    height: 56px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    color: #ffffff !important;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 4px;
+    border-radius: 12px;
+    margin-top: 20px;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 8px 24px rgba(102, 126, 234, 0.35);
+    position: relative;
+    overflow: hidden;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+
+    // 按钮文字样式
+    :deep(span) {
+      position: relative;
+      z-index: 1;
+      display: inline-block;
+      text-transform: uppercase;
+      color: #ffffff !important;
+    }
+
+    // 添加光泽效果
+    &::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.3),
+        transparent
+      );
+      transition: left 0.5s;
+    }
 
     &:hover {
-      background-color: #d3d4d6;
-      border-color: #c0c4cc;
-      color: #303133;
+      transform: translateY(-3px) scale(1.02);
+      box-shadow: 0 12px 32px rgba(102, 126, 234, 0.5);
+      background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+      letter-spacing: 5px;
+      color: #ffffff !important;
+
+      &::before {
+        left: 100%;
+      }
     }
 
     &:active {
-      background-color: #c0c4cc;
-      border-color: #a8abb2;
+      transform: translateY(-1px) scale(0.98);
+      box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
     }
-  }
-}
 
-.login-tip {
-  text-align: center;
-  margin-top: 20px;
-  padding-top: 20px;
-  border-top: 1px solid #f0f0f0;
-
-  p {
-    font-size: 12px;
-    color: #909399;
-    margin: 0;
+    // loading状态样式
+    &.is-loading {
+      pointer-events: none;
+      opacity: 0.8;
+    }
   }
 }
 
@@ -246,6 +313,7 @@ const handleLogin = async () => {
   .login-section {
     width: 100%;
     max-width: 100%;
+    padding: 32px 24px;
   }
 }
 </style>

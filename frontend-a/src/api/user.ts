@@ -22,6 +22,16 @@ export interface Address {
 }
 
 export const userApi = {
+    // 发送短信验证码
+    sendSmsCode(phone: string) {
+        return request.post('/user/sms/send', { phone })
+    },
+
+    // 短信验证码登录
+    loginWithSms(phone: string, code: string) {
+        return request.post<any, { token: string; userInfo?: User }>('/user/login/sms', { phone, code })
+    },
+
     // 获取当前用户信息
     getUserInfo() {
         return request.get<any, User>('/user/info')
@@ -30,6 +40,11 @@ export const userApi = {
     // 更新用户信息
     updateUserInfo(data: Partial<User>) {
         return request.put('/user/update', data)
+    },
+
+    // 修改头像
+    updateAvatar(avatarUrl: string) {
+        return request.put('/user/avatar', { avatar: avatarUrl })
     },
 
     // 修改密码

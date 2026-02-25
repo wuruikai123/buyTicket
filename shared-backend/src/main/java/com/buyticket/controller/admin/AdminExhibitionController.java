@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -113,13 +114,10 @@ public class AdminExhibitionController {
                 dto.setSalesAmount(BigDecimal.ZERO);
             }
             
-            // 总票数（计算每天的总票数：上午+下午）
+            // 总票数（使用每时段门票数计算）
             int totalTickets = 0;
-            if (exhibition.getMorningTickets() != null) {
-                totalTickets += exhibition.getMorningTickets();
-            }
-            if (exhibition.getAfternoonTickets() != null) {
-                totalTickets += exhibition.getAfternoonTickets();
+            if (exhibition.getTicketsPerPeriod() != null) {
+                totalTickets = exhibition.getTicketsPerPeriod();
             }
             dto.setTotalTickets(totalTickets);
             
@@ -146,18 +144,38 @@ public class AdminExhibitionController {
     public JsonData create(@RequestBody Exhibition exhibition) {
         exhibitionService.save(exhibition);
         
-        // 初始化库存
+        // 初始化库存（使用新的每小时门票数和时间段）
         if (exhibition.getStartDate() != null && exhibition.getEndDate() != null) {
+            // 获取时间段
+            String dailyStartTime = exhibition.getDailyStartTime() != null ? exhibition.getDailyStartTime() : "10:00";
+            String dailyEndTime = exhibition.getDailyEndTime() != null ? exhibition.getDailyEndTime() : "18:00";
+            
+            // 初始化库存 - 为每一天创建上午和下午两个时段的库存
+            Integer ticketsPerPeriod = exhibition.getTicketsPerPeriod() != null ? exhibition.getTicketsPerPeriod() : 100;
+            
             inventoryService.initializeInventory(
                 exhibition.getId(),
                 exhibition.getStartDate(),
                 exhibition.getEndDate(),
-                exhibition.getMorningTickets(),
-                exhibition.getAfternoonTickets()
+                dailyStartTime,
+                dailyEndTime,
+                ticketsPerPeriod
             );
         }
         
         return JsonData.buildSuccess("创建成功");
+    }
+    
+    /**
+     * 为展览初始化库存（上午和下午两个时段）
+     * @deprecated 已废弃，使用 inventoryService.initializeInventory 代替
+     */
+    @Deprecated
+    private void initializeInventoryForExhibition(Long exhibitionId, LocalDate startDate, LocalDate endDate,
+                                                   String dailyStartTime, String dailyEndTime, Integer ticketsPerPeriod) {
+        // 此方法已废弃，直接调用service层方法
+        inventoryService.initializeInventory(exhibitionId, startDate, endDate, 
+                                            dailyStartTime, dailyEndTime, ticketsPerPeriod);
     }
 
     /**
@@ -165,7 +183,36 @@ public class AdminExhibitionController {
      */
     @PostMapping("/update")
     public JsonData update(@RequestBody Exhibition exhibition) {
+        // 打印接收到的数据，用于调试
+        System.out.println("更新展览: ID=" + exhibition.getId() + 
+                         ", 开始日期=" + exhibition.getStartDate() + 
+                         ", 结束日期=" + exhibition.getEndDate());
+        
         exhibitionService.updateById(exhibition);
+        
+        // 如果日期或票数有变化，需要重新初始化库存
+        if (exhibition.getStartDate() != null && exhibition.getEndDate() != null) {
+            // 删除旧库存
+            com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.buyticket.entity.ExhibitionTimeSlotInventory> deleteQuery = 
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
+            deleteQuery.eq(com.buyticket.entity.ExhibitionTimeSlotInventory::getExhibitionId, exhibition.getId());
+            inventoryService.remove(deleteQuery);
+            
+            // 重新初始化库存
+            String dailyStartTime = exhibition.getDailyStartTime() != null ? exhibition.getDailyStartTime() : "10:00";
+            String dailyEndTime = exhibition.getDailyEndTime() != null ? exhibition.getDailyEndTime() : "18:00";
+            Integer ticketsPerPeriod = exhibition.getTicketsPerPeriod() != null ? exhibition.getTicketsPerPeriod() : 100;
+            
+            inventoryService.initializeInventory(
+                exhibition.getId(),
+                exhibition.getStartDate(),
+                exhibition.getEndDate(),
+                dailyStartTime,
+                dailyEndTime,
+                ticketsPerPeriod
+            );
+        }
+        
         return JsonData.buildSuccess("更新成功");
     }
 

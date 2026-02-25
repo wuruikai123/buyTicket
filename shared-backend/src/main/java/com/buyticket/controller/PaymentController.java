@@ -8,6 +8,7 @@ import com.buyticket.service.AlipayService;
 import com.buyticket.service.OrderItemService;
 import com.buyticket.service.TicketOrderService;
 import com.buyticket.service.MallOrderService;
+import com.buyticket.service.ExhibitionTimeSlotInventoryService;
 import com.buyticket.utils.JsonData;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,6 +38,9 @@ public class PaymentController {
     
     @Autowired
     private OrderItemService orderItemService;
+    
+    @Autowired
+    private ExhibitionTimeSlotInventoryService inventoryService;
     
     /**
      * 创建支付订单（PC端）
@@ -244,6 +248,29 @@ public class PaymentController {
             if ("TRADE_SUCCESS".equals(tradeStatus) || "TRADE_FINISHED".equals(tradeStatus)) {
                 // 支付成功，更新订单状态 (0:待支付 -> 1:待使用)
                 if (order.getStatus() == 0) {
+                    // 1. 扣减库存（支付成功后才扣减）
+                    LambdaQueryWrapper<OrderItem> itemQueryWrapper = new LambdaQueryWrapper<>();
+                    itemQueryWrapper.eq(OrderItem::getOrderId, order.getId());
+                    List<OrderItem> orderItems = orderItemService.list(itemQueryWrapper);
+                    
+                    for (OrderItem item : orderItems) {
+                        try {
+                            inventoryService.decreaseInventory(
+                                item.getExhibitionId(),
+                                item.getTicketDate(),
+                                item.getTimeSlot(),
+                                item.getQuantity()
+                            );
+                            log.info("扣减库存成功: exhibitionId={}, date={}, timeSlot={}, quantity={}", 
+                                    item.getExhibitionId(), item.getTicketDate(), item.getTimeSlot(), item.getQuantity());
+                        } catch (RuntimeException e) {
+                            log.error("扣减库存失败: orderNo={}, error={}", outTradeNo, e.getMessage());
+                            // 库存扣减失败，但支付已成功，记录错误但不影响订单状态更新
+                            // 需要人工介入处理
+                        }
+                    }
+                    
+                    // 2. 更新订单状态
                     order.setStatus(1);  // 1:待使用
                     order.setPayTime(java.time.LocalDateTime.now());
                     ticketOrderService.updateById(order);
@@ -303,15 +330,39 @@ public class PaymentController {
             log.info("订单号: {}, 支付宝交易号: {}, 交易状态: {}, 金额: {}", 
                     outTradeNo, tradeNo, tradeStatus, totalAmount);
             
-            // 查询订单并更新状态
+            // 查询订单并更新状态（同步回调作为备用方案）
             TicketOrder ticketOrder = ticketOrderService.getByOrderNo(outTradeNo);
             if (ticketOrder != null && ("TRADE_SUCCESS".equals(tradeStatus) || "TRADE_FINISHED".equals(tradeStatus))) {
-                // 支付成功，更新订单状态 (0:待支付 -> 1:已支付)
+                // 支付成功，更新订单状态 (0:待支付 -> 1:待使用)
                 if (ticketOrder.getStatus() == 0) {
-                    ticketOrder.setStatus(1);  // 1:已支付
+                    // 1. 扣减库存（支付成功后才扣减）
+                    LambdaQueryWrapper<OrderItem> itemQueryWrapper = new LambdaQueryWrapper<>();
+                    itemQueryWrapper.eq(OrderItem::getOrderId, ticketOrder.getId());
+                    List<OrderItem> orderItems = orderItemService.list(itemQueryWrapper);
+                    
+                    for (OrderItem item : orderItems) {
+                        try {
+                            inventoryService.decreaseInventory(
+                                item.getExhibitionId(),
+                                item.getTicketDate(),
+                                item.getTimeSlot(),
+                                item.getQuantity()
+                            );
+                            log.info("扣减库存成功（同步通知）: exhibitionId={}, date={}, timeSlot={}, quantity={}", 
+                                    item.getExhibitionId(), item.getTicketDate(), item.getTimeSlot(), item.getQuantity());
+                        } catch (RuntimeException e) {
+                            log.error("扣减库存失败（同步通知）: orderNo={}, error={}", outTradeNo, e.getMessage());
+                            // 库存扣减失败，但支付已成功，记录错误但不影响订单状态更新
+                        }
+                    }
+                    
+                    // 2. 更新订单状态
+                    ticketOrder.setStatus(1);  // 1:待使用
                     ticketOrder.setPayTime(java.time.LocalDateTime.now());
                     ticketOrderService.updateById(ticketOrder);
-                    log.info("门票订单支付成功，状态已更新（同步通知）: orderNo={}", outTradeNo);
+                    log.info("门票订单支付成功，状态已更新为待使用（同步通知）: orderNo={}", outTradeNo);
+                } else {
+                    log.info("门票订单状态已是: {}, 无需更新（同步通知）: orderNo={}", ticketOrder.getStatus(), outTradeNo);
                 }
             } else {
                 // 尝试查询商城订单
@@ -321,12 +372,14 @@ public class PaymentController {
                 com.buyticket.entity.MallOrder mallOrder = mallOrderService.getOne(mallQueryWrapper);
                 
                 if (mallOrder != null && ("TRADE_SUCCESS".equals(tradeStatus) || "TRADE_FINISHED".equals(tradeStatus))) {
-                    // 支付成功，更新订单状态 (0:待支付 -> 1:已支付)
+                    // 支付成功，更新订单状态 (0:待支付 -> 1:待发货)
                     if (mallOrder.getStatus() == 0) {
-                        mallOrder.setStatus(1);  // 1:已支付
+                        mallOrder.setStatus(1);  // 1:待发货
                         mallOrder.setPayTime(java.time.LocalDateTime.now());
                         mallOrderService.updateById(mallOrder);
-                        log.info("商城订单支付成功，状态已更新（同步通知）: orderNo={}", outTradeNo);
+                        log.info("商城订单支付成功，状态已更新为待发货（同步通知）: orderNo={}", outTradeNo);
+                    } else {
+                        log.info("商城订单状态已是: {}, 无需更新（同步通知）: orderNo={}", mallOrder.getStatus(), outTradeNo);
                     }
                 }
             }
@@ -403,6 +456,28 @@ public class PaymentController {
             TicketOrder ticketOrder = ticketOrderService.getByOrderNo(orderNo);
             if (ticketOrder != null) {
                 if (ticketOrder.getStatus() == 0) {
+                    // 1. 扣减库存（支付成功后才扣减）
+                    LambdaQueryWrapper<OrderItem> itemQueryWrapper = new LambdaQueryWrapper<>();
+                    itemQueryWrapper.eq(OrderItem::getOrderId, ticketOrder.getId());
+                    List<OrderItem> orderItems = orderItemService.list(itemQueryWrapper);
+                    
+                    for (OrderItem item : orderItems) {
+                        try {
+                            inventoryService.decreaseInventory(
+                                item.getExhibitionId(),
+                                item.getTicketDate(),
+                                item.getTimeSlot(),
+                                item.getQuantity()
+                            );
+                            log.info("扣减库存成功（测试）: exhibitionId={}, date={}, timeSlot={}, quantity={}", 
+                                    item.getExhibitionId(), item.getTicketDate(), item.getTimeSlot(), item.getQuantity());
+                        } catch (RuntimeException e) {
+                            log.error("扣减库存失败（测试）: orderNo={}, error={}", orderNo, e.getMessage());
+                            return JsonData.buildError("扣减库存失败: " + e.getMessage());
+                        }
+                    }
+                    
+                    // 2. 更新订单状态
                     ticketOrder.setStatus(1);  // 1:已支付
                     ticketOrder.setPayTime(java.time.LocalDateTime.now());
                     ticketOrderService.updateById(ticketOrder);

@@ -28,10 +28,99 @@ public class UserController {
     
     @Autowired
     private UserAddressService userAddressService;
+    
+    @Autowired
+    private com.buyticket.service.SmsService smsService;
+    
+    @Autowired
+    private com.buyticket.service.UidGeneratorService uidGeneratorService;
 
     // 从JWT上下文获取当前用户ID
     private Long getCurrentUserId() {
         return UserContext.getUserId();
+    }
+
+    /**
+     * 发送短信验证码
+     */
+    @PostMapping("/sms/send")
+    public JsonData sendSmsCode(@RequestBody Map<String, String> request) {
+        String phone = request.get("phone");
+        
+        if (phone == null || phone.trim().isEmpty()) {
+            return JsonData.buildError("手机号不能为空");
+        }
+        
+        // 验证手机号格式
+        if (!phone.matches("^1[3-9]\\d{9}$")) {
+            return JsonData.buildError("手机号格式不正确");
+        }
+        
+        try {
+            boolean success = smsService.sendVerificationCode(phone);
+            if (success) {
+                return JsonData.buildSuccess("验证码已发送");
+            } else {
+                return JsonData.buildError("发送失败，请稍后重试");
+            }
+        } catch (Exception e) {
+            return JsonData.buildError(e.getMessage());
+        }
+    }
+    
+    /**
+     * 短信验证码登录/注册
+     */
+    @PostMapping("/login/sms")
+    public JsonData loginWithSms(@RequestBody Map<String, String> request) {
+        String phone = request.get("phone");
+        String code = request.get("code");
+        
+        if (phone == null || phone.trim().isEmpty()) {
+            return JsonData.buildError("手机号不能为空");
+        }
+        
+        if (code == null || code.trim().isEmpty()) {
+            return JsonData.buildError("验证码不能为空");
+        }
+        
+        // 验证验证码
+        boolean verified = smsService.verifyCode(phone, code);
+        if (!verified) {
+            return JsonData.buildError("验证码错误或已过期");
+        }
+        
+        // 查找用户
+        LambdaQueryWrapper<SysUser> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(SysUser::getPhone, phone);
+        SysUser user = sysUserService.getOne(queryWrapper);
+        
+        // 如果用户不存在，自动注册
+        if (user == null) {
+            user = new SysUser();
+            user.setUsername(phone); // 用户名默认为手机号
+            user.setPhone(phone);
+            user.setPassword(""); // 短信登录不需要密码
+            user.setUid(uidGeneratorService.generateNextUid()); // 使用新的UID生成规则
+            user.setBalance(new BigDecimal("0.00"));
+            user.setCreateTime(LocalDateTime.now());
+            user.setStatus(1); // 正常状态
+            sysUserService.save(user);
+        }
+        
+        // 检查用户状态
+        if (user.getStatus() != null && user.getStatus() == 0) {
+            return JsonData.buildError("账号已被冻结，请联系管理员");
+        }
+        
+        // 生成Token
+        String token = JwtUtils.generateToken(user);
+        
+        Map<String, Object> result = new HashMap<>();
+        result.put("token", token);
+        result.put("userInfo", user);
+        
+        return JsonData.buildSuccess(result);
     }
 
     /**
@@ -82,7 +171,7 @@ public class UserController {
         user.setUsername(registerReq.getUsername());
         user.setPassword(registerReq.getPassword()); // 实际应加密
         user.setPhone(registerReq.getPhone());
-        user.setUid("UID" + System.currentTimeMillis()); // 随机生成UID
+        user.setUid(uidGeneratorService.generateNextUid()); // 使用新的UID生成规则
         user.setBalance(new BigDecimal("0.00"));
         user.setCreateTime(LocalDateTime.now());
         
@@ -128,6 +217,33 @@ public class UserController {
         }
         sysUserService.updateById(user);
         return JsonData.buildSuccess("更新成功");
+    }
+
+    /**
+     * 修改头像
+     */
+    @PutMapping("/avatar")
+    public JsonData updateAvatar(@RequestBody Map<String, String> request) {
+        Long userId = getCurrentUserId();
+        if (userId == null) {
+            return JsonData.buildError("未登录");
+        }
+        
+        String avatar = request.get("avatar");
+        if (avatar == null || avatar.trim().isEmpty()) {
+            return JsonData.buildError("头像URL不能为空");
+        }
+        
+        SysUser user = new SysUser();
+        user.setId(userId);
+        user.setAvatar(avatar);
+        
+        boolean success = sysUserService.updateById(user);
+        if (success) {
+            return JsonData.buildSuccess("头像修改成功");
+        } else {
+            return JsonData.buildError("头像修改失败");
+        }
     }
 
     /**

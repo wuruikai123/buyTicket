@@ -89,18 +89,8 @@ public class AdminTicketInventoryController {
         java.time.LocalDate currentDate = startDate;
         while (!currentDate.isAfter(endDate)) {
             for (String timeSlot : request.getTimeSlots()) {
-                // 根据时间段确定门票数量
-                Integer ticketCount;
-                if ("09:00-12:00".equals(timeSlot)) {
-                    // 使用9-12点门票数量
-                    ticketCount = exhibition.getMorningTickets();
-                } else if ("14:00-17:00".equals(timeSlot)) {
-                    // 使用14-17点门票数量
-                    ticketCount = exhibition.getAfternoonTickets();
-                } else {
-                    // 其他时间段使用默认值100
-                    ticketCount = 100;
-                }
+                // 使用展览的每时段门票数
+                Integer ticketCount = exhibition.getTicketsPerPeriod();
                 
                 // 如果没有设置，使用默认值100
                 if (ticketCount == null || ticketCount <= 0) {

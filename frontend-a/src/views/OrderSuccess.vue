@@ -65,8 +65,26 @@ const orderInfo = ref({
 const loading = ref(false);
 
 onMounted(async () => {
+  // 检查Token是否存在
+  const token = localStorage.getItem('token');
+  if (!token) {
+    ElMessage.warning('登录已过期，请重新登录查看订单');
+    // 保存当前URL参数，登录后可以返回
+    const queryParams = route.query;
+    if (queryParams.out_trade_no) {
+      sessionStorage.setItem('pendingOrderNo', queryParams.out_trade_no as string);
+    }
+    // 延迟跳转到登录页
+    setTimeout(() => {
+      router.push({
+        name: 'Login',
+        query: { redirect: '/order-success', ...queryParams }
+      });
+    }, 2000);
+    return;
+  }
+
   // 从URL参数中获取支付宝返回的信息
-  // 支付宝可能返回的参数：out_trade_no, trade_no, total_amount 等
   const queryParams = route.query;
   
   orderInfo.value = {
@@ -77,16 +95,17 @@ onMounted(async () => {
     orderType: 'ticket'
   };
 
-  console.log('OrderSuccess 页面加载，所有参数:', queryParams);
-  console.log('提取的订单信息:', {
-    orderNo: orderInfo.value.orderNo,
-    tradeNo: orderInfo.value.tradeNo,
-    totalAmount: orderInfo.value.totalAmount
-  });
+  // 如果没有订单号，检查sessionStorage
+  if (!orderInfo.value.orderNo) {
+    const pendingOrderNo = sessionStorage.getItem('pendingOrderNo');
+    if (pendingOrderNo) {
+      orderInfo.value.orderNo = pendingOrderNo;
+      sessionStorage.removeItem('pendingOrderNo');
+    }
+  }
 
   // 如果没有订单号，可能是直接访问，显示提示
   if (!orderInfo.value.orderNo) {
-    console.warn('没有订单信息，可能是直接访问');
     return;
   }
 
@@ -98,25 +117,16 @@ onMounted(async () => {
 const autoRedirectToOrderDetail = async () => {
   loading.value = true;
   try {
-    console.log('开始查询订单详情，订单号:', orderInfo.value.orderNo);
-    
     // 先尝试查询门票订单
     try {
-      console.log('尝试查询门票订单...');
       const ticketOrder = await ticketApi.getOrderByOrderNo(orderInfo.value.orderNo);
-      console.log('门票订单查询结果:', ticketOrder);
       
       if (ticketOrder && ticketOrder.id) {
         orderInfo.value.orderId = ticketOrder.id;
         orderInfo.value.orderType = 'ticket';
-        console.log('找到门票订单，ID:', ticketOrder.id);
         
         // 延迟1.5秒后跳转，让用户看到成功页面
         setTimeout(() => {
-          console.log('跳转到订单详情页面:', {
-            id: ticketOrder.id,
-            type: 'ticket'
-          });
           router.push({
             name: 'OrderDetail',
             params: { id: String(ticketOrder.id) },
@@ -126,27 +136,19 @@ const autoRedirectToOrderDetail = async () => {
         return;
       }
     } catch (e) {
-      console.warn('门票订单查询失败:', e);
       // 门票订单查询失败，尝试查询商城订单
     }
 
     // 尝试查询商城订单
     try {
-      console.log('尝试查询商城订单...');
       const mallOrder = await mallApi.getOrderByOrderNo(orderInfo.value.orderNo);
-      console.log('商城订单查询结果:', mallOrder);
       
       if (mallOrder && mallOrder.id) {
         orderInfo.value.orderId = mallOrder.id;
         orderInfo.value.orderType = 'mall';
-        console.log('找到商城订单，ID:', mallOrder.id);
         
         // 延迟1.5秒后跳转，让用户看到成功页面
         setTimeout(() => {
-          console.log('跳转到订单详情页面:', {
-            id: mallOrder.id,
-            type: 'mall'
-          });
           router.push({
             name: 'OrderDetail',
             params: { id: String(mallOrder.id) },
@@ -156,15 +158,12 @@ const autoRedirectToOrderDetail = async () => {
         return;
       }
     } catch (e) {
-      console.warn('商城订单查询失败:', e);
       // 商城订单查询失败
     }
 
     // 如果都没找到，显示错误信息
-    console.error('无法找到对应的订单');
     ElMessage.warning('无法找到对应的订单，请稍后手动查看');
   } catch (error) {
-    console.error('自动跳转失败:', error);
     ElMessage.warning('订单查询失败，请稍后手动查看');
   } finally {
     loading.value = false;

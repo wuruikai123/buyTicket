@@ -167,10 +167,14 @@ onUnmounted(() => {
   height: 64px;
   border: none;
   border-radius: 14px;
-  background: #d7d7d7;
-  color: #2d2d2d;
+  background: #f58080;
+  color: #ffffff;
   font-size: 22px;
   letter-spacing: 2px;
+}
+
+.primary:active {
+  background: #f56c6c;
 }
 </style>
 

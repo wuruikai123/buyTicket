@@ -1,5 +1,5 @@
 <template>
-  <div class="about-page">
+  <div class="about-page" v-if="!loading">
     <!-- 背景图片层 -->
     <div class="background-layer" :style="{ backgroundImage: config.backgroundImage ? `url(${config.backgroundImage})` : '' }"></div>
     
@@ -31,6 +31,11 @@
       </div>
     </div>
   </div>
+  
+  <!-- 加载状态 -->
+  <div v-else class="loading-container">
+    <div class="loading-spinner"></div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -49,6 +54,7 @@ interface AboutConfig {
   introImage2: string
 }
 
+const loading = ref(true)
 const config = ref<AboutConfig>({
   title: '关于展厅',
   content: '',
@@ -63,12 +69,15 @@ const goBack = () => {
 
 const loadConfig = async () => {
   try {
+    loading.value = true
     const data: any = await request.get('/about/config')
     if (data) {
       config.value = data
     }
   } catch (error) {
     console.error('加载关于展厅配置失败', error)
+  } finally {
+    loading.value = false
   }
 }
 
@@ -234,6 +243,35 @@ onMounted(() => {
   
   .content-text {
     font-size: 13px;
+  }
+}
+
+/* 加载状态 */
+.loading-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #2c201d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 </style>

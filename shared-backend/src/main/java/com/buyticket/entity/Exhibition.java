@@ -34,19 +34,19 @@ public class Exhibition {
     private BigDecimal price;
 
     /**
-     * 每小时门票数量
+     * 每时段门票数量（上午/下午各一个时段）
      */
-    private Integer ticketsPerHour;
+    private Integer ticketsPerPeriod;
 
     /**
-     * 9-12点时段门票数量
+     * 每日开始时间（HH:mm格式）
      */
-    private Integer morningTickets;
+    private String dailyStartTime;
 
     /**
-     * 14-17点时段门票数量
+     * 每日结束时间（HH:mm格式）
      */
-    private Integer afternoonTickets;
+    private String dailyEndTime;
 
     private String coverImage;
 
