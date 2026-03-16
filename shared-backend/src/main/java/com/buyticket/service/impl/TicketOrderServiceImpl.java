@@ -121,4 +121,35 @@ public class TicketOrderServiceImpl extends ServiceImpl<TicketOrderMapper, Ticke
         queryWrapper.eq(TicketOrder::getOrderNo, orderNo);
         return this.getOne(queryWrapper);
     }
+    
+    @Override
+    @Transactional
+    public TicketOrder verifyByOrderNo(String orderNo) {
+        TicketOrder order = getByOrderNo(orderNo);
+        
+        if (order == null) {
+            throw new RuntimeException("订单不存在");
+        }
+        
+        if (order.getStatus() != 1) {
+            String statusText = "";
+            switch (order.getStatus()) {
+                case 0: statusText = "待支付"; break;
+                case 2: statusText = "已使用"; break;
+                case 3: statusText = "已取消"; break;
+                case 4: statusText = "已作废"; break;
+                case 5: statusText = "退款中"; break;
+                case 6: statusText = "已退款"; break;
+                default: statusText = "未知状态";
+            }
+            throw new RuntimeException("订单状态不正确，当前状态：" + statusText);
+        }
+        
+        // 更新订单状态为已使用
+        order.setStatus(2);
+        order.setVerifyTime(java.time.LocalDateTime.now());
+        this.updateById(order);
+        
+        return order;
+    }
 }

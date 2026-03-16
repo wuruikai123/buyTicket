@@ -14,7 +14,9 @@
     "dayjs": "^1.11.10",
     "echarts": "^5.5.0",
     "element-plus": "^2.5.6",
+    "jszip": "^3.10.1",
     "pinia": "^2.1.7",
+    "qrcode": "^1.5.3",
     "qrcode-reader-vue3": "^3.1.4",
     "vue": "^3.4.21",
     "vue-echarts": "^6.6.9",
@@ -22,6 +24,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.11.24",
+    "@types/qrcode": "^1.5.5",
     "@vitejs/plugin-vue": "^5.0.4",
     "sass-embedded": "^1.93.3",
     "typescript": "^5.3.3",

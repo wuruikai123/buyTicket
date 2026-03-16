@@ -15,4 +15,11 @@ public interface TicketOrderService extends IService<TicketOrder> {
      * @return 订单信息
      */
     TicketOrder getByOrderNo(String orderNo);
+    
+    /**
+     * 根据订单号核销订单
+     * @param orderNo 订单号
+     * @return 核销后的订单信息
+     */
+    TicketOrder verifyByOrderNo(String orderNo);
 }

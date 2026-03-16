@@ -11,25 +11,55 @@ export type OrderRecord = {
 }
 
 /**
- * 核销订单
- * 逻辑：查询订单 → 验证状态 → 核销
- * @param orderNo 订单号
+ * 核销订单或特殊票券（统一接口）
+ * 自动识别：T开头=普通订单，ST开头=特殊票券
+ * @param code 订单号或票券编号
  * @returns 核销成功返回true，失败抛出错误
  */
-export async function verifyOrder(orderNo: string): Promise<boolean> {
-  if (!orderNo || !orderNo.trim()) {
-    throw new Error('请输入订单号')
+export async function verifyOrder(code: string): Promise<boolean> {
+  if (!code || !code.trim()) {
+    throw new Error('请输入订单号或票券编号')
   }
   
   try {
-    // 调用后端核销接口
-    // 后端会自动：1.查询订单 2.验证状态 3.更新为已使用
-    await request.post('/order/ticket/verify', { orderNo: orderNo.trim() })
+    // 调用统一核销接口
+    // 后端会自动识别类型并处理：
+    // - ST开头：特殊票券核销
+    // - T开头：普通订单核销
+    const adminInfo = getAdminInfo()
+    await request.post('/admin/verify/scan', {
+      code: code.trim(),
+      adminId: adminInfo.adminId,
+      adminName: adminInfo.adminName
+    })
     return true
   } catch (error: any) {
     console.error('核销失败:', error)
     // 抛出错误，让调用方处理
     throw error
+  }
+}
+
+/**
+ * 获取当前登录的管理员信息
+ */
+function getAdminInfo() {
+  try {
+    const userStr = localStorage.getItem('user')
+    if (userStr) {
+      const user = JSON.parse(userStr)
+      return {
+        adminId: user.id || null,
+        adminName: user.username || user.name || '核销员'
+      }
+    }
+  } catch (error) {
+    console.error('获取管理员信息失败:', error)
+  }
+  
+  return {
+    adminId: null,
+    adminName: '核销员'
   }
 }
 
@@ -76,6 +106,3 @@ function formatDateTime(dateTime: string): string {
   const minutes = String(date.getMinutes()).padStart(2, '0')
   return `${year}年${month}月${day}日 ${hours}:${minutes}`
 }
-
-
-
