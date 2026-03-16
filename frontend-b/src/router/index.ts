@@ -133,6 +133,12 @@ const routes: RouteRecordRaw[] = [
         name: 'SystemProfile',
         component: () => import('@/views/system/ProfileSettings.vue'),
         meta: { title: '个人设置', icon: 'User' }
+      },
+      {
+        path: 'system/special-ticket',
+        name: 'SpecialTicket',
+        component: () => import('@/views/system/SpecialTicketGenerate.vue'),
+        meta: { title: '特邀VIP票券', icon: 'Ticket' }
       }
     ]
   }

@@ -73,33 +73,33 @@ const onDecode = async (result: string) => {
   try {
     stopScan()
     
-    // 解析二维码数据，提取订单号
-    let orderNo = ''
+    // 解析二维码数据，提取订单号或票券编号
+    let code = ''
     try {
       // 尝试解析JSON格式的二维码（A端生成的二维码）
       const data = JSON.parse(result)
-      orderNo = data.orderNo || data.order_no || ''
+      code = data.orderNo || data.order_no || data.ticketCode || data.code || ''
     } catch {
-      // 如果不是JSON，可能是纯订单号字符串
-      orderNo = result.trim()
+      // 如果不是JSON，可能是纯订单号/票券编号字符串
+      code = result.trim()
     }
     
-    // 验证订单号格式（以T开头）
-    if (!orderNo || !orderNo.startsWith('T')) {
+    // 验证格式（以T开头的订单号 或 以ST开头的特殊票券）
+    if (!code || (!code.startsWith('T') && !code.startsWith('ST'))) {
       status.value = 'error'
       errorMsg.value = '无效的二维码格式'
       return
     }
     
-    // 调用核销接口
-    // 后端逻辑：查询订单 → 验证状态 → 更新为已使用
-    await verifyOrder(orderNo)
+    // 调用核销接口（统一接口，自动识别订单或特殊票券）
+    await verifyOrder(code)
     
     // 核销成功，显示结果
+    const isSpecialTicket = code.startsWith('ST')
     order.value = {
       id: 0,
-      orderNo: orderNo,
-      exhibition: '门票订单',
+      orderNo: code,
+      exhibition: isSpecialTicket ? '特邀VIP' : '门票订单',
       validTime: new Date().toLocaleString('zh-CN', {
         year: 'numeric',
         month: '2-digit',
@@ -107,7 +107,7 @@ const onDecode = async (result: string) => {
         hour: '2-digit',
         minute: '2-digit'
       }),
-      buyer: '用户',
+      buyer: isSpecialTicket ? '特邀VIP' : '用户',
       status: 2
     }
     
@@ -126,31 +126,33 @@ const onDecode = async (result: string) => {
     // 根据错误信息判断具体原因
     const errMsg = error.message || error.toString()
     
-    // 提取订单号用于显示
-    let scannedOrderNo = ''
+    // 提取编号用于显示
+    let scannedCode = ''
     try {
       const data = JSON.parse(result)
-      scannedOrderNo = data.orderNo || data.order_no || ''
+      scannedCode = data.orderNo || data.order_no || data.ticketCode || data.code || ''
     } catch {
-      scannedOrderNo = result.trim()
+      scannedCode = result.trim()
     }
     
-    if (errMsg.includes('订单不存在')) {
+    const isSpecialTicket = scannedCode.startsWith('ST')
+    
+    if (errMsg.includes('不存在')) {
       status.value = 'notfound'
-      errorMsg.value = '订单不存在'
-    } else if (errMsg.includes('已核销过了') || errMsg.includes('已核销')) {
-      // 订单状态为2，已经核销过
+      errorMsg.value = isSpecialTicket ? '票券不存在' : '订单不存在'
+    } else if (errMsg.includes('已使用') || errMsg.includes('已核销')) {
+      // 已经核销过
       status.value = 'verified'
       order.value = {
         id: 0,
-        orderNo: scannedOrderNo,
-        exhibition: '门票订单',
+        orderNo: scannedCode,
+        exhibition: isSpecialTicket ? '特邀VIP' : '门票订单',
         validTime: '已核销',
-        buyer: '用户',
-        verifyTime: '该订单已核销过了',
+        buyer: isSpecialTicket ? '特邀VIP' : '用户',
+        verifyTime: isSpecialTicket ? '该票券已使用' : '该订单已核销过了',
         status: 2
       }
-      errorMsg.value = '该订单已核销过了'
+      errorMsg.value = isSpecialTicket ? '该票券已使用' : '该订单已核销过了'
     } else if (errMsg.includes('未支付')) {
       status.value = 'error'
       errorMsg.value = '订单未支付，无法核销'
