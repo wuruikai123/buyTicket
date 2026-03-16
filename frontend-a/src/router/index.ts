@@ -85,6 +85,12 @@ const router = createRouter({
           component: () => import('@/views/Payment.vue'),
         },
         {
+          path: 'huifu-payment/:orderId',
+          name: 'HuifuPayment',
+          component: () => import('@/views/HuifuPayment.vue'),
+          meta: { title: '支付订单' }
+        },
+        {
           path: 'order-success',
           name: 'OrderSuccess',
           component: () => import('@/views/OrderSuccess.vue'),
