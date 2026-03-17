@@ -1,197 +1,174 @@
 <template>
-  <div class="order-success-container">
-    <div class="success-card">
+  <div class="order-success-page">
+    <div class="success-container">
       <!-- 成功图标 -->
       <div class="success-icon">
-        <svg viewBox="0 0 52 52" class="checkmark">
-          <circle class="checkmark-circle" cx="26" cy="26" r="25" fill="none"/>
-          <path class="checkmark-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+        <svg viewBox="0 0 24 24" width="80" height="80">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" fill="#52c41a"/>
         </svg>
       </div>
 
-      <!-- 成功信息 -->
-      <h1 class="success-title">支付成功！</h1>
-      <p class="success-subtitle">感谢您的购买</p>
+      <!-- 状态信息 -->
+      <div class="status-info">
+        <h1 v-if="paymentStatus === 'success'" class="status-title success">支付成功</h1>
+        <h1 v-else-if="paymentStatus === 'pending'" class="status-title pending">支付处理中</h1>
+        <h1 v-else class="status-title failed">支付失败</h1>
+
+        <p class="status-message">
+          <span v-if="paymentStatus === 'success'">感谢您的支付，订单已成功创建</span>
+          <span v-else-if="paymentStatus === 'pending'">您的支付正在处理中，请稍候...</span>
+          <span v-else>支付未成功，请重试</span>
+        </p>
+      </div>
 
       <!-- 订单信息 -->
-      <div class="order-info" v-if="orderInfo.orderNo">
-        <div class="info-row">
+      <div class="order-details" v-if="orderInfo">
+        <div class="detail-row">
           <span class="label">订单号：</span>
           <span class="value">{{ orderInfo.orderNo }}</span>
         </div>
-        <div class="info-row" v-if="orderInfo.tradeNo">
-          <span class="label">支付宝交易号：</span>
-          <span class="value">{{ orderInfo.tradeNo }}</span>
+        <div class="detail-row">
+          <span class="label">订单金额：</span>
+          <span class="value price">¥{{ orderInfo.totalAmount }}</span>
         </div>
-        <div class="info-row" v-if="orderInfo.totalAmount">
-          <span class="label">支付金额：</span>
-          <span class="value amount">¥{{ orderInfo.totalAmount }}</span>
+        <div class="detail-row">
+          <span class="label">支付时间：</span>
+          <span class="value">{{ orderInfo.payTime || '处理中...' }}</span>
         </div>
+        <div class="detail-row">
+          <span class="label">订单状态：</span>
+          <span class="value" :class="statusClass">{{ statusText }}</span>
+        </div>
+      </div>
+
+      <!-- 加载状态 -->
+      <div v-if="loading" class="loading">
+        <div class="spinner"></div>
+        <p>正在查询订单状态...</p>
+      </div>
+
+      <!-- 错误信息 -->
+      <div v-if="error" class="error-message">
+        <p>{{ error }}</p>
       </div>
 
       <!-- 操作按钮 -->
       <div class="action-buttons">
-        <button class="btn btn-primary" @click="goToOrderDetail">查看订单详情</button>
+        <button class="btn btn-primary" @click="goToProfile">查看订单</button>
         <button class="btn btn-secondary" @click="goToHome">返回首页</button>
-      </div>
-
-      <!-- 提示信息 -->
-      <div class="tips">
-        <p>您可以在"个人中心 - 我的订单"中查看订单详情</p>
-        <p>门票将在展览当天使用订单号进行核销</p>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
-import { ElMessage } from 'element-plus';
-import { ticketApi } from '@/api/ticket';
-import { mallApi } from '@/api/mall';
+import { ref, onMounted, computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import axios from 'axios'
 
-const route = useRoute();
-const router = useRouter();
+const route = useRoute()
+const router = useRouter()
 
-const orderInfo = ref({
-  orderNo: '',
-  tradeNo: '',
-  totalAmount: '',
-  orderId: 0,
-  orderType: 'ticket'
-});
+const orderNo = ref<string>('')
+const orderType = ref<'ticket' | 'mall'>('ticket')
+const orderInfo = ref<any>(null)
+const paymentStatus = ref<'success' | 'pending' | 'failed'>('pending')
+const loading = ref(true)
+const error = ref<string>('')
 
-const loading = ref(false);
-
-onMounted(async () => {
-  // 检查Token是否存在
-  const token = localStorage.getItem('token');
-  if (!token) {
-    ElMessage.warning('登录已过期，请重新登录查看订单');
-    // 保存当前URL参数，登录后可以返回
-    const queryParams = route.query;
-    if (queryParams.out_trade_no) {
-      sessionStorage.setItem('pendingOrderNo', queryParams.out_trade_no as string);
-    }
-    // 延迟跳转到登录页
-    setTimeout(() => {
-      router.push({
-        name: 'Login',
-        query: { redirect: '/order-success', ...queryParams }
-      });
-    }, 2000);
-    return;
+const statusText = computed(() => {
+  const statusMap: Record<number, string> = {
+    0: '待支付',
+    1: '已支付',
+    2: '已发货',
+    3: '已完成',
+    4: '已取消',
+    5: '已退款'
   }
+  return statusMap[orderInfo.value?.status] || '未知状态'
+})
 
-  // 从URL参数中获取支付宝返回的信息
-  const queryParams = route.query;
-  
-  orderInfo.value = {
-    orderNo: (queryParams.out_trade_no as string) || (queryParams.orderNo as string) || '',
-    tradeNo: (queryParams.trade_no as string) || (queryParams.tradeNo as string) || '',
-    totalAmount: (queryParams.total_amount as string) || (queryParams.totalAmount as string) || '',
-    orderId: 0,
-    orderType: 'ticket'
-  };
+const statusClass = computed(() => {
+  if (orderInfo.value?.status === 1) return 'success'
+  if (orderInfo.value?.status === 0) return 'pending'
+  return 'failed'
+})
 
-  // 如果没有订单号，检查sessionStorage
-  if (!orderInfo.value.orderNo) {
-    const pendingOrderNo = sessionStorage.getItem('pendingOrderNo');
-    if (pendingOrderNo) {
-      orderInfo.value.orderNo = pendingOrderNo;
-      sessionStorage.removeItem('pendingOrderNo');
-    }
-  }
-
-  // 如果没有订单号，可能是直接访问，显示提示
-  if (!orderInfo.value.orderNo) {
-    return;
-  }
-
-  // 自动跳转到订单详情页面
-  await autoRedirectToOrderDetail();
-});
-
-// 根据订单号查询订单详情并跳转
-const autoRedirectToOrderDetail = async () => {
-  loading.value = true;
+// 查询订单信息
+const queryOrderInfo = async () => {
   try {
-    // 先尝试查询门票订单
-    try {
-      const ticketOrder = await ticketApi.getOrderByOrderNo(orderInfo.value.orderNo);
-      
-      if (ticketOrder && ticketOrder.id) {
-        orderInfo.value.orderId = ticketOrder.id;
-        orderInfo.value.orderType = 'ticket';
-        
-        // 延迟1.5秒后跳转，让用户看到成功页面
-        setTimeout(() => {
-          router.push({
-            name: 'OrderDetail',
-            params: { id: String(ticketOrder.id) },
-            query: { type: 'ticket' }
-          });
-        }, 1500);
-        return;
-      }
-    } catch (e) {
-      // 门票订单查询失败，尝试查询商城订单
+    loading.value = true
+    error.value = ''
+
+    // 从URL参数获取订单号
+    orderNo.value = (route.query.out_trade_no as string) || ''
+    orderType.value = (route.query.type as 'ticket' | 'mall') || 'ticket'
+
+    if (!orderNo.value) {
+      error.value = '订单号不存在'
+      paymentStatus.value = 'failed'
+      return
     }
 
-    // 尝试查询商城订单
-    try {
-      const mallOrder = await mallApi.getOrderByOrderNo(orderInfo.value.orderNo);
-      
-      if (mallOrder && mallOrder.id) {
-        orderInfo.value.orderId = mallOrder.id;
-        orderInfo.value.orderType = 'mall';
-        
-        // 延迟1.5秒后跳转，让用户看到成功页面
-        setTimeout(() => {
-          router.push({
-            name: 'OrderDetail',
-            params: { id: String(mallOrder.id) },
-            query: { type: 'mall' }
-          });
-        }, 1500);
-        return;
-      }
-    } catch (e) {
-      // 商城订单查询失败
+    // 根据订单类型查询订单信息
+    let response
+    if (orderType.value === 'ticket') {
+      response = await axios.get(`/api/v1/order/ticket/${orderNo.value}`)
+    } else {
+      response = await axios.get(`/api/v1/order/mall/${orderNo.value}`)
     }
 
-    // 如果都没找到，显示错误信息
-    ElMessage.warning('无法找到对应的订单，请稍后手动查看');
-  } catch (error) {
-    ElMessage.warning('订单查询失败，请稍后手动查看');
+    if (response.data.code !== 200) {
+      error.value = response.data.msg || '查询订单失败'
+      paymentStatus.value = 'failed'
+      return
+    }
+
+    const order = response.data.data
+    if (!order) {
+      error.value = '订单不存在'
+      paymentStatus.value = 'failed'
+      return
+    }
+
+    orderInfo.value = order
+
+    // 根据订单状态判断支付状态
+    if (order.status === 1) {
+      // 1: 已支付
+      paymentStatus.value = 'success'
+    } else if (order.status === 0) {
+      // 0: 待支付
+      paymentStatus.value = 'pending'
+    } else {
+      paymentStatus.value = 'failed'
+    }
+  } catch (err: any) {
+    error.value = err.message || '查询订单失败'
+    paymentStatus.value = 'failed'
   } finally {
-    loading.value = false;
+    loading.value = false
   }
-};
+}
 
-const goToOrderDetail = () => {
-  if (orderInfo.value.orderId) {
-    router.push({
-      name: 'OrderDetail',
-      params: { id: String(orderInfo.value.orderId) },
-      query: { type: orderInfo.value.orderType }
-    });
-  } else if (orderInfo.value.orderNo) {
-    // 如果没有订单ID，尝试通过订单号查询
-    autoRedirectToOrderDetail();
-  } else {
-    router.push('/profile');
-  }
-};
+// 返回个人中心
+const goToProfile = () => {
+  router.push('/profile')
+}
 
+// 返回首页
 const goToHome = () => {
-  router.push('/');
-};
+  router.push('/')
+}
+
+onMounted(() => {
+  queryOrderInfo()
+})
 </script>
 
 <style scoped>
-.order-success-container {
+.order-success-page {
   min-height: 100vh;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   display: flex;
@@ -200,195 +177,172 @@ const goToHome = () => {
   padding: 20px;
 }
 
-.success-card {
+.success-container {
   background: white;
-  border-radius: 20px;
-  padding: 60px 40px;
+  border-radius: 12px;
+  padding: 40px;
   max-width: 500px;
   width: 100%;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
   text-align: center;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
 }
 
-/* 成功图标动画 */
 .success-icon {
-  margin: 0 auto 30px;
-  width: 80px;
-  height: 80px;
+  margin-bottom: 24px;
+  display: flex;
+  justify-content: center;
 }
 
-.checkmark {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  display: block;
-  stroke-width: 2;
-  stroke: #4CAF50;
-  stroke-miterlimit: 10;
-  box-shadow: inset 0px 0px 0px #4CAF50;
-  animation: fill 0.4s ease-in-out 0.4s forwards, scale 0.3s ease-in-out 0.9s both;
-}
-
-.checkmark-circle {
-  stroke-dasharray: 166;
-  stroke-dashoffset: 166;
-  stroke-width: 2;
-  stroke-miterlimit: 10;
-  stroke: #4CAF50;
-  fill: none;
-  animation: stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
-}
-
-.checkmark-check {
-  transform-origin: 50% 50%;
-  stroke-dasharray: 48;
-  stroke-dashoffset: 48;
-  animation: stroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.8s forwards;
-}
-
-@keyframes stroke {
-  100% {
-    stroke-dashoffset: 0;
-  }
-}
-
-@keyframes scale {
-  0%, 100% {
-    transform: none;
-  }
-  50% {
-    transform: scale3d(1.1, 1.1, 1);
-  }
-}
-
-@keyframes fill {
-  100% {
-    box-shadow: inset 0px 0px 0px 30px #4CAF50;
-  }
-}
-
-/* 文字样式 */
-.success-title {
-  font-size: 32px;
+.status-title {
+  font-size: 28px;
   font-weight: bold;
-  color: #333;
-  margin-bottom: 10px;
+  margin: 0 0 12px 0;
+
+  &.success {
+    color: #52c41a;
+  }
+
+  &.pending {
+    color: #faad14;
+  }
+
+  &.failed {
+    color: #f5222d;
+  }
 }
 
-.success-subtitle {
+.status-message {
   font-size: 16px;
   color: #666;
-  margin-bottom: 40px;
+  margin-bottom: 32px;
 }
 
-/* 订单信息 */
-.order-info {
-  background: #f8f9fa;
-  border-radius: 12px;
-  padding: 24px;
-  margin-bottom: 30px;
+.order-details {
+  background: #f5f5f5;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 32px;
   text-align: left;
 }
 
-.info-row {
+.detail-row {
   display: flex;
   justify-content: space-between;
-  align-items: center;
   padding: 12px 0;
-  border-bottom: 1px solid #e9ecef;
+  border-bottom: 1px solid #e0e0e0;
+
+  &:last-child {
+    border-bottom: none;
+  }
 }
 
-.info-row:last-child {
-  border-bottom: none;
-}
-
-.info-row .label {
-  color: #666;
+.label {
+  color: #999;
   font-size: 14px;
 }
 
-.info-row .value {
+.value {
   color: #333;
   font-size: 14px;
   font-weight: 500;
-  word-break: break-all;
+
+  &.price {
+    color: #ff4d4f;
+    font-size: 16px;
+    font-weight: bold;
+  }
+
+  &.success {
+    color: #52c41a;
+  }
+
+  &.pending {
+    color: #faad14;
+  }
+
+  &.failed {
+    color: #f5222d;
+  }
 }
 
-.info-row .amount {
-  color: #4CAF50;
-  font-size: 18px;
-  font-weight: bold;
+.loading {
+  margin: 32px 0;
 }
 
-/* 按钮 */
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 16px;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.error-message {
+  background: #fff2f0;
+  border: 1px solid #ffccc7;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 24px;
+  color: #ff4d4f;
+  font-size: 14px;
+}
+
 .action-buttons {
   display: flex;
-  gap: 15px;
-  margin-bottom: 30px;
+  gap: 12px;
 }
 
 .btn {
   flex: 1;
-  padding: 14px 24px;
+  height: 44px;
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   font-size: 16px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.3s;
-}
 
-.btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-}
+  &.btn-primary {
+    background: #667eea;
+    color: white;
 
-.btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-}
-
-.btn-secondary {
-  background: white;
-  color: #667eea;
-  border: 2px solid #667eea;
-}
-
-.btn-secondary:hover {
-  background: #f8f9fa;
-}
-
-/* 提示信息 */
-.tips {
-  padding-top: 20px;
-  border-top: 1px solid #e9ecef;
-}
-
-.tips p {
-  color: #999;
-  font-size: 13px;
-  line-height: 1.8;
-  margin: 5px 0;
-}
-
-/* 响应式 */
-@media (max-width: 768px) {
-  .success-card {
-    padding: 40px 24px;
+    &:hover {
+      background: #5568d3;
+    }
   }
 
-  .success-title {
+  &.btn-secondary {
+    background: #f5f5f5;
+    color: #333;
+
+    &:hover {
+      background: #e0e0e0;
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .success-container {
+    padding: 24px;
+  }
+
+  .status-title {
     font-size: 24px;
   }
 
   .action-buttons {
     flex-direction: column;
-  }
-
-  .info-row {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 5px;
   }
 }
 </style>

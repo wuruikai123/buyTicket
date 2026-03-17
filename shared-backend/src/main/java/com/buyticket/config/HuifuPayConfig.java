@@ -15,11 +15,20 @@ public class HuifuPayConfig {
     @Value("${huifu.merchant-id:}")
     private String merchantIdValue;
     
-    @Value("${huifu.api-key:}")
-    private String apiKeyValue;
-    
     @Value("${huifu.app-id:}")
     private String appIdValue;
+    
+    @Value("${huifu.product-id:}")
+    private String productIdValue;
+    
+    @Value("${huifu.merchant-public-key:}")
+    private String merchantPublicKeyValue;
+    
+    @Value("${huifu.merchant-private-key:}")
+    private String merchantPrivateKeyValue;
+    
+    @Value("${huifu.huifu-public-key:}")
+    private String huifuPublicKeyValue;
     
     @Value("${huifu.notify-url:}")
     private String notifyUrlValue;
@@ -32,8 +41,11 @@ public class HuifuPayConfig {
     
     // 静态变量，供其他类使用
     public static String merchantId;
-    public static String apiKey;
     public static String appId;
+    public static String productId;
+    public static String merchantPublicKey;
+    public static String merchantPrivateKey;
+    public static String huifuPublicKey;
     public static String notifyUrl;
     public static String returnUrl;
     public static String gatewayUrl;
@@ -41,31 +53,54 @@ public class HuifuPayConfig {
     @PostConstruct
     public void init() {
         merchantId = merchantIdValue;
-        apiKey = apiKeyValue;
         appId = appIdValue;
+        productId = productIdValue;
+        merchantPublicKey = merchantPublicKeyValue;
+        merchantPrivateKey = merchantPrivateKeyValue;
+        huifuPublicKey = huifuPublicKeyValue;
         notifyUrl = notifyUrlValue;
         returnUrl = returnUrlValue;
         gatewayUrl = gatewayUrlValue;
         
         // 验证关键配置
         if (merchantId == null || merchantId.trim().isEmpty()) {
-            System.out.println("⚠️ 警告：汇付宝商户号未配置！请设置 huifu.merchant-id");
+            throw new IllegalStateException("汇付宝商户号未配置！请设置 huifu.merchant-id");
         }
         
-        if (apiKey == null || apiKey.trim().isEmpty()) {
-            System.out.println("⚠️ 警告：汇付宝API密钥未配置！请设置 huifu.api-key");
+        if (merchantPrivateKey == null || merchantPrivateKey.trim().isEmpty()) {
+            throw new IllegalStateException("汇付宝商户私钥未配置！请设置 huifu.merchant-private-key");
+        }
+        
+        if (huifuPublicKey == null || huifuPublicKey.trim().isEmpty()) {
+            throw new IllegalStateException("汇付宝公钥未配置！请设置 huifu.huifu-public-key");
         }
         
         if (appId == null || appId.trim().isEmpty()) {
-            System.out.println("⚠️ 警告：汇付宝应用ID未配置！请设置 huifu.app-id");
+            throw new IllegalStateException("汇付宝应用ID未配置！请设置 huifu.app-id");
         }
         
-        System.out.println("=== 汇付宝配置加载 ===");
-        System.out.println("商户号: " + (merchantId != null ? merchantId : "未配置"));
-        System.out.println("应用ID: " + (appId != null ? appId : "未配置"));
+        if (notifyUrl == null || notifyUrl.trim().isEmpty()) {
+            throw new IllegalStateException("汇付宝异步通知地址未配置！请设置 huifu.notify-url");
+        }
+        
+        if (returnUrl == null || returnUrl.trim().isEmpty()) {
+            throw new IllegalStateException("汇付宝同步回调地址未配置！请设置 huifu.return-url");
+        }
+        
+        if (gatewayUrl == null || gatewayUrl.trim().isEmpty()) {
+            throw new IllegalStateException("汇付宝网关地址未配置！请设置 huifu.gateway-url");
+        }
+        
+        System.out.println("=== 汇付宝配置加载成功 ===");
+        System.out.println("商户号: " + merchantId);
+        System.out.println("应用ID: " + appId);
+        System.out.println("产品ID: " + productId);
         System.out.println("异步通知地址: " + notifyUrl);
         System.out.println("同步回调地址: " + returnUrl);
         System.out.println("网关地址: " + gatewayUrl);
+        System.out.println("商户公钥: 已配置 (长度: " + merchantPublicKey.length() + ")");
+        System.out.println("商户私钥: 已配置 (长度: " + merchantPrivateKey.length() + ")");
+        System.out.println("汇付公钥: 已配置 (长度: " + huifuPublicKey.length() + ")");
         System.out.println("====================");
     }
 }

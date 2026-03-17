@@ -2,6 +2,7 @@ package com.buyticket.service.impl;
 
 import com.buyticket.config.HuifuPayConfig;
 import com.buyticket.service.HuifuPayService;
+import com.buyticket.utils.RsaUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -10,13 +11,14 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.util.*;
 
 /**
  * 汇付宝支付服务实现
  * 支持微信和支付宝H5页面支付
+ * 使用 RSA 签名和加解密
  */
 @Slf4j
 @Service
@@ -46,11 +48,13 @@ public class HuifuPayServiceImpl implements HuifuPayService {
             params.put("pay_type", payType); // WECHAT 或 ALIPAY
             params.put("notify_url", HuifuPayConfig.notifyUrl);
             params.put("return_url", HuifuPayConfig.returnUrl);
-            params.put("timestamp", String.valueOf(System.currentTimeMillis()));
+            params.put("timestamp", String.valueOf(System.currentTimeMillis() / 1000)); // 秒级时间戳
             
-            // 生成签名
-            String sign = generateSign(params, HuifuPayConfig.apiKey);
+            // 生成签名（使用商户私钥）
+            String sign = generateSign(params);
             params.put("sign", sign);
+            
+            log.info("汇付宝支付请求参数: {}", params);
             
             // 发送HTTP请求
             String apiUrl = HuifuPayConfig.gatewayUrl + "/api/pay/h5/create";
@@ -59,8 +63,6 @@ public class HuifuPayServiceImpl implements HuifuPayService {
             log.info("汇付宝支付创建响应: {}", response);
             
             // 解析响应，返回支付URL
-            // 注意：这里需要根据汇付宝实际返回格式解析
-            // 示例：假设返回JSON格式 {"code": 200, "data": {"pay_url": "https://..."}}
             return parsePayUrl(response);
             
         } catch (Exception e) {
@@ -81,10 +83,10 @@ public class HuifuPayServiceImpl implements HuifuPayService {
             params.put("merchant_id", HuifuPayConfig.merchantId);
             params.put("app_id", HuifuPayConfig.appId);
             params.put("out_trade_no", orderNo);
-            params.put("timestamp", String.valueOf(System.currentTimeMillis()));
+            params.put("timestamp", String.valueOf(System.currentTimeMillis() / 1000));
             
             // 生成签名
-            String sign = generateSign(params, HuifuPayConfig.apiKey);
+            String sign = generateSign(params);
             params.put("sign", sign);
             
             // 发送查询请求
@@ -119,7 +121,7 @@ public class HuifuPayServiceImpl implements HuifuPayService {
             signParams.remove("sign");
             
             // 生成签名
-            String expectedSign = generateSign(signParams, HuifuPayConfig.apiKey);
+            String expectedSign = generateSign(signParams);
             
             boolean valid = sign.equals(expectedSign);
             log.info("签名验证结果: {}, 接收签名: {}, 计算签名: {}", valid, sign, expectedSign);
@@ -146,10 +148,10 @@ public class HuifuPayServiceImpl implements HuifuPayService {
             params.put("out_trade_no", orderNo);
             params.put("refund_amount", refundAmount);
             params.put("refund_reason", reason);
-            params.put("timestamp", String.valueOf(System.currentTimeMillis()));
+            params.put("timestamp", String.valueOf(System.currentTimeMillis() / 1000));
             
             // 生成签名
-            String sign = generateSign(params, HuifuPayConfig.apiKey);
+            String sign = generateSign(params);
             params.put("sign", sign);
             
             // 发送退款请求
@@ -168,10 +170,10 @@ public class HuifuPayServiceImpl implements HuifuPayService {
     }
     
     /**
-     * 生成签名
-     * 签名规则：将参数按key排序，拼接成 key1=value1&key2=value2&key=apiKey 的格式，然后MD5加密
+     * 生成签名（使用 RSA 私钥）
+     * 签名规则：将参数按key排序，拼接成 key1=value1&key2=value2&... 的格式，然后使用私钥签名
      */
-    private String generateSign(Map<String, String> params, String apiKey) {
+    private String generateSign(Map<String, String> params) {
         try {
             // 按key排序
             TreeMap<String, String> sortedParams = new TreeMap<>(params);
@@ -187,26 +189,11 @@ public class HuifuPayServiceImpl implements HuifuPayService {
                 }
             }
             
-            // 添加密钥
-            sb.append("&key=").append(apiKey);
+            String signContent = sb.toString();
+            log.debug("签名原文: {}", signContent);
             
-            log.debug("签名原文: {}", sb.toString());
-            
-            // MD5加密
-            MessageDigest md = MessageDigest.getInstance("MD5");
-            byte[] bytes = md.digest(sb.toString().getBytes(StandardCharsets.UTF_8));
-            
-            // 转换为16进制字符串
-            StringBuilder hexString = new StringBuilder();
-            for (byte b : bytes) {
-                String hex = Integer.toHexString(0xff & b);
-                if (hex.length() == 1) {
-                    hexString.append('0');
-                }
-                hexString.append(hex);
-            }
-            
-            String sign = hexString.toString().toUpperCase();
+            // 使用商户私钥签名
+            String sign = RsaUtils.sign(HuifuPayConfig.merchantPrivateKey, signContent);
             log.debug("生成签名: {}", sign);
             
             return sign;
@@ -230,14 +217,18 @@ public class HuifuPayServiceImpl implements HuifuPayService {
             conn.setConnectTimeout(10000);
             conn.setReadTimeout(10000);
             
-            // 构建请求体
+            // 构建请求体 - URL编码
             StringBuilder postData = new StringBuilder();
             for (Map.Entry<String, String> entry : params.entrySet()) {
                 if (postData.length() > 0) {
                     postData.append("&");
                 }
-                postData.append(entry.getKey()).append("=").append(entry.getValue());
+                postData.append(URLEncoder.encode(entry.getKey(), StandardCharsets.UTF_8))
+                        .append("=")
+                        .append(URLEncoder.encode(entry.getValue(), StandardCharsets.UTF_8));
             }
+            
+            log.debug("POST请求体: {}", postData.toString());
             
             // 发送请求
             try (OutputStream os = conn.getOutputStream()) {
@@ -268,21 +259,41 @@ public class HuifuPayServiceImpl implements HuifuPayService {
     
     /**
      * 解析支付URL
-     * 注意：需要根据汇付宝实际返回格式调整
+     * 根据汇付宝实际返回格式解析
      */
     private String parsePayUrl(String response) {
-        // TODO: 根据汇付宝实际返回格式解析
-        // 示例：假设返回JSON格式
-        // {"code": 200, "msg": "success", "data": {"pay_url": "https://..."}}
-        
-        // 简单示例（实际需要使用JSON解析库）
-        if (response.contains("pay_url")) {
-            int start = response.indexOf("pay_url") + 10;
-            int end = response.indexOf("\"", start);
-            return response.substring(start, end);
+        try {
+            log.info("解析支付URL响应: {}", response);
+            
+            // 汇付宝返回格式示例：
+            // {"code": 200, "msg": "success", "data": {"pay_url": "https://..."}}
+            
+            if (response.contains("pay_url")) {
+                // 查找 "pay_url": "..." 的内容
+                int startIndex = response.indexOf("\"pay_url\"");
+                if (startIndex != -1) {
+                    startIndex = response.indexOf("\"", startIndex + 10) + 1;
+                    int endIndex = response.indexOf("\"", startIndex);
+                    if (endIndex > startIndex) {
+                        String payUrl = response.substring(startIndex, endIndex);
+                        log.info("解析得到支付URL: {}", payUrl);
+                        return payUrl;
+                    }
+                }
+            }
+            
+            // 如果响应本身就是URL
+            if (response.startsWith("http")) {
+                log.info("响应本身是支付URL: {}", response);
+                return response;
+            }
+            
+            throw new RuntimeException("无法解析支付URL，响应内容: " + response);
+            
+        } catch (Exception e) {
+            log.error("解析支付URL失败", e);
+            throw new RuntimeException("解析支付URL失败: " + e.getMessage());
         }
-        
-        throw new RuntimeException("解析支付URL失败: " + response);
     }
     
     /**

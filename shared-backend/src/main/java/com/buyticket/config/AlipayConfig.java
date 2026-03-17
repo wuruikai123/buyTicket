@@ -23,13 +23,13 @@ public class AlipayConfig {
     @Value("${alipay.alipay-public-key}")
     private String alipayPublicKeyValue;
     
-    @Value("${alipay.notify-url}")
+    @Value("${alipay.notify-url:}")
     private String notifyUrlValue;
     
-    @Value("${alipay.return-url}")
+    @Value("${alipay.return-url:}")
     private String returnUrlValue;
     
-    @Value("${alipay.gateway-url}")
+    @Value("${alipay.gateway-url:}")
     private String gatewayUrlValue;
     
     @Value("${alipay.sign-type:RSA2}")
@@ -63,19 +63,31 @@ public class AlipayConfig {
         // 验证关键配置不能为空
         if (merchant_private_key == null || merchant_private_key.trim().isEmpty() 
             || merchant_private_key.equals("your_prod_private_key")) {
-            throw new IllegalStateException("支付宝商户私钥未配置！请设置 alipay.merchant-private-key 或环境变量 ALIPAY_MERCHANT_PRIVATE_KEY");
+            throw new IllegalStateException("支付宝商户私钥未配置！请设置 alipay.merchant-private-key");
         }
         
         if (app_id == null || app_id.trim().isEmpty() || app_id.equals("your_prod_app_id")) {
-            throw new IllegalStateException("支付宝APPID未配置！请设置 alipay.app-id 或环境变量 ALIPAY_APP_ID");
+            throw new IllegalStateException("支付宝APPID未配置！请设置 alipay.app-id");
         }
         
         if (alipay_public_key == null || alipay_public_key.trim().isEmpty() 
             || alipay_public_key.equals("your_prod_public_key")) {
-            throw new IllegalStateException("支付宝公钥未配置！请设置 alipay.alipay-public-key 或环境变量 ALIPAY_PUBLIC_KEY");
+            throw new IllegalStateException("支付宝公钥未配置！请设置 alipay.alipay-public-key");
         }
         
-        // 打印配置信息（生产环境应该删除或使用日志）
+        if (notify_url == null || notify_url.trim().isEmpty()) {
+            throw new IllegalStateException("支付宝异步通知地址未配置！请设置 alipay.notify-url");
+        }
+        
+        if (return_url == null || return_url.trim().isEmpty()) {
+            throw new IllegalStateException("支付宝同步返回地址未配置！请设置 alipay.return-url");
+        }
+        
+        if (gatewayUrl == null || gatewayUrl.trim().isEmpty()) {
+            throw new IllegalStateException("支付宝网关地址未配置！请设置 alipay.gateway-url");
+        }
+        
+        // 打印配置信息
         System.out.println("=== 支付宝配置加载成功 ===");
         System.out.println("APPID: " + app_id);
         System.out.println("异步通知地址: " + notify_url);

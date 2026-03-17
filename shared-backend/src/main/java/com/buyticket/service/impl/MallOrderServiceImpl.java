@@ -109,4 +109,12 @@ public class MallOrderServiceImpl extends ServiceImpl<MallOrderMapper, MallOrder
         }
         return sb.toString();
     }
+    
+    @Override
+    public MallOrder getByOrderNo(String orderNo) {
+        com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<MallOrder> queryWrapper = 
+            new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
+        queryWrapper.eq(MallOrder::getOrderNo, orderNo);
+        return this.getOne(queryWrapper);
+    }
 }

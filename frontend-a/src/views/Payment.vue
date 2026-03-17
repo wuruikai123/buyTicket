@@ -25,6 +25,26 @@
         <div class="method-list">
           <div 
             class="method-item" 
+            :class="{ active: selectedMethod === 'wechat' }"
+            @click="selectedMethod = 'wechat'"
+          >
+            <div class="method-icon wechat-icon">
+              <svg viewBox="0 0 1024 1024" width="32" height="32">
+                <path d="M512 0C229.376 0 0 229.376 0 512s229.376 512 512 512 512-229.376 512-512S794.624 0 512 0z" fill="#09B81F"/>
+                <path d="M384 320c-52.928 0-96 43.072-96 96s43.072 96 96 96 96-43.072 96-96-43.072-96-96-96z m256 0c-52.928 0-96 43.072-96 96s43.072 96 96 96 96-43.072 96-96-43.072-96-96-96z m-128 320c-105.856 0-192 86.144-192 192s86.144 192 192 192 192-86.144 192-192-86.144-192-192-192z" fill="#FFFFFF"/>
+              </svg>
+            </div>
+            <div class="method-info">
+              <div class="method-name">微信支付</div>
+              <div class="method-desc">推荐使用微信扫码支付</div>
+            </div>
+            <div class="method-check">
+              <span v-if="selectedMethod === 'wechat'" class="check-icon">✓</span>
+            </div>
+          </div>
+
+          <div 
+            class="method-item" 
             :class="{ active: selectedMethod === 'alipay' }"
             @click="selectedMethod = 'alipay'"
           >
@@ -43,8 +63,6 @@
               <span v-if="selectedMethod === 'alipay'" class="check-icon">✓</span>
             </div>
           </div>
-
-
         </div>
       </div>
 
@@ -82,7 +100,7 @@ const router = useRouter()
 const orderId = ref<number>(0)
 const orderType = ref<'ticket' | 'mall'>('ticket')
 const orderInfo = ref<any>(null)
-const selectedMethod = ref<string>('alipay')
+const selectedMethod = ref<string>('wechat')
 const paying = ref(false)
 
 // 加载订单信息
@@ -115,32 +133,27 @@ const handlePay = async () => {
   try {
     paying.value = true
 
-    if (selectedMethod.value === 'alipay') {
-      // 检查是否有订单号
-      if (!orderInfo.value || !orderInfo.value.orderNo) {
-        throw new Error('订单号不存在')
-      }
+    if (!orderInfo.value || !orderInfo.value.orderNo) {
+      throw new Error('订单号不存在')
+    }
 
-      // 统一使用PC网页支付（因为手机网站支付未开通）
-      // 注意：如需开通手机端支付，需要在支付宝开放平台开通"手机网站支付"产品
+    let payUrl: string | null = null
+
+    if (selectedMethod.value === 'wechat') {
+      // 微信支付（使用汇付宝）
+      const response = await paymentApi.createWechatPay({ orderNo: orderInfo.value.orderNo })
+      payUrl = response?.pay_url
+    } else if (selectedMethod.value === 'alipay') {
+      // 支付宝支付（使用汇付宝）
       const response = await paymentApi.createAlipayPc({ orderNo: orderInfo.value.orderNo })
-      
-      if (response && typeof response === 'string') {
-        // 后端返回支付表单HTML，直接提交
-        const form = document.createElement('div')
-        form.innerHTML = response
-        document.body.appendChild(form)
-        
-        // 自动提交表单
-        const submitForm = form.querySelector('form') as HTMLFormElement
-        if (submitForm) {
-          submitForm.submit()
-        } else {
-          throw new Error('支付表单生成失败')
-        }
-      } else {
-        throw new Error('获取支付表单失败')
-      }
+      payUrl = response?.pay_url
+    }
+
+    if (payUrl) {
+      // 跳转到汇付宝支付页面
+      window.location.href = payUrl
+    } else {
+      throw new Error('获取支付链接失败')
     }
   } catch (error: any) {
     paying.value = false
