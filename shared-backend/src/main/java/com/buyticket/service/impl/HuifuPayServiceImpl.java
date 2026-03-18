@@ -3,316 +3,188 @@ package com.buyticket.service.impl;
 import com.buyticket.config.HuifuPayConfig;
 import com.buyticket.service.HuifuPayService;
 import com.buyticket.utils.RsaUtils;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.huifu.bspay.sdk.opps.core.BasePay;
+import com.huifu.bspay.sdk.opps.core.config.MerConfig;
+import com.huifu.bspay.sdk.opps.client.BasePayClient;
+import com.huifu.bspay.sdk.opps.core.request.V3TradePaymentJspayRequest;
+import com.huifu.bspay.sdk.opps.core.request.V2TradePaymentScanpayQueryRequest;
+import com.huifu.bspay.sdk.opps.core.request.V2TradePaymentScanpayRefundRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
+import jakarta.annotation.PostConstruct;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
-/**
- * 汇付宝支付服务实现
- * 支持微信和支付宝H5页面支付
- * 使用 RSA 签名和加解密
- */
 @Slf4j
 @Service
 public class HuifuPayServiceImpl implements HuifuPayService {
-    
-    /**
-     * 创建支付订单（H5页面支付）
-     * @param orderNo 订单号
-     * @param amount 支付金额（单位：元）
-     * @param subject 商品标题
-     * @param payType 支付类型：WECHAT(微信) 或 ALIPAY(支付宝)
-     * @return 支付URL
-     */
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @PostConstruct
+    public void init() {
+        try {
+            MerConfig merConfig = new MerConfig();
+            merConfig.setSysId(HuifuPayConfig.appId);
+            merConfig.setProcutId(HuifuPayConfig.productId);
+            merConfig.setRsaPrivateKey(HuifuPayConfig.merchantPrivateKey);
+            merConfig.setRsaPublicKey(HuifuPayConfig.huifuPublicKey);
+            BasePay.debug = true;
+            BasePay.prodMode = BasePay.MODE_PROD;
+            BasePay.initWithMerConfig(merConfig);
+            log.info("Huifu SDK initialized: sys_id={}, product_id={}", HuifuPayConfig.appId, HuifuPayConfig.productId);
+        } catch (Exception e) {
+            log.error("Huifu SDK init failed", e);
+        }
+    }
+
     @Override
     public String createPayment(String orderNo, String amount, String subject, String payType) {
         try {
-            log.info("创建汇付宝支付订单: orderNo={}, amount={}, subject={}, payType={}", 
-                    orderNo, amount, subject, payType);
-            
-            // 构建请求参数
-            Map<String, String> params = new TreeMap<>();
-            params.put("merchant_id", HuifuPayConfig.merchantId);
-            params.put("app_id", HuifuPayConfig.appId);
-            params.put("out_trade_no", orderNo);
-            params.put("total_amount", amount);
-            params.put("subject", subject);
-            params.put("pay_type", payType); // WECHAT 或 ALIPAY
-            params.put("notify_url", HuifuPayConfig.notifyUrl);
-            params.put("return_url", HuifuPayConfig.returnUrl);
-            params.put("timestamp", String.valueOf(System.currentTimeMillis() / 1000)); // 秒级时间戳
-            
-            // 生成签名（使用商户私钥）
-            String sign = generateSign(params);
-            params.put("sign", sign);
-            
-            log.info("汇付宝支付请求参数: {}", params);
-            
-            // 发送HTTP请求
-            String apiUrl = HuifuPayConfig.gatewayUrl + "/api/pay/h5/create";
-            String response = sendPostRequest(apiUrl, params);
-            
-            log.info("汇付宝支付创建响应: {}", response);
-            
-            // 解析响应，返回支付URL
-            return parsePayUrl(response);
-            
+            log.info("Creating payment: orderNo={}, amount={}, payType={}", orderNo, amount, payType);
+            String tradeType;
+            if ("WECHAT".equals(payType)) {
+                tradeType = "T_H5";
+            } else if ("ALIPAY".equals(payType)) {
+                tradeType = "A_WAP";
+            } else {
+                throw new RuntimeException("Unsupported pay type: " + payType);
+            }
+            String reqDate = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+            String reqSeqId = reqDate + orderNo + System.currentTimeMillis() % 10000;
+
+            V3TradePaymentJspayRequest request = new V3TradePaymentJspayRequest();
+            request.setReqDate(reqDate);
+            request.setReqSeqId(reqSeqId);
+            request.setHuifuId(HuifuPayConfig.merchantId);
+            request.setGoodsDesc(subject);
+            request.setTradeType(tradeType);
+            request.setTransAmt(formatAmount(amount));
+            request.addExtendInfo("notify_url", HuifuPayConfig.notifyUrl);
+
+            log.info("Calling Huifu SDK jspay: reqSeqId={}, tradeType={}, amt={}", reqSeqId, tradeType, amount);
+            Map<String, Object> response = BasePayClient.request(request);
+            log.info("Huifu SDK response: {}", response);
+
+            return parsePayUrl(response, tradeType);
         } catch (Exception e) {
-            log.error("创建汇付宝支付订单失败", e);
-            throw new RuntimeException("创建支付订单失败: " + e.getMessage());
+            log.error("createPayment failed", e);
+            throw new RuntimeException("createPayment failed: " + e.getMessage());
         }
     }
-    
-    /**
-     * 查询支付状态
-     */
+
     @Override
     public Map<String, Object> queryPaymentStatus(String orderNo) {
         try {
-            log.info("查询汇付宝支付状态: orderNo={}", orderNo);
-            
-            Map<String, String> params = new TreeMap<>();
-            params.put("merchant_id", HuifuPayConfig.merchantId);
-            params.put("app_id", HuifuPayConfig.appId);
-            params.put("out_trade_no", orderNo);
-            params.put("timestamp", String.valueOf(System.currentTimeMillis() / 1000));
-            
-            // 生成签名
-            String sign = generateSign(params);
-            params.put("sign", sign);
-            
-            // 发送查询请求
-            String apiUrl = HuifuPayConfig.gatewayUrl + "/api/pay/query";
-            String response = sendPostRequest(apiUrl, params);
-            
-            log.info("汇付宝支付查询响应: {}", response);
-            
-            // 解析响应
-            return parseQueryResponse(response);
-            
+            String reqDate = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+            V2TradePaymentScanpayQueryRequest request = new V2TradePaymentScanpayQueryRequest();
+            request.setHuifuId(HuifuPayConfig.merchantId);
+            request.setOrgReqDate(reqDate);
+            request.setOrgReqSeqId(reqDate + orderNo);
+            Map<String, Object> response = BasePayClient.request(request);
+            log.info("Query response: {}", response);
+            return response;
         } catch (Exception e) {
-            log.error("查询支付状态失败", e);
-            throw new RuntimeException("查询支付状态失败: " + e.getMessage());
+            log.error("queryPaymentStatus failed", e);
+            throw new RuntimeException("queryPaymentStatus failed: " + e.getMessage());
         }
     }
-    
-    /**
-     * 验证支付回调签名
-     */
+
     @Override
     public boolean verifyNotify(Map<String, String> params) {
         try {
             String sign = params.get("sign");
-            if (sign == null || sign.isEmpty()) {
-                log.error("回调参数中没有签名");
-                return false;
-            }
-            
-            // 移除sign参数
-            Map<String, String> signParams = new TreeMap<>(params);
-            signParams.remove("sign");
-            
-            // 生成签名
-            String expectedSign = generateSign(signParams);
-            
-            boolean valid = sign.equals(expectedSign);
-            log.info("签名验证结果: {}, 接收签名: {}, 计算签名: {}", valid, sign, expectedSign);
-            
-            return valid;
-            
+            if (sign == null || sign.isEmpty()) return false;
+            String respData = params.get("resp_data");
+            if (respData == null) return false;
+            return RsaUtils.verify(HuifuPayConfig.huifuPublicKey, respData, sign);
         } catch (Exception e) {
-            log.error("验证签名失败", e);
+            log.error("verifyNotify failed", e);
             return false;
         }
     }
-    
-    /**
-     * 申请退款
-     */
+
     @Override
     public Map<String, Object> refund(String orderNo, String refundAmount, String reason) {
         try {
-            log.info("申请汇付宝退款: orderNo={}, amount={}, reason={}", orderNo, refundAmount, reason);
-            
-            Map<String, String> params = new TreeMap<>();
-            params.put("merchant_id", HuifuPayConfig.merchantId);
-            params.put("app_id", HuifuPayConfig.appId);
-            params.put("out_trade_no", orderNo);
-            params.put("refund_amount", refundAmount);
-            params.put("refund_reason", reason);
-            params.put("timestamp", String.valueOf(System.currentTimeMillis() / 1000));
-            
-            // 生成签名
-            String sign = generateSign(params);
-            params.put("sign", sign);
-            
-            // 发送退款请求
-            String apiUrl = HuifuPayConfig.gatewayUrl + "/api/pay/refund";
-            String response = sendPostRequest(apiUrl, params);
-            
-            log.info("汇付宝退款响应: {}", response);
-            
-            // 解析响应
-            return parseRefundResponse(response);
-            
+            String reqDate = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+            V2TradePaymentScanpayRefundRequest request = new V2TradePaymentScanpayRefundRequest();
+            request.setReqDate(reqDate);
+            request.setReqSeqId(reqDate + "REFUND" + orderNo);
+            request.setHuifuId(HuifuPayConfig.merchantId);
+            request.setOrgReqDate(reqDate);
+            request.setOrdAmt(formatAmount(refundAmount));
+            request.addExtendInfo("remark", reason);
+            Map<String, Object> response = BasePayClient.request(request);
+            log.info("Refund response: {}", response);
+            return response;
         } catch (Exception e) {
-            log.error("申请退款失败", e);
-            throw new RuntimeException("申请退款失败: " + e.getMessage());
+            log.error("refund failed", e);
+            throw new RuntimeException("refund failed: " + e.getMessage());
         }
     }
-    
-    /**
-     * 生成签名（使用 RSA 私钥）
-     * 签名规则：将参数按key排序，拼接成 key1=value1&key2=value2&... 的格式，然后使用私钥签名
-     */
-    private String generateSign(Map<String, String> params) {
-        try {
-            // 按key排序
-            TreeMap<String, String> sortedParams = new TreeMap<>(params);
-            
-            // 拼接参数
-            StringBuilder sb = new StringBuilder();
-            for (Map.Entry<String, String> entry : sortedParams.entrySet()) {
-                if (entry.getValue() != null && !entry.getValue().isEmpty()) {
-                    if (sb.length() > 0) {
-                        sb.append("&");
-                    }
-                    sb.append(entry.getKey()).append("=").append(entry.getValue());
+
+    @SuppressWarnings("unchecked")
+    private String parsePayUrl(Map<String, Object> response, String tradeType) {
+        // SDK returns the data fields at top level (resp_code, resp_desc, pay_info, etc.)
+        // The outer response may also have a nested "data" map - check both
+        Map<String, Object> data;
+        Object dataObj = response.get("data");
+        if (dataObj instanceof Map) {
+            data = (Map<String, Object>) dataObj;
+        } else if (dataObj instanceof String) {
+            try {
+                data = objectMapper.readValue((String) dataObj, Map.class);
+            } catch (Exception e) {
+                data = response; // fallback to top-level
+            }
+        } else {
+            // No "data" field: fields are at top level
+            data = response;
+        }
+
+        String respCode = (String) data.get("resp_code");
+        String respDesc = (String) data.get("resp_desc");
+        log.info("resp_code: {}, resp_desc: {}", respCode, respDesc);
+
+        // 00000000 = success, 00000100 = processing, 20000000 = duplicate (treat as success)
+        if (!"00000000".equals(respCode) && !"00000100".equals(respCode) && !"20000000".equals(respCode)) {
+            throw new RuntimeException("Huifu error: " + respCode + " - " + respDesc);
+        }
+
+        // pay_info contains the redirect URL for H5 payments
+        String payInfo = (String) data.get("pay_info");
+        if (payInfo != null && !payInfo.isEmpty()) {
+            if (payInfo.startsWith("http")) return payInfo;
+            try {
+                Map<String, Object> payInfoMap = objectMapper.readValue(payInfo, Map.class);
+                for (String key : new String[]{"h5_url", "mweb_url", "pay_url", "url"}) {
+                    Object v = payInfoMap.get(key);
+                    if (v instanceof String && !((String) v).isEmpty()) return (String) v;
                 }
-            }
-            
-            String signContent = sb.toString();
-            log.debug("签名原文: {}", signContent);
-            
-            // 使用商户私钥签名
-            String sign = RsaUtils.sign(HuifuPayConfig.merchantPrivateKey, signContent);
-            log.debug("生成签名: {}", sign);
-            
-            return sign;
-            
-        } catch (Exception e) {
-            log.error("生成签名失败", e);
-            throw new RuntimeException("生成签名失败: " + e.getMessage());
+            } catch (Exception ignored) {}
         }
+
+        String qrCode = (String) data.get("qr_code");
+        if (qrCode != null && !qrCode.isEmpty()) return qrCode;
+
+        // 20000000 duplicate: the original payment was created successfully,
+        // but we can't retrieve the URL again. Need a new req_seq_id.
+        if ("20000000".equals(respCode)) {
+            throw new RuntimeException("重复交易: 请使用新的订单号重试");
+        }
+
+        throw new RuntimeException("Cannot get pay URL from response: " + response);
     }
-    
-    /**
-     * 发送POST请求
-     */
-    private String sendPostRequest(String apiUrl, Map<String, String> params) {
+
+    private String formatAmount(String amount) {
         try {
-            URL url = new URL(apiUrl);
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("POST");
-            conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
-            conn.setDoOutput(true);
-            conn.setConnectTimeout(10000);
-            conn.setReadTimeout(10000);
-            
-            // 构建请求体 - URL编码
-            StringBuilder postData = new StringBuilder();
-            for (Map.Entry<String, String> entry : params.entrySet()) {
-                if (postData.length() > 0) {
-                    postData.append("&");
-                }
-                postData.append(URLEncoder.encode(entry.getKey(), StandardCharsets.UTF_8))
-                        .append("=")
-                        .append(URLEncoder.encode(entry.getValue(), StandardCharsets.UTF_8));
-            }
-            
-            log.debug("POST请求体: {}", postData.toString());
-            
-            // 发送请求
-            try (OutputStream os = conn.getOutputStream()) {
-                os.write(postData.toString().getBytes(StandardCharsets.UTF_8));
-            }
-            
-            // 读取响应
-            int responseCode = conn.getResponseCode();
-            log.info("HTTP响应码: {}", responseCode);
-            
-            BufferedReader in = new BufferedReader(
-                new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8));
-            String inputLine;
-            StringBuilder response = new StringBuilder();
-            
-            while ((inputLine = in.readLine()) != null) {
-                response.append(inputLine);
-            }
-            in.close();
-            
-            return response.toString();
-            
+            return String.format("%.2f", Double.parseDouble(amount));
         } catch (Exception e) {
-            log.error("发送HTTP请求失败", e);
-            throw new RuntimeException("发送HTTP请求失败: " + e.getMessage());
+            return amount;
         }
-    }
-    
-    /**
-     * 解析支付URL
-     * 根据汇付宝实际返回格式解析
-     */
-    private String parsePayUrl(String response) {
-        try {
-            log.info("解析支付URL响应: {}", response);
-            
-            // 汇付宝返回格式示例：
-            // {"code": 200, "msg": "success", "data": {"pay_url": "https://..."}}
-            
-            if (response.contains("pay_url")) {
-                // 查找 "pay_url": "..." 的内容
-                int startIndex = response.indexOf("\"pay_url\"");
-                if (startIndex != -1) {
-                    startIndex = response.indexOf("\"", startIndex + 10) + 1;
-                    int endIndex = response.indexOf("\"", startIndex);
-                    if (endIndex > startIndex) {
-                        String payUrl = response.substring(startIndex, endIndex);
-                        log.info("解析得到支付URL: {}", payUrl);
-                        return payUrl;
-                    }
-                }
-            }
-            
-            // 如果响应本身就是URL
-            if (response.startsWith("http")) {
-                log.info("响应本身是支付URL: {}", response);
-                return response;
-            }
-            
-            throw new RuntimeException("无法解析支付URL，响应内容: " + response);
-            
-        } catch (Exception e) {
-            log.error("解析支付URL失败", e);
-            throw new RuntimeException("解析支付URL失败: " + e.getMessage());
-        }
-    }
-    
-    /**
-     * 解析查询响应
-     */
-    private Map<String, Object> parseQueryResponse(String response) {
-        // TODO: 根据汇付宝实际返回格式解析
-        Map<String, Object> result = new HashMap<>();
-        result.put("raw_response", response);
-        return result;
-    }
-    
-    /**
-     * 解析退款响应
-     */
-    private Map<String, Object> parseRefundResponse(String response) {
-        // TODO: 根据汇付宝实际返回格式解析
-        Map<String, Object> result = new HashMap<>();
-        result.put("raw_response", response);
-        return result;
     }
 }

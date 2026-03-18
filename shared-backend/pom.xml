@@ -135,6 +135,13 @@
            <version>2.0.24</version>
        </dependency>
 
+       <!-- 汇付宝斗拱SDK -->
+       <dependency>
+           <groupId>com.huifu.bspay.sdk</groupId>
+           <artifactId>dg-java-sdk</artifactId>
+           <version>3.0.26</version>
+       </dependency>
+
     </dependencies>
 
 	<build>
@@ -142,6 +149,21 @@
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<version>3.11.0</version>
+				<configuration>
+					<release>17</release>
+					<annotationProcessorPaths>
+						<path>
+							<groupId>org.projectlombok</groupId>
+							<artifactId>lombok</artifactId>
+							<version>1.18.38</version>
+						</path>
+					</annotationProcessorPaths>
+				</configuration>
 			</plugin>
 		</plugins>
 	</build>
