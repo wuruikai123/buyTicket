@@ -48,13 +48,14 @@ public class HuifuPayServiceImpl implements HuifuPayService {
             String tradeType;
             String productId;
             if ("WECHAT".equals(payType)) {
-                tradeType = "T_H5";
-                productId = "JSPAY"; // 微信H5支付使用JSPAY产品
+                tradeType = "T_MINIAPP";
+                productId = "PAYUN"; // 微信支付使用PAYUN产品，交易类型T_MINIAPP
             } else if ("ALIPAY".equals(payType)) {
                 tradeType = "A_NATIVE";
                 productId = "PAYUN"; // 支付宝使用PAYUN产品
             } else {
-                throw new RuntimeException("Unsupported pay type: " + payType);
+                throw new RuntimeException("Unsupported pay type: " +
+                 payType);
             }
             String reqDate = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
             String reqSeqId = reqDate + orderNo + System.currentTimeMillis() % 10000;

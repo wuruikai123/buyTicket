@@ -47,6 +47,11 @@ aliyun:
     signName: "元星河文化"
     templateCode: "SMS_501865326"
 
+# 微信公众号配置
+wechat:
+  app-id: "wxf5b4629dc8260f04"
+  app-secret: "YOUR_WECHAT_APP_SECRET"  # 请填入微信公众号AppSecret
+
 # 汇付宝支付配置
 huifu:
   merchant-id: "6666000183050701"

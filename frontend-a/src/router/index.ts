@@ -96,6 +96,11 @@ const router = createRouter({
           component: () => import('@/views/OrderSuccess.vue'),
         },
         {
+          path: 'wechat-pay-callback',
+          name: 'WechatPayCallback',
+          component: () => import('@/views/WechatPayCallback.vue'),
+        },
+        {
           path: 'about',
           name: 'About',
           component: () => import('@/views/About.vue'),

@@ -38,6 +38,12 @@ public class HuifuPayConfig {
     
     @Value("${huifu.gateway-url:https://paas.huifu.com}")
     private String gatewayUrlValue;
+
+    @Value("${wechat.app-id:}")
+    private String wechatAppIdValue;
+
+    @Value("${wechat.app-secret:}")
+    private String wechatAppSecretValue;
     
     // 静态变量，供其他类使用
     public static String merchantId;
@@ -49,6 +55,8 @@ public class HuifuPayConfig {
     public static String notifyUrl;
     public static String returnUrl;
     public static String gatewayUrl;
+    public static String wechatAppId;
+    public static String wechatAppSecret;
     
     @PostConstruct
     public void init() {
@@ -61,6 +69,8 @@ public class HuifuPayConfig {
         notifyUrl = notifyUrlValue;
         returnUrl = returnUrlValue;
         gatewayUrl = gatewayUrlValue;
+        wechatAppId = wechatAppIdValue;
+        wechatAppSecret = wechatAppSecretValue;
         
         // 验证关键配置
         if (merchantId == null || merchantId.trim().isEmpty()) {

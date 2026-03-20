@@ -140,9 +140,10 @@ const handlePay = async () => {
     let payUrl: string | null = null
 
     if (selectedMethod.value === 'wechat') {
-      // 微信支付（使用汇付宝）
-      const response = await paymentApi.createWechatPay({ orderNo: orderInfo.value.orderNo })
-      payUrl = response?.pay_url
+      // 微信支付：先跳转微信授权获取 openid，回调页再下单
+      const { redirectToWechatAuth } = await import('@/api/payment')
+      redirectToWechatAuth(orderInfo.value.orderNo)
+      return // 页面会跳转，不需要继续执行
     } else if (selectedMethod.value === 'alipay') {
       // 支付宝支付（使用汇付宝）
       const response = await paymentApi.createAlipayPc({ orderNo: orderInfo.value.orderNo })

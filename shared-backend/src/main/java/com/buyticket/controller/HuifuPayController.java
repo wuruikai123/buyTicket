@@ -11,8 +11,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.servlet.http.HttpServletRequest;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * 汇付宝支付控制器
@@ -32,6 +37,48 @@ public class HuifuPayController {
     @Autowired
     private MallOrderService mallOrderService;
     
+    /**
+     * 微信网页授权：用 code 换取 openid
+     * @param code 微信授权 code
+     * @return openid
+     */
+    @GetMapping("/wechat-openid")
+    public JsonData getWechatOpenId(@RequestParam String code) {
+        try {
+            String appId = com.buyticket.config.HuifuPayConfig.wechatAppId;
+            String appSecret = com.buyticket.config.HuifuPayConfig.wechatAppSecret;
+            String urlStr = "https://api.weixin.qq.com/sns/oauth2/access_token"
+                    + "?appid=" + appId
+                    + "&secret=" + appSecret
+                    + "&code=" + code
+                    + "&grant_type=authorization_code";
+            URL url = new URL(urlStr);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(5000);
+            BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) sb.append(line);
+            reader.close();
+            ObjectMapper mapper = new ObjectMapper();
+            Map<String, Object> resp = mapper.readValue(sb.toString(), Map.class);
+            log.info("微信换取openid响应: {}", resp);
+            if (resp.containsKey("errcode")) {
+                return JsonData.buildError("微信授权失败: " + resp.get("errmsg"));
+            }
+            String openId = (String) resp.get("openid");
+            Map<String, String> result = new HashMap<>();
+            result.put("openid", openId);
+            result.put("sub_appid", appId);
+            return JsonData.buildSuccess(result);
+        } catch (Exception e) {
+            log.error("获取微信openid失败", e);
+            return JsonData.buildError("获取openid失败: " + e.getMessage());
+        }
+    }
+
     /**
      * 创建支付订单（H5页面支付）
      * @param orderNo 订单号
