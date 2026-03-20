@@ -42,19 +42,35 @@ public class HuifuPayServiceImpl implements HuifuPayService {
     }
 
     @Override
-    public String createPayment(String orderNo, String amount, String subject, String payType) {
+    public String createPayment(String orderNo, String amount, String subject, String payType, String subAppId, String subOpenId) {
         try {
             log.info("Creating payment: orderNo={}, amount={}, payType={}", orderNo, amount, payType);
             String tradeType;
+            String productId;
             if ("WECHAT".equals(payType)) {
                 tradeType = "T_H5";
+                productId = "JSPAY"; // 微信H5支付使用JSPAY产品
             } else if ("ALIPAY".equals(payType)) {
-                tradeType = "A_WAP";
+                tradeType = "A_NATIVE";
+                productId = "PAYUN"; // 支付宝使用PAYUN产品
             } else {
                 throw new RuntimeException("Unsupported pay type: " + payType);
             }
             String reqDate = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
             String reqSeqId = reqDate + orderNo + System.currentTimeMillis() % 10000;
+
+            // Re-init SDK with correct product_id for this pay type
+            try {
+                MerConfig merConfig = new MerConfig();
+                merConfig.setSysId(HuifuPayConfig.appId);
+                merConfig.setProcutId(productId);
+                merConfig.setRsaPrivateKey(HuifuPayConfig.merchantPrivateKey);
+                merConfig.setRsaPublicKey(HuifuPayConfig.huifuPublicKey);
+                BasePay.initWithMerConfig(merConfig);
+                log.info("SDK re-initialized with product_id={}", productId);
+            } catch (Exception e) {
+                log.warn("SDK re-init failed, continuing", e);
+            }
 
             V3TradePaymentJspayRequest request = new V3TradePaymentJspayRequest();
             request.setReqDate(reqDate);
@@ -64,6 +80,16 @@ public class HuifuPayServiceImpl implements HuifuPayService {
             request.setTradeType(tradeType);
             request.setTransAmt(formatAmount(amount));
             request.addExtendInfo("notify_url", HuifuPayConfig.notifyUrl);
+
+            // T_MINIAPP requires sub_appid and sub_openid
+            if ("T_MINIAPP".equals(tradeType)) {
+                if (subAppId != null && !subAppId.isEmpty()) {
+                    request.addExtendInfo("sub_appid", subAppId);
+                }
+                if (subOpenId != null && !subOpenId.isEmpty()) {
+                    request.addExtendInfo("sub_openid", subOpenId);
+                }
+            }
 
             log.info("Calling Huifu SDK jspay: reqSeqId={}, tradeType={}, amt={}", reqSeqId, tradeType, amount);
             Map<String, Object> response = BasePayClient.request(request);

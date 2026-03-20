@@ -40,7 +40,9 @@ public class HuifuPayController {
      */
     @PostMapping("/create")
     public JsonData createPayment(@RequestParam String orderNo, 
-                                  @RequestParam String payType) {
+                                  @RequestParam String payType,
+                                  @RequestParam(required = false) String subAppId,
+                                  @RequestParam(required = false) String subOpenId) {
         try {
             log.info("创建汇付宝支付: orderNo={}, payType={}", orderNo, payType);
             
@@ -88,7 +90,7 @@ public class HuifuPayController {
             }
             
             // 创建支付订单
-            String payUrl = huifuPayService.createPayment(orderNo, amount, subject, payType);
+            String payUrl = huifuPayService.createPayment(orderNo, amount, subject, payType, subAppId, subOpenId);
             
             Map<String, String> result = new HashMap<>();
             result.put("pay_url", payUrl);
