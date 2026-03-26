@@ -3,8 +3,11 @@ package com.buyticket.controller;
 import com.buyticket.service.HuifuPayService;
 import com.buyticket.service.TicketOrderService;
 import com.buyticket.service.MallOrderService;
+import com.buyticket.service.OrderItemService;
+import com.buyticket.service.ExhibitionTimeSlotInventoryService;
 import com.buyticket.entity.TicketOrder;
 import com.buyticket.entity.MallOrder;
+import com.buyticket.entity.OrderItem;
 import com.buyticket.utils.JsonData;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,6 +21,7 @@ import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 
 /**
  * 汇付宝支付控制器
@@ -36,6 +40,12 @@ public class HuifuPayController {
     
     @Autowired
     private MallOrderService mallOrderService;
+
+    @Autowired
+    private OrderItemService orderItemService;
+
+    @Autowired
+    private ExhibitionTimeSlotInventoryService inventoryService;
     
     /**
      * 微信网页授权：用 code 换取 openid
@@ -152,7 +162,7 @@ public class HuifuPayController {
     }
     
     /**
-     * 查询支付状态
+     * 查询支付状态，查到成功时自动补单
      * @param orderNo 订单号
      * @return 支付状态
      */
@@ -160,10 +170,57 @@ public class HuifuPayController {
     public JsonData queryPaymentStatus(@RequestParam String orderNo) {
         try {
             log.info("查询支付状态: orderNo={}", orderNo);
-            
-            Map<String, Object> result = huifuPayService.queryPaymentStatus(orderNo);
+
+            Map<String, Object> rawResult = huifuPayService.queryPaymentStatus(orderNo);
+
+            // 提取支付状态
+            Map<String, String> flatParams = new HashMap<>();
+            for (Map.Entry<String, Object> entry : rawResult.entrySet()) {
+                if (entry.getValue() != null) {
+                    flatParams.put(entry.getKey(), String.valueOf(entry.getValue()));
+                }
+            }
+            // 尝试解析 data 子对象
+            Object dataObj = rawResult.get("data");
+            if (dataObj instanceof Map) {
+                for (Map.Entry<?, ?> entry : ((Map<?, ?>) dataObj).entrySet()) {
+                    if (entry.getValue() != null) {
+                        flatParams.put(String.valueOf(entry.getKey()), String.valueOf(entry.getValue()));
+                    }
+                }
+            }
+
+            String tradeStatus = firstNonBlank(
+                    flatParams.get("trans_stat"),
+                    flatParams.get("trade_status"),
+                    flatParams.get("status"),
+                    flatParams.get("resp_code")
+            );
+
+            log.info("查单结果: orderNo={}, tradeStatus={}", orderNo, tradeStatus);
+
+            // 查到支付成功时自动补单
+            if (isPaymentSuccess(tradeStatus)) {
+                log.info("查单确认支付成功，开始补单: orderNo={}", orderNo);
+                TicketOrder ticketOrder = ticketOrderService.getByOrderNo(orderNo);
+                if (ticketOrder != null) {
+                    handleTicketOrderPayment(ticketOrder, tradeStatus, null);
+                } else {
+                    LambdaQueryWrapper<MallOrder> mallQueryWrapper = new LambdaQueryWrapper<>();
+                    mallQueryWrapper.eq(MallOrder::getOrderNo, orderNo);
+                    MallOrder mallOrder = mallOrderService.getOne(mallQueryWrapper);
+                    if (mallOrder != null) {
+                        handleMallOrderPayment(mallOrder, tradeStatus, null);
+                    }
+                }
+            }
+
+            // 返回给前端：简化状态
+            Map<String, Object> result = new HashMap<>(rawResult);
+            result.put("paid", isPaymentSuccess(tradeStatus));
+            result.put("tradeStatus", tradeStatus);
             return JsonData.buildSuccess(result);
-            
+
         } catch (Exception e) {
             log.error("查询支付状态失败: orderNo={}", orderNo, e);
             return JsonData.buildError("查询失败: " + e.getMessage());
@@ -192,39 +249,41 @@ public class HuifuPayController {
             }
             
             log.info("汇付宝回调参数: {}", params);
-            
+
+            Map<String, String> payResult = extractPayResult(params);
+
             // 验证签名
             boolean signVerified = huifuPayService.verifyNotify(params);
             if (!signVerified) {
                 log.error("汇付宝回调签名验证失败");
                 return "failure";
             }
-            
-            // 获取订单号和交易状态
-            String outTradeNo = params.get("out_trade_no");  // 商户订单号
-            String tradeNo = params.get("trade_no");  // 汇付宝交易号
-            String tradeStatus = params.get("trade_status");  // 交易状态
-            String totalAmount = params.get("total_amount");  // 交易金额
-            
-            log.info("订单号: {}, 汇付宝交易号: {}, 交易状态: {}, 金额: {}", 
+
+            String outTradeNo = payResult.get("outTradeNo");
+            String tradeNo = payResult.get("tradeNo");
+            String tradeStatus = payResult.get("tradeStatus");
+            String totalAmount = payResult.get("totalAmount");
+
+            log.info("订单号: {}, 汇付宝交易号: {}, 交易状态: {}, 金额: {}",
                     outTradeNo, tradeNo, tradeStatus, totalAmount);
-            
+
+            if (!isPaymentSuccess(tradeStatus)) {
+                log.warn("汇付宝异步回调未达到支付成功状态: orderNo={}, tradeStatus={}", outTradeNo, tradeStatus);
+                return "success";
+            }
+
             // 查询订单
             TicketOrder ticketOrder = ticketOrderService.getByOrderNo(outTradeNo);
             if (ticketOrder != null) {
-                // 处理门票订单
                 handleTicketOrderPayment(ticketOrder, tradeStatus, totalAmount);
                 return "success";
             }
-            
-            // 尝试查询商城订单
-            com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<MallOrder> mallQueryWrapper = 
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
+
+            LambdaQueryWrapper<MallOrder> mallQueryWrapper = new LambdaQueryWrapper<>();
             mallQueryWrapper.eq(MallOrder::getOrderNo, outTradeNo);
             MallOrder mallOrder = mallOrderService.getOne(mallQueryWrapper);
-            
+
             if (mallOrder != null) {
-                // 处理商城订单
                 handleMallOrderPayment(mallOrder, tradeStatus, totalAmount);
                 return "success";
             }
@@ -260,34 +319,38 @@ public class HuifuPayController {
             }
             
             log.info("汇付宝同步回调参数: {}", params);
-            
+
+            Map<String, String> payResult = extractPayResult(params);
+
             // 验证签名
             boolean signVerified = huifuPayService.verifyNotify(params);
             if (!signVerified) {
                 log.warn("汇付宝同步回调签名验证失败，但继续处理");
             }
-            
-            String outTradeNo = params.get("out_trade_no");
-            String tradeNo = params.get("trade_no");
-            String totalAmount = params.get("total_amount");
-            String tradeStatus = params.get("trade_status");
-            
-            log.info("订单号: {}, 汇付宝交易号: {}, 交易状态: {}, 金额: {}", 
+
+            String outTradeNo = payResult.get("outTradeNo");
+            String tradeNo = payResult.get("tradeNo");
+            String totalAmount = payResult.get("totalAmount");
+            String tradeStatus = payResult.get("tradeStatus");
+
+            log.info("订单号: {}, 汇付宝交易号: {}, 交易状态: {}, 金额: {}",
                     outTradeNo, tradeNo, tradeStatus, totalAmount);
-            
-            // 查询订单并更新状态
-            TicketOrder ticketOrder = ticketOrderService.getByOrderNo(outTradeNo);
-            if (ticketOrder != null) {
-                handleTicketOrderPayment(ticketOrder, tradeStatus, totalAmount);
-            } else {
-                com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<MallOrder> mallQueryWrapper = 
-                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
-                mallQueryWrapper.eq(MallOrder::getOrderNo, outTradeNo);
-                MallOrder mallOrder = mallOrderService.getOne(mallQueryWrapper);
-                
-                if (mallOrder != null) {
-                    handleMallOrderPayment(mallOrder, tradeStatus, totalAmount);
+
+            if (isPaymentSuccess(tradeStatus)) {
+                TicketOrder ticketOrder = ticketOrderService.getByOrderNo(outTradeNo);
+                if (ticketOrder != null) {
+                    handleTicketOrderPayment(ticketOrder, tradeStatus, totalAmount);
+                } else {
+                    LambdaQueryWrapper<MallOrder> mallQueryWrapper = new LambdaQueryWrapper<>();
+                    mallQueryWrapper.eq(MallOrder::getOrderNo, outTradeNo);
+                    MallOrder mallOrder = mallOrderService.getOne(mallQueryWrapper);
+
+                    if (mallOrder != null) {
+                        handleMallOrderPayment(mallOrder, tradeStatus, totalAmount);
+                    }
                 }
+            } else {
+                log.warn("汇付宝同步回调未达到支付成功状态: orderNo={}, tradeStatus={}", outTradeNo, tradeStatus);
             }
             
             Map<String, String> result = new HashMap<>();
@@ -361,30 +424,162 @@ public class HuifuPayController {
      * 处理门票订单支付
      */
     private void handleTicketOrderPayment(TicketOrder order, String tradeStatus, String totalAmount) {
-        // TODO: 根据汇付宝实际返回的交易状态调整
-        // 示例：假设支付成功状态为 "SUCCESS" 或 "FINISHED"
-        if ("SUCCESS".equals(tradeStatus) || "FINISHED".equals(tradeStatus)) {
-            if (order.getStatus() == 0) {
-                order.setStatus(1);  // 1:待使用
-                order.setPayTime(java.time.LocalDateTime.now());
-                ticketOrderService.updateById(order);
-                log.info("门票订单支付成功，状态已更新: orderNo={}", order.getOrderNo());
-            }
+        if (!isPaymentSuccess(tradeStatus)) {
+            return;
         }
+
+        if (order.getStatus() != 0) {
+            log.info("门票订单状态已是: {}, 无需更新: orderNo={}", order.getStatus(), order.getOrderNo());
+            return;
+        }
+
+        LambdaQueryWrapper<OrderItem> itemQuery = new LambdaQueryWrapper<>();
+        itemQuery.eq(OrderItem::getOrderId, order.getId());
+        java.util.List<OrderItem> orderItems = orderItemService.list(itemQuery);
+
+        for (OrderItem item : orderItems) {
+            boolean success = inventoryService.decreaseInventory(
+                    item.getExhibitionId(),
+                    item.getTicketDate(),
+                    item.getTimeSlot(),
+                    item.getQuantity()
+            );
+            if (!success) {
+                throw new RuntimeException("扣减库存失败: " + item.getExhibitionName() + " " + item.getTicketDate() + " " + item.getTimeSlot());
+            }
+            log.info("扣减库存成功: exhibitionId={}, date={}, timeSlot={}, quantity={}",
+                    item.getExhibitionId(), item.getTicketDate(), item.getTimeSlot(), item.getQuantity());
+        }
+
+        order.setStatus(1);  // 1:待使用
+        order.setPayTime(java.time.LocalDateTime.now());
+        ticketOrderService.updateById(order);
+        log.info("门票订单支付成功，状态已更新: orderNo={}", order.getOrderNo());
     }
-    
+
     /**
      * 处理商城订单支付
      */
     private void handleMallOrderPayment(MallOrder order, String tradeStatus, String totalAmount) {
-        // TODO: 根据汇付宝实际返回的交易状态调整
-        if ("SUCCESS".equals(tradeStatus) || "FINISHED".equals(tradeStatus)) {
-            if (order.getStatus() == 0) {
-                order.setStatus(1);  // 1:待发货
-                order.setPayTime(java.time.LocalDateTime.now());
-                mallOrderService.updateById(order);
-                log.info("商城订单支付成功，状态已更新: orderNo={}", order.getOrderNo());
+        if (!isPaymentSuccess(tradeStatus)) {
+            return;
+        }
+
+        if (order.getStatus() != 0) {
+            log.info("商城订单状态已是: {}, 无需更新: orderNo={}", order.getStatus(), order.getOrderNo());
+            return;
+        }
+
+        order.setStatus(1);  // 1:待发货
+        order.setPayTime(java.time.LocalDateTime.now());
+        mallOrderService.updateById(order);
+        log.info("商城订单支付成功，状态已更新: orderNo={}", order.getOrderNo());
+    }
+
+    private Map<String, String> extractPayResult(Map<String, String> params) {
+        Map<String, String> result = new HashMap<>();
+        result.put("outTradeNo", firstNonBlank(
+                params.get("out_trade_no"),
+                params.get("req_seq_id"),
+                params.get("org_req_seq_id")
+        ));
+        result.put("tradeNo", firstNonBlank(
+                params.get("trade_no"),
+                params.get("hf_seq_id"),
+                params.get("huifu_seq_id")
+        ));
+        result.put("tradeStatus", firstNonBlank(
+                params.get("trade_status"),
+                params.get("trans_stat"),
+                params.get("status"),
+                params.get("resp_code")
+        ));
+        result.put("totalAmount", firstNonBlank(
+                params.get("total_amount"),
+                params.get("trans_amt"),
+                params.get("ord_amt")
+        ));
+
+        String respData = params.get("resp_data");
+        if (respData != null && !respData.isBlank()) {
+            try {
+                Map<String, Object> respMap = new ObjectMapper().readValue(respData, Map.class);
+                if (isBlank(result.get("outTradeNo"))) {
+                    result.put("outTradeNo", firstNonBlank(
+                            stringValue(respMap.get("out_trade_no")),
+                            stringValue(respMap.get("req_seq_id")),
+                            stringValue(respMap.get("org_req_seq_id"))
+                    ));
+                }
+                if (isBlank(result.get("tradeNo"))) {
+                    result.put("tradeNo", firstNonBlank(
+                            stringValue(respMap.get("trade_no")),
+                            stringValue(respMap.get("hf_seq_id")),
+                            stringValue(respMap.get("huifu_seq_id"))
+                    ));
+                }
+                if (isBlank(result.get("tradeStatus"))) {
+                    result.put("tradeStatus", firstNonBlank(
+                            stringValue(respMap.get("trade_status")),
+                            stringValue(respMap.get("trans_stat")),
+                            stringValue(respMap.get("status")),
+                            stringValue(respMap.get("resp_code"))
+                    ));
+                }
+                if (isBlank(result.get("totalAmount"))) {
+                    result.put("totalAmount", firstNonBlank(
+                            stringValue(respMap.get("total_amount")),
+                            stringValue(respMap.get("trans_amt")),
+                            stringValue(respMap.get("ord_amt"))
+                    ));
+                }
+            } catch (Exception e) {
+                log.warn("解析汇付回调resp_data失败: {}", respData, e);
             }
         }
+
+        if (!isBlank(result.get("outTradeNo"))) {
+            String maybeReqSeqId = result.get("outTradeNo");
+            if (maybeReqSeqId.matches("\\d{8}T\\d{13}[A-Z0-9]{6}\\d{1,4}")) {
+                result.put("outTradeNo", maybeReqSeqId.substring(8, maybeReqSeqId.length() - 4));
+            }
+        }
+
+        return result;
+    }
+
+    private boolean isPaymentSuccess(String tradeStatus) {
+        if (tradeStatus == null) {
+            return false;
+        }
+        String normalized = tradeStatus.trim().toUpperCase();
+        return "SUCCESS".equals(normalized)
+                || "FINISHED".equals(normalized)
+                || "S".equals(normalized)
+                || "00000000".equals(normalized)
+                || "PAYED".equals(normalized)
+                || "PAID".equals(normalized)
+                || "TRADE_SUCCESS".equals(normalized)
+                || "TRADE_FINISHED".equals(normalized);
+    }
+
+    private String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            if (!isBlank(value)) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
+    }
+
+    private String stringValue(Object value) {
+        return value == null ? null : String.valueOf(value);
     }
 }

@@ -58,7 +58,7 @@ public class HuifuPayServiceImpl implements HuifuPayService {
                  payType);
             }
             String reqDate = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-            String reqSeqId = reqDate + orderNo + System.currentTimeMillis() % 10000;
+            String reqSeqId = reqDate + orderNo; // 固定格式，便于查单时精确匹配
 
             // Re-init SDK with correct product_id for this pay type
             try {
@@ -106,13 +106,34 @@ public class HuifuPayServiceImpl implements HuifuPayService {
     @Override
     public Map<String, Object> queryPaymentStatus(String orderNo) {
         try {
-            String reqDate = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+            String reqDate;
+            try {
+                long ts = Long.parseLong(orderNo.substring(1, 14));
+                reqDate = new java.text.SimpleDateFormat("yyyyMMdd")
+                        .format(new java.util.Date(ts));
+            } catch (Exception ex) {
+                reqDate = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+            }
+            String orgReqSeqId = reqDate + orderNo;
+
+            // 查单前确保 SDK 用正确的 product_id 初始化
+            try {
+                MerConfig merConfig = new MerConfig();
+                merConfig.setSysId(HuifuPayConfig.appId);
+                merConfig.setProcutId(HuifuPayConfig.productId);
+                merConfig.setRsaPrivateKey(HuifuPayConfig.merchantPrivateKey);
+                merConfig.setRsaPublicKey(HuifuPayConfig.huifuPublicKey);
+                BasePay.initWithMerConfig(merConfig);
+            } catch (Exception e) {
+                log.warn("SDK re-init for query failed", e);
+            }
+
             V2TradePaymentScanpayQueryRequest request = new V2TradePaymentScanpayQueryRequest();
             request.setHuifuId(HuifuPayConfig.merchantId);
             request.setOrgReqDate(reqDate);
-            request.setOrgReqSeqId(reqDate + orderNo);
+            request.setOrgReqSeqId(orgReqSeqId);
             Map<String, Object> response = BasePayClient.request(request);
-            log.info("Query response: {}", response);
+            log.info("Query response for orderNo={}: {}", orderNo, response);
             return response;
         } catch (Exception e) {
             log.error("queryPaymentStatus failed", e);

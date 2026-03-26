@@ -68,7 +68,7 @@
         </div>
       </div>
 
-      <div class="payment-actions">
+      <div class="payment-actions" v-if="!qrCodeUrl">
         <button class="btn-cancel" @click="handleCancel">取消订单</button>
         <button 
           class="btn-pay" 
@@ -77,6 +77,20 @@
         >
           {{ paying ? '跳转中...' : '立即支付' }}
         </button>
+      </div>
+
+      <!-- 支付宝二维码展示区 -->
+      <div class="qr-section" v-if="qrCodeUrl">
+        <div class="qr-tip">请使用支付宝扫描下方二维码完成支付</div>
+        <div class="qr-wrapper">
+          <qrcode-vue :value="qrCodeUrl" :size="220" level="H" />
+        </div>
+        <div class="qr-actions">
+          <button class="btn-paid" :disabled="checking" @click="handleCheckPaid">
+            {{ checking ? '查询中...' : '我已完成支付' }}
+          </button>
+          <button class="btn-reselect" @click="qrCodeUrl = ''; stopPolling()">重新选择</button>
+        </div>
       </div>
 
       <div class="payment-tips">
@@ -89,12 +103,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { huifuPayApi } from '@/api/huifuPay'
 import { ticketApi } from '@/api/ticket'
 import { mallApi } from '@/api/mall'
+import QrcodeVue from 'qrcode.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -104,6 +119,9 @@ const orderType = ref<'ticket' | 'mall'>('ticket')
 const orderInfo = ref<any>(null)
 const selectedMethod = ref<'WECHAT' | 'ALIPAY' | ''>('')
 const paying = ref(false)
+const qrCodeUrl = ref('')        // 支付宝二维码
+const checking = ref(false)      // 正在查单
+const pollTimer = ref<number | undefined>(undefined)
 
 // 加载订单信息
 const loadOrderInfo = async () => {
@@ -128,6 +146,57 @@ const loadOrderInfo = async () => {
   }
 }
 
+// 轮询查单
+const startPolling = (orderNo: string) => {
+  stopPolling()
+  let attempts = 0
+  const maxAttempts = 60
+  pollTimer.value = setInterval(async () => {
+    attempts++
+    if (attempts > maxAttempts) {
+      stopPolling()
+      return
+    }
+    try {
+      const res = await huifuPayApi.queryPaymentStatus(orderNo)
+      if (res?.paid) {
+        stopPolling()
+        ElMessage.success('支付成功！')
+        router.push(`/order/${orderId.value}?type=${orderType.value}`)
+      }
+    } catch (e) {
+      // 查单失败不打断轮询
+    }
+  }, 2000) as unknown as number
+}
+
+const stopPolling = () => {
+  if (pollTimer.value) {
+    clearInterval(pollTimer.value)
+    pollTimer.value = undefined
+  }
+}
+
+// 手动点击"我已完成支付"
+const handleCheckPaid = async () => {
+  if (!orderInfo.value?.orderNo) return
+  checking.value = true
+  try {
+    const res = await huifuPayApi.queryPaymentStatus(orderInfo.value.orderNo)
+    if (res?.paid) {
+      stopPolling()
+      ElMessage.success('支付成功！')
+      router.push(`/order/${orderId.value}?type=${orderType.value}`)
+    } else {
+      ElMessage.warning('暂未检测到支付成功，请稍后再试')
+    }
+  } catch (e: any) {
+    ElMessage.error(e.message || '查询失败')
+  } finally {
+    checking.value = false
+  }
+}
+
 // 处理支付
 const handlePay = async () => {
   if (!selectedMethod.value || paying.value) return
@@ -135,26 +204,37 @@ const handlePay = async () => {
   try {
     paying.value = true
 
-    // 检查是否有订单号
     if (!orderInfo.value || !orderInfo.value.orderNo) {
       throw new Error('订单号不存在')
     }
 
-    // 调用汇付宝支付接口
     const response = await huifuPayApi.createPayment(
       orderInfo.value.orderNo,
       selectedMethod.value
     )
 
-    if (response && response.pay_url) {
-      // 跳转到支付页面
-      window.location.href = response.pay_url
-    } else {
+    if (!response || !response.pay_url) {
       throw new Error('获取支付URL失败')
     }
+
+    const payUrl = response.pay_url
+
+    // 支付宝扫码（qr.alipay.com 或非 http 链接）=> 展示二维码
+    if (
+      selectedMethod.value === 'ALIPAY' &&
+      (payUrl.startsWith('https://qr.alipay.com') || !payUrl.startsWith('http'))
+    ) {
+      qrCodeUrl.value = payUrl
+      startPolling(orderInfo.value.orderNo)
+    } else {
+      // H5 跳转
+      stopPolling()
+      window.location.href = payUrl
+    }
   } catch (error: any) {
-    paying.value = false
     ElMessage.error(error.message || '发起支付失败')
+  } finally {
+    paying.value = false
   }
 }
 
@@ -184,6 +264,10 @@ const handleCancel = async () => {
 
 onMounted(() => {
   loadOrderInfo()
+})
+
+onUnmounted(() => {
+  stopPolling()
 })
 </script>
 
@@ -399,6 +483,70 @@ onMounted(() => {
   font-size: 12px;
   color: #666;
   line-height: 1.6;
+}
+
+.qr-section {
+  text-align: center;
+  padding: 8px 0 16px;
+}
+
+.qr-tip {
+  font-size: 15px;
+  color: #333;
+  margin-bottom: 16px;
+  font-weight: 500;
+}
+
+.qr-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+  padding: 20px;
+  background: #f9f9f9;
+  border-radius: 12px;
+  border: 1px solid #e8e8e8;
+}
+
+.qr-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.btn-paid {
+  padding: 12px 28px;
+  background: #1677ff;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.btn-paid:hover:not(:disabled) {
+  background: #0958d9;
+}
+
+.btn-paid:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-reselect {
+  padding: 12px 20px;
+  background: #f0f0f0;
+  color: #666;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-reselect:hover {
+  background: #e0e0e0;
 }
 
 @media (max-width: 768px) {
