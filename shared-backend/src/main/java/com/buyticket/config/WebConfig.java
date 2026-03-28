@@ -45,6 +45,12 @@ public class WebConfig implements WebMvcConfigurer {
                         // 支付宝回调接口（重要：支付宝服务器调用时没有Token）
                         "/api/v1/payment/alipay/notify",
                         "/api/v1/payment/alipay/return",
+                        // 汇付宝回调接口（重要：汇付宝服务器调用时没有Token）
+                        "/api/v1/huifu-pay/notify",
+                        "/api/v1/huifu-pay/return",
+                        // 汇付宝查单接口（前端轮询，用户可能未登录状态）
+                        "/api/v1/huifu-pay/query",
+                        "/api/v1/huifu-pay/create",
                         // 静态资源 - 上传的图片文件
                         "/uploads/**",
                         // Swagger文档

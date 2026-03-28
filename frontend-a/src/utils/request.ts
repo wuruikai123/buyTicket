@@ -3,7 +3,7 @@ import axios from 'axios'
 // 创建 axios 实例
 const request = axios.create({
     baseURL: '/api/v1', // 基础路径，需要配置 vite 代理
-    timeout: 5000 // 超时时间
+    timeout: 15000 // 超时时间
 })
 
 // 请求拦截器

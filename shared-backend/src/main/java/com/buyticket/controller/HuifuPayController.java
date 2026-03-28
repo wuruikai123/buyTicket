@@ -215,9 +215,23 @@ public class HuifuPayController {
                 }
             }
 
-            // 返回给前端：简化状态
+            // 返回给前端：优先检查本地数据库订单状态（notify可能已先更新）
+            boolean paidByDb = false;
+            TicketOrder localOrder = ticketOrderService.getByOrderNo(orderNo);
+            if (localOrder != null && localOrder.getStatus() >= 1 && localOrder.getStatus() != 3 && localOrder.getStatus() != 6) {
+                paidByDb = true;
+                log.info("本地订单已支付: orderNo={}, status={}", orderNo, localOrder.getStatus());
+            } else {
+                LambdaQueryWrapper<MallOrder> mq = new LambdaQueryWrapper<>();
+                mq.eq(MallOrder::getOrderNo, orderNo);
+                MallOrder localMall = mallOrderService.getOne(mq);
+                if (localMall != null && localMall.getStatus() >= 1) {
+                    paidByDb = true;
+                    log.info("本地商城订单已支付: orderNo={}, status={}", orderNo, localMall.getStatus());
+                }
+            }
             Map<String, Object> result = new HashMap<>(rawResult);
-            result.put("paid", isPaymentSuccess(tradeStatus));
+            result.put("paid", paidByDb || isPaymentSuccess(tradeStatus));
             result.put("tradeStatus", tradeStatus);
             return JsonData.buildSuccess(result);
 
@@ -540,8 +554,10 @@ public class HuifuPayController {
 
         if (!isBlank(result.get("outTradeNo"))) {
             String maybeReqSeqId = result.get("outTradeNo");
-            if (maybeReqSeqId.matches("\\d{8}T\\d{13}[A-Z0-9]{6}\\d{1,4}")) {
-                result.put("outTradeNo", maybeReqSeqId.substring(8, maybeReqSeqId.length() - 4));
+            // req_seq_id 格式为 yyyyMMdd + orderNo，orderNo 以 T 开头
+            // 直接截取第8位之后的内容作为 orderNo
+            if (maybeReqSeqId.length() > 8 && maybeReqSeqId.substring(0, 8).matches("\\d{8}") && maybeReqSeqId.charAt(8) == 'T') {
+                result.put("outTradeNo", maybeReqSeqId.substring(8));
             }
         }
 

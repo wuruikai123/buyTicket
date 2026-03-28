@@ -146,28 +146,42 @@ const loadOrderInfo = async () => {
   }
 }
 
-// 轮询查单
+// 轮询查单 - 直接查订单状态，不依赖汇付宝查单接口
 const startPolling = (orderNo: string) => {
   stopPolling()
   let attempts = 0
-  const maxAttempts = 60
+  let failCount = 0
+  const maxAttempts = 30
   pollTimer.value = setInterval(async () => {
     attempts++
     if (attempts > maxAttempts) {
       stopPolling()
+      // 超时后直接跳转到profile，让用户自己确认
+      window.location.href = '/profile'
       return
     }
     try {
-      const res = await huifuPayApi.queryPaymentStatus(orderNo)
-      if (res?.paid) {
+      console.log(`[Poll] 第${attempts}次查订单状态: orderId=${orderId.value}, orderNo=${orderNo}`)
+      // 优先用orderNo查询，更可靠
+      const order = await ticketApi.getOrderByOrderNo(orderNo)
+      console.log('[Poll] 订单状态:', order?.status)
+      // status != 0 表示已支付
+      if (order && order.status !== 0) {
         stopPolling()
-        ElMessage.success('支付成功！')
-        router.push(`/order/${orderId.value}?type=${orderType.value}`)
+        ElMessage.success('支付成功！门票已生成，请在"我的"页面查看')
+        setTimeout(() => { window.location.href = '/profile' }, 1500)
       }
+      failCount = 0
     } catch (e) {
-      // 查单失败不打断轮询
+      failCount++
+      console.warn('[Poll] 查订单状态失败:', e)
+      // 连续失败5次直接跳profile
+      if (failCount >= 5) {
+        stopPolling()
+        window.location.href = '/profile'
+      }
     }
-  }, 2000) as unknown as number
+  }, 3000) as unknown as number
 }
 
 const stopPolling = () => {
@@ -179,18 +193,22 @@ const stopPolling = () => {
 
 // 手动点击"我已完成支付"
 const handleCheckPaid = async () => {
-  if (!orderInfo.value?.orderNo) return
   checking.value = true
   try {
-    const res = await huifuPayApi.queryPaymentStatus(orderInfo.value.orderNo)
-    if (res?.paid) {
+    const orderNo = orderInfo.value?.orderNo
+    if (!orderNo) throw new Error('订单号不存在')
+    console.log('[Check] 手动查询订单状态: orderNo=', orderNo)
+    const order = await ticketApi.getOrderByOrderNo(orderNo)
+    console.log('[Check] 订单状态:', order?.status)
+    if (order && order.status !== 0) {
       stopPolling()
-      ElMessage.success('支付成功！')
-      router.push(`/order/${orderId.value}?type=${orderType.value}`)
+      ElMessage.success('支付成功！门票已生成，请在"我的"页面查看')
+      setTimeout(() => { window.location.href = '/profile' }, 1500)
     } else {
       ElMessage.warning('暂未检测到支付成功，请稍后再试')
     }
   } catch (e: any) {
+    console.error('[Check] 查询失败:', e)
     ElMessage.error(e.message || '查询失败')
   } finally {
     checking.value = false
