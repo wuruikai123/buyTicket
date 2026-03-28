@@ -16,6 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.Map;
 
 @Slf4j
@@ -161,7 +162,27 @@ public class OrderController {
         if (order == null) {
             return JsonData.buildError("订单不存在");
         }
-        return JsonData.buildSuccess(order);
+
+        java.util.Map<String, Object> result = new java.util.HashMap<>();
+        result.put("id", order.getId());
+        result.put("orderNo", order.getOrderNo());
+        result.put("userId", order.getUserId());
+        result.put("totalAmount", order.getTotalAmount());
+        result.put("status", order.getStatus());
+        result.put("contactName", order.getContactName());
+        result.put("contactPhone", order.getContactPhone());
+        result.put("createTime", order.getCreateTime());
+        result.put("payTime", order.getPayTime());
+        result.put("verifyTime", order.getVerifyTime());
+        result.put("refundRequestTime", order.getRefundRequestTime());
+        result.put("refundTime", order.getRefundTime());
+
+        java.util.List<OrderItem> items = orderItemService.list(
+            new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderId, order.getId())
+        );
+        result.put("items", items);
+
+        return JsonData.buildSuccess(result);
     }
 
     /**
@@ -177,7 +198,7 @@ public class OrderController {
     }
 
     /**
-     * 通过订单号核销门票订单（待使用 -> 已使用）
+     * 通过订单号核销门票订单（按子票核销：每次核销1张待使用子票）
      */
     @PostMapping("/ticket/verify")
     public JsonData verifyTicketOrderByNo(@RequestBody java.util.Map<String, String> request) {
@@ -185,96 +206,85 @@ public class OrderController {
         if (orderNo == null || orderNo.trim().isEmpty()) {
             return JsonData.buildError("请输入订单号");
         }
-        
-        com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<TicketOrder> queryWrapper = 
+
+        com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<TicketOrder> queryWrapper =
             new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
         queryWrapper.eq(TicketOrder::getOrderNo, orderNo.trim());
         TicketOrder order = ticketOrderService.getOne(queryWrapper);
-        
+
         if (order == null) {
             return JsonData.buildError("订单不存在");
         }
-        if (order.getStatus() != 1) {
-            return JsonData.buildError("只有待使用的订单才能核销");
+        if (order.getStatus() != 1 && order.getStatus() != 5) {
+            return JsonData.buildError("当前订单状态不可核销");
         }
-        
-        // 验证核销时间是否符合规则
-        String timeValidationError = validateVerificationTime(order.getId());
+
+        LambdaQueryWrapper<OrderItem> itemQuery = new LambdaQueryWrapper<>();
+        itemQuery.eq(OrderItem::getOrderId, order.getId());
+        java.util.List<OrderItem> orderItems = orderItemService.list(itemQuery);
+        if (orderItems == null || orderItems.isEmpty()) {
+            return JsonData.buildError("订单信息异常，无法核销");
+        }
+
+        OrderItem target = null;
+        for (OrderItem item : orderItems) {
+            if (item.getTicketStatus() != null && item.getTicketStatus() == 1) {
+                target = item;
+                break;
+            }
+        }
+
+        if (target == null) {
+            return JsonData.buildError("无可核销子票");
+        }
+
+        String timeValidationError = validateTicketItemVerificationTime(target);
         if (timeValidationError != null) {
             return JsonData.buildError(timeValidationError);
         }
-        
-        order.setStatus(2); // 已使用
-        order.setVerifyTime(java.time.LocalDateTime.now()); // 设置核销时间
-        ticketOrderService.updateById(order);
-        return JsonData.buildSuccess("核销成功");
+
+        target.setTicketStatus(2);
+        orderItemMapper.updateById(target);
+
+        refreshOrderStatusByItems(order, orderItems);
+        return JsonData.buildSuccess("核销成功（已核销1张）");
     }
-    
+
     /**
-     * 验证核销时间是否符合规则
-     * 规则：
-     * - 上午票（时间段开始时间 < 12:00）：只能在当天开始时间到12:00之前核销
-     * - 下午票（时间段开始时间 >= 12:00）：只能在12:00到当天结束时间核销
-     * 
-     * @param orderId 订单ID
-     * @return 错误信息，如果验证通过返回null
+     * 验证单张子票核销时间是否符合规则
      */
-    private String validateVerificationTime(Long orderId) {
+    private String validateTicketItemVerificationTime(OrderItem item) {
         try {
-            // 查询订单项获取时间段信息
-            LambdaQueryWrapper<OrderItem> itemQuery = new LambdaQueryWrapper<>();
-            itemQuery.eq(OrderItem::getOrderId, orderId);
-            java.util.List<OrderItem> orderItems = orderItemService.list(itemQuery);
-            
-            if (orderItems == null || orderItems.isEmpty()) {
-                return "订单信息异常，无法核销";
-            }
-            
-            // 获取当前时间
             java.time.LocalTime currentTime = java.time.LocalTime.now();
             java.time.LocalDate currentDate = java.time.LocalDate.now();
-            
-            // 检查每个订单项的时间段
-            for (OrderItem item : orderItems) {
-                // 检查是否是今天的票
-                if (!item.getTicketDate().equals(currentDate)) {
-                    return "只能核销今天的门票";
+
+            if (item.getTicketDate() == null || !item.getTicketDate().equals(currentDate)) {
+                return "只能核销今天的门票";
+            }
+
+            String timeSlot = item.getTimeSlot();
+            if (timeSlot == null || timeSlot.trim().isEmpty()) {
+                return null;
+            }
+
+            String[] times = timeSlot.split("-");
+            if (times.length != 2) {
+                return null;
+            }
+
+            java.time.LocalTime startTime = java.time.LocalTime.parse(times[0].trim());
+            java.time.LocalTime noonTime = java.time.LocalTime.of(12, 0);
+
+            if (startTime.isBefore(noonTime)) {
+                if (currentTime.isBefore(startTime) || !currentTime.isBefore(noonTime)) {
+                    return "上午票只能在" + times[0].trim() + "-12:00之间核销";
                 }
-                
-                String timeSlot = item.getTimeSlot();
-                if (timeSlot == null || timeSlot.trim().isEmpty()) {
-                    continue;
-                }
-                
-                // 解析时间段，格式如 "09:00-12:00"
-                String[] times = timeSlot.split("-");
-                if (times.length != 2) {
-                    continue;
-                }
-                
-                try {
-                    java.time.LocalTime startTime = java.time.LocalTime.parse(times[0].trim());
-                    java.time.LocalTime noonTime = java.time.LocalTime.of(12, 0);
-                    
-                    // 判断是上午票还是下午票
-                    if (startTime.isBefore(noonTime)) {
-                        // 上午票：只能在开始时间到12:00之前核销
-                        if (currentTime.isBefore(startTime) || currentTime.isAfter(noonTime) || currentTime.equals(noonTime)) {
-                            return "上午票只能在" + times[0].trim() + "-12:00之间核销";
-                        }
-                    } else {
-                        // 下午票：只能在12:00到结束时间核销
-                        if (currentTime.isBefore(noonTime)) {
-                            return "下午票只能在12:00之后核销";
-                        }
-                    }
-                } catch (Exception e) {
-                    // 时间解析失败，跳过验证
-                    log.error("时间段解析失败: {}", timeSlot);
+            } else {
+                if (currentTime.isBefore(noonTime)) {
+                    return "下午票只能在12:00之后核销";
                 }
             }
-            
-            return null; // 验证通过
+            return null;
         } catch (Exception e) {
             log.error("验证核销时间失败", e);
             return "验证核销时间失败";
@@ -524,29 +534,64 @@ public class OrderController {
      * 用户申请退款
      */
     @PostMapping("/ticket/{id}/request-refund")
-    public JsonData requestRefund(@PathVariable Long id) {
+    public JsonData requestRefund(@PathVariable Long id, @RequestBody(required = false) java.util.Map<String, Object> body) {
         Long userId = getCurrentUserId();
         TicketOrder order = ticketOrderService.getById(id);
-        
+
         if (order == null) {
             return JsonData.buildError("订单不存在");
         }
-        
+
         if (!order.getUserId().equals(userId)) {
             return JsonData.buildError("无权操作此订单");
         }
-        
-        // 只有待使用状态的订单可以申请退款
-        if (order.getStatus() != 1) {
-            return JsonData.buildError("只有待使用的订单可以申请退款");
+
+        if (order.getStatus() != 1 && order.getStatus() != 5) {
+            return JsonData.buildError("当前订单状态不支持退款申请");
         }
-        
-        // 更新订单状态为退款中
-        order.setStatus(5);
-        order.setRefundRequestTime(java.time.LocalDateTime.now());
-        ticketOrderService.updateById(order);
-        
-        log.info("用户 {} 申请退款订单 {}", userId, id);
+
+        java.util.List<Long> ticketItemIds = extractTicketItemIds(body);
+
+        LambdaQueryWrapper<OrderItem> query = new LambdaQueryWrapper<>();
+        query.eq(OrderItem::getOrderId, id);
+        java.util.List<OrderItem> allItems = orderItemService.list(query);
+        if (allItems == null || allItems.isEmpty()) {
+            return JsonData.buildError("订单不存在门票明细");
+        }
+
+        java.util.Set<Long> targetIds = new java.util.HashSet<>();
+        if (ticketItemIds == null || ticketItemIds.isEmpty()) {
+            // 兼容旧前端：不传则整单申请退款
+            for (OrderItem item : allItems) {
+                if (item.getTicketStatus() != null && item.getTicketStatus() == 1) {
+                    targetIds.add(item.getId());
+                }
+            }
+        } else {
+            targetIds.addAll(ticketItemIds);
+        }
+
+        int updated = 0;
+        for (OrderItem item : allItems) {
+            if (!targetIds.contains(item.getId())) {
+                continue;
+            }
+            if (item.getTicketStatus() == null || item.getTicketStatus() != 1) {
+                return JsonData.buildError("存在不可退款门票（已使用/已退款/退款中）");
+            }
+            item.setTicketStatus(5);
+            item.setRefundRequestTime(java.time.LocalDateTime.now());
+            orderItemMapper.updateById(item);
+            updated++;
+        }
+
+        if (updated == 0) {
+            return JsonData.buildError("没有可退款门票");
+        }
+
+        refreshOrderStatusByItems(order, allItems);
+
+        log.info("用户 {} 申请退款订单 {}, 子票数 {}", userId, id, updated);
         return JsonData.buildSuccess("退款申请已提交");
     }
 
@@ -554,29 +599,122 @@ public class OrderController {
      * 用户取消退款申请
      */
     @PostMapping("/ticket/{id}/cancel-refund")
-    public JsonData cancelRefund(@PathVariable Long id) {
+    public JsonData cancelRefund(@PathVariable Long id, @RequestBody(required = false) java.util.Map<String, Object> body) {
         Long userId = getCurrentUserId();
         TicketOrder order = ticketOrderService.getById(id);
-        
+
         if (order == null) {
             return JsonData.buildError("订单不存在");
         }
-        
+
         if (!order.getUserId().equals(userId)) {
             return JsonData.buildError("无权操作此订单");
         }
-        
-        // 只有退款中状态的订单可以取消退款
-        if (order.getStatus() != 5) {
-            return JsonData.buildError("只有退款中的订单可以取消退款");
+
+        java.util.List<Long> ticketItemIds = extractTicketItemIds(body);
+
+        LambdaQueryWrapper<OrderItem> query = new LambdaQueryWrapper<>();
+        query.eq(OrderItem::getOrderId, id);
+        java.util.List<OrderItem> allItems = orderItemService.list(query);
+        if (allItems == null || allItems.isEmpty()) {
+            return JsonData.buildError("订单不存在门票明细");
         }
-        
-        // 恢复订单状态为待使用
-        order.setStatus(1);
-        order.setRefundRequestTime(null);
-        ticketOrderService.updateById(order);
-        
-        log.info("用户 {} 取消退款申请订单 {}", userId, id);
+
+        java.util.Set<Long> targetIds = new java.util.HashSet<>();
+        if (ticketItemIds == null || ticketItemIds.isEmpty()) {
+            for (OrderItem item : allItems) {
+                if (item.getTicketStatus() != null && item.getTicketStatus() == 5) {
+                    targetIds.add(item.getId());
+                }
+            }
+        } else {
+            targetIds.addAll(ticketItemIds);
+        }
+
+        int updated = 0;
+        for (OrderItem item : allItems) {
+            if (!targetIds.contains(item.getId())) {
+                continue;
+            }
+            if (item.getTicketStatus() == null || item.getTicketStatus() != 5) {
+                return JsonData.buildError("存在不可取消退款的门票");
+            }
+            item.setTicketStatus(1);
+            item.setRefundRequestTime(null);
+            orderItemMapper.updateById(item);
+            updated++;
+        }
+
+        if (updated == 0) {
+            return JsonData.buildError("没有可取消退款的门票");
+        }
+
+        refreshOrderStatusByItems(order, allItems);
+
+        log.info("用户 {} 取消退款申请订单 {}, 子票数 {}", userId, id, updated);
         return JsonData.buildSuccess("已取消退款申请");
+    }
+
+    private java.util.List<Long> extractTicketItemIds(java.util.Map<String, Object> body) {
+        if (body == null || !body.containsKey("ticketItemIds")) {
+            return java.util.Collections.emptyList();
+        }
+        Object value = body.get("ticketItemIds");
+        if (!(value instanceof java.util.List)) {
+            return java.util.Collections.emptyList();
+        }
+        java.util.List<?> raw = (java.util.List<?>) value;
+        java.util.List<Long> ids = new java.util.ArrayList<>();
+        for (Object o : raw) {
+            if (o == null) {
+                continue;
+            }
+            try {
+                ids.add(Long.parseLong(String.valueOf(o)));
+            } catch (Exception ignored) {
+            }
+        }
+        return ids;
+    }
+
+    private void refreshOrderStatusByItems(TicketOrder order, java.util.List<OrderItem> currentItems) {
+        if (currentItems == null || currentItems.isEmpty()) {
+            return;
+        }
+
+        java.util.List<OrderItem> latest = orderItemService.list(
+            new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderId, order.getId())
+        );
+
+        int waiting = 0;
+        int used = 0;
+        int refunding = 0;
+        int refunded = 0;
+
+        for (OrderItem item : latest) {
+            Integer ts = item.getTicketStatus();
+            if (ts == null) {
+                ts = 1;
+            }
+            if (ts == 1) waiting++;
+            else if (ts == 2) used++;
+            else if (ts == 5) refunding++;
+            else if (ts == 6) refunded++;
+        }
+
+        if (refunding > 0) {
+            order.setStatus(5);
+            order.setRefundRequestTime(java.time.LocalDateTime.now());
+        } else if (waiting > 0) {
+            order.setStatus(1);
+            order.setRefundRequestTime(null);
+        } else if (used > 0) {
+            order.setStatus(2);
+        } else if (refunded == latest.size()) {
+            order.setStatus(6);
+            order.setRefundTime(java.time.LocalDateTime.now());
+        }
+
+        ticketOrderService.updateById(order);
     }
 }

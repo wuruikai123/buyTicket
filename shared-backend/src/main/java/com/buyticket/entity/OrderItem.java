@@ -7,6 +7,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Data
 @TableName("order_item")
@@ -25,7 +26,29 @@ public class OrderItem {
 
     private String timeSlot;
 
+    /**
+     * 单票模式下固定为1，兼容历史数据保留字段
+     */
     private Integer quantity;
 
     private BigDecimal price;
+
+    /**
+     * 单张票购票人
+     */
+    private String buyerName;
+
+    /**
+     * 单张票证件号
+     */
+    private String buyerIdCard;
+
+    /**
+     * 子票状态(1:待使用,2:已使用,5:退款中,6:已退款)
+     */
+    private Integer ticketStatus;
+
+    private LocalDateTime refundRequestTime;
+
+    private LocalDateTime refundTime;
 }

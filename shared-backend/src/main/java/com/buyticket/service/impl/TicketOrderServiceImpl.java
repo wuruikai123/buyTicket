@@ -4,19 +4,23 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.buyticket.dto.TicketOrderCreateRequest;
 import com.buyticket.entity.Exhibition;
+import com.buyticket.entity.ExhibitionTimeSlotInventory;
 import com.buyticket.entity.OrderItem;
 import com.buyticket.entity.TicketOrder;
 import com.buyticket.mapper.OrderItemMapper;
 import com.buyticket.mapper.TicketOrderMapper;
-import com.buyticket.entity.ExhibitionTimeSlotInventory;
 import com.buyticket.service.ExhibitionService;
 import com.buyticket.service.ExhibitionTimeSlotInventoryService;
 import com.buyticket.service.TicketOrderService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -32,58 +36,89 @@ public class TicketOrderServiceImpl extends ServiceImpl<TicketOrderMapper, Ticke
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> createOrder(Long userId, TicketOrderCreateRequest request) {
-        // 1. 获取展览信息
+        if (request == null || request.getExhibitionId() == null) {
+            throw new RuntimeException("参数错误");
+        }
+        if (request.getItems() == null || request.getItems().isEmpty()) {
+            throw new RuntimeException("请至少选择一张票");
+        }
+        if (request.getTotalAmount() == null || request.getTotalAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new RuntimeException("订单金额错误");
+        }
+
         Exhibition exhibition = exhibitionService.getById(request.getExhibitionId());
         if (exhibition == null) {
             throw new RuntimeException("展览不存在");
         }
-        
-        // 2. 检查库存是否充足（不扣减，只检查）
+
+        int totalQuantity = 0;
+        BigDecimal calculatedTotal = BigDecimal.ZERO;
+
         for (TicketOrderCreateRequest.TicketItemRequest item : request.getItems()) {
-            try {
-                ExhibitionTimeSlotInventory inventory = inventoryService.getAvailableInventory(
+            if (item.getDate() == null || !StringUtils.hasText(item.getTimeSlot())
+                    || item.getQuantity() == null || item.getQuantity() <= 0
+                    || item.getUnitPrice() == null || item.getUnitPrice().compareTo(BigDecimal.ZERO) < 0) {
+                throw new RuntimeException("票务参数不完整");
+            }
+
+            ExhibitionTimeSlotInventory inventory = inventoryService.getAvailableInventory(
                     request.getExhibitionId(),
                     item.getDate(),
                     item.getTimeSlot()
-                );
-                
-                if (inventory == null) {
-                    throw new RuntimeException("库存记录不存在");
-                }
-                
-                if (inventory.getAvailableTickets() < item.getQuantity()) {
-                    throw new RuntimeException(item.getDate() + " " + item.getTimeSlot() + " 库存不足，剩余" + inventory.getAvailableTickets() + "张");
-                }
-            } catch (RuntimeException e) {
-                throw new RuntimeException(item.getDate() + " " + item.getTimeSlot() + " " + e.getMessage());
+            );
+            if (inventory == null) {
+                throw new RuntimeException(item.getDate() + " " + item.getTimeSlot() + " 库存记录不存在");
+            }
+            if (inventory.getAvailableTickets() < item.getQuantity()) {
+                throw new RuntimeException(item.getDate() + " " + item.getTimeSlot() + " 库存不足，剩余" + inventory.getAvailableTickets() + "张");
+            }
+
+            totalQuantity += item.getQuantity();
+            calculatedTotal = calculatedTotal.add(item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity())));
+        }
+
+        if (request.getBuyers() == null || request.getBuyers().size() != totalQuantity) {
+            throw new RuntimeException("购票人信息数量必须与票数一致");
+        }
+
+        for (TicketOrderCreateRequest.TicketBuyerRequest buyer : request.getBuyers()) {
+            if (buyer == null || !StringUtils.hasText(buyer.getName()) || !StringUtils.hasText(buyer.getIdCard())) {
+                throw new RuntimeException("购票人信息不完整");
             }
         }
 
-        // 3. 创建订单（库存将在支付成功后扣减）
+        if (request.getTotalAmount().compareTo(calculatedTotal) != 0) {
+            throw new RuntimeException("订单金额校验失败");
+        }
+
         TicketOrder order = new TicketOrder();
         order.setUserId(userId);
         order.setTotalAmount(request.getTotalAmount());
-        order.setStatus(0); // 待支付
+        order.setStatus(0);
         order.setContactName(request.getContactName());
         order.setContactPhone(request.getContactPhone());
-        
-        // 生成安全的订单号: T + 时间戳(13位) + 随机6位字母数字
         String orderNo = generateSecureOrderNo();
         order.setOrderNo(orderNo);
-        
         this.save(order);
 
-        // 4. 创建订单详情
+        int buyerIndex = 0;
         for (TicketOrderCreateRequest.TicketItemRequest item : request.getItems()) {
-            OrderItem orderItem = new OrderItem();
-            orderItem.setOrderId(order.getId());
-            orderItem.setExhibitionId(request.getExhibitionId());
-            orderItem.setExhibitionName(exhibition.getName());
-            orderItem.setTicketDate(item.getDate());
-            orderItem.setTimeSlot(item.getTimeSlot());
-            orderItem.setQuantity(item.getQuantity());
-            orderItem.setPrice(item.getUnitPrice());
-            orderItemMapper.insert(orderItem);
+            for (int i = 0; i < item.getQuantity(); i++) {
+                TicketOrderCreateRequest.TicketBuyerRequest buyer = request.getBuyers().get(buyerIndex++);
+
+                OrderItem orderItem = new OrderItem();
+                orderItem.setOrderId(order.getId());
+                orderItem.setExhibitionId(request.getExhibitionId());
+                orderItem.setExhibitionName(exhibition.getName());
+                orderItem.setTicketDate(item.getDate());
+                orderItem.setTimeSlot(item.getTimeSlot());
+                orderItem.setQuantity(1);
+                orderItem.setPrice(item.getUnitPrice());
+                orderItem.setBuyerName(buyer.getName().trim());
+                orderItem.setBuyerIdCard(buyer.getIdCard().trim().toUpperCase());
+                orderItem.setTicketStatus(1);
+                orderItemMapper.insert(orderItem);
+            }
         }
 
         Map<String, Object> result = new HashMap<>();
@@ -91,20 +126,13 @@ public class TicketOrderServiceImpl extends ServiceImpl<TicketOrderMapper, Ticke
         result.put("orderNo", orderNo);
         return result;
     }
-    
-    /**
-     * 生成安全的订单号
-     * 格式：T + 时间戳(13位) + 随机6位字母数字
-     */
+
     private String generateSecureOrderNo() {
         long timestamp = System.currentTimeMillis();
         String randomStr = generateRandomString(6);
         return "T" + timestamp + randomStr;
     }
-    
-    /**
-     * 生成随机字符串
-     */
+
     private String generateRandomString(int length) {
         String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
         StringBuilder sb = new StringBuilder();
@@ -114,42 +142,42 @@ public class TicketOrderServiceImpl extends ServiceImpl<TicketOrderMapper, Ticke
         }
         return sb.toString();
     }
-    
+
     @Override
     public TicketOrder getByOrderNo(String orderNo) {
         LambdaQueryWrapper<TicketOrder> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(TicketOrder::getOrderNo, orderNo);
         return this.getOne(queryWrapper);
     }
-    
+
     @Override
     @Transactional
     public TicketOrder verifyByOrderNo(String orderNo) {
         TicketOrder order = getByOrderNo(orderNo);
-        
         if (order == null) {
             throw new RuntimeException("订单不存在");
         }
-        
         if (order.getStatus() != 1) {
-            String statusText = "";
-            switch (order.getStatus()) {
-                case 0: statusText = "待支付"; break;
-                case 2: statusText = "已使用"; break;
-                case 3: statusText = "已取消"; break;
-                case 4: statusText = "已作废"; break;
-                case 5: statusText = "退款中"; break;
-                case 6: statusText = "已退款"; break;
-                default: statusText = "未知状态";
-            }
-            throw new RuntimeException("订单状态不正确，当前状态：" + statusText);
+            throw new RuntimeException("订单状态不正确");
         }
-        
-        // 更新订单状态为已使用
+
+        LambdaQueryWrapper<OrderItem> itemWrapper = new LambdaQueryWrapper<>();
+        itemWrapper.eq(OrderItem::getOrderId, order.getId())
+                .eq(OrderItem::getTicketStatus, 1);
+        List<OrderItem> waitingTickets = orderItemMapper.selectList(itemWrapper);
+        if (waitingTickets == null || waitingTickets.isEmpty()) {
+            throw new RuntimeException("无可核销门票");
+        }
+
+        // 保持兼容：核销订单号时，将该订单下待使用子票全部核销
+        for (OrderItem item : waitingTickets) {
+            item.setTicketStatus(2);
+            orderItemMapper.updateById(item);
+        }
+
         order.setStatus(2);
-        order.setVerifyTime(java.time.LocalDateTime.now());
+        order.setVerifyTime(LocalDateTime.now());
         this.updateById(order);
-        
         return order;
     }
 }

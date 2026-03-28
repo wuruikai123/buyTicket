@@ -1,6 +1,5 @@
 <template>
   <div class="order-detail">
-    <!-- 顶部导航 -->
     <div class="header">
       <button class="back-button" @click="goBack">
         <el-icon><ArrowLeft /></el-icon>
@@ -10,7 +9,6 @@
     </div>
 
     <div class="detail-content" v-loading="loading">
-      <!-- 订单状态 -->
       <div class="status-section">
         <div class="status-icon">
           <el-icon v-if="order.status === 0"><Clock /></el-icon>
@@ -24,15 +22,14 @@
         </div>
       </div>
 
-      <!-- 联系人/收货信息 -->
       <div class="info-section">
-        <h3 class="section-title">{{ orderType === 'ticket' ? '持票人信息' : '收货信息' }}</h3>
+        <h3 class="section-title">联系人信息</h3>
         <div class="info-row">
-          <span class="label">{{ orderType === 'ticket' ? '真实姓名' : '收货人' }}</span>
+          <span class="label">联系人</span>
           <span class="value">{{ order.contactName || order.receiverName }}</span>
         </div>
         <div class="info-row">
-          <span class="label">{{ orderType === 'ticket' ? '身份证号' : '联系电话' }}</span>
+          <span class="label">联系电话</span>
           <span class="value">{{ order.contactPhone || order.receiverPhone }}</span>
         </div>
         <div class="info-row" v-if="orderType === 'mall'">
@@ -41,36 +38,58 @@
         </div>
       </div>
 
-      <!-- 商品/门票信息 -->
-      <div class="items-section">
-        <h3 class="section-title">{{ orderType === 'ticket' ? '门票信息' : '商品信息' }}</h3>
-        <div v-for="(item, index) in order.items" :key="index" class="order-item">
-          <div class="item-image" :style="{ backgroundImage: item.coverImage ? `url(${item.coverImage})` : '' }">
-            <span v-if="!item.coverImage" class="no-image">暂无图片</span>
+      <div class="items-section" v-if="orderType === 'ticket'">
+        <h3 class="section-title">门票明细（按子票）</h3>
+        <div v-for="item in order.items" :key="item.id" class="ticket-item-card">
+          <div class="ticket-item-header">
+            <div class="ticket-main">
+              <span class="ticket-name">{{ item.exhibitionName || '展览门票' }}</span>
+              <span class="ticket-time">{{ item.ticketDate }} {{ item.timeSlot }}</span>
+            </div>
+            <span class="ticket-status" :class="statusClass(item.ticketStatus)">{{ ticketStatusText(item.ticketStatus) }}</span>
           </div>
+
+          <div class="ticket-buyer">
+            <div>购票人：{{ item.buyerName || '-' }}</div>
+            <div>证件号：{{ item.buyerIdCard || '-' }}</div>
+          </div>
+
+          <div class="ticket-select" v-if="item.ticketStatus === 1 || item.ticketStatus === 5">
+            <el-checkbox
+              v-if="item.ticketStatus === 1"
+              :model-value="selectedRefundIds.includes(item.id)"
+              @change="(val:boolean) => toggleSelect(item.id, val, 'refund')"
+            >勾选申请退款</el-checkbox>
+            <el-checkbox
+              v-if="item.ticketStatus === 5"
+              :model-value="selectedCancelRefundIds.includes(item.id)"
+              @change="(val:boolean) => toggleSelect(item.id, val, 'cancel')"
+            >勾选取消退款</el-checkbox>
+          </div>
+        </div>
+      </div>
+
+      <div class="items-section" v-else>
+        <h3 class="section-title">商品信息</h3>
+        <div v-for="(item, index) in order.items" :key="index" class="order-item">
           <div class="item-info">
-            <h4 class="item-name">{{ item.name || item.exhibitionName || item.productName }}</h4>
-            <p class="item-spec" v-if="orderType === 'ticket'">
-              {{ item.ticketDate }} {{ item.timeSlot }}
-            </p>
+            <h4 class="item-name">{{ item.name || item.productName }}</h4>
             <p class="item-price">¥{{ item.price }} × {{ item.quantity }}</p>
           </div>
           <div class="item-subtotal">¥{{ (item.price * item.quantity).toFixed(2) }}</div>
         </div>
       </div>
 
-      <!-- 订单信息 -->
       <div class="order-info-section">
         <h3 class="section-title">订单信息</h3>
-        
-        <!-- 二维码区域 (仅门票订单且状态为待使用时显示) -->
+
         <div class="qrcode-section" v-if="orderType === 'ticket' && order.status === 1 && order.orderNo">
           <div class="qrcode-wrapper">
             <qrcode-vue :value="qrcodeData" :size="200" level="H" />
           </div>
-          <p class="qrcode-tip">请向工作人员出示此二维码进行核销</p>
+          <p class="qrcode-tip">请向工作人员出示此二维码进行核销（每次核销1张子票）</p>
         </div>
-        
+
         <div class="info-row order-no-row" v-if="order.orderNo">
           <span class="label">订单号</span>
           <div class="order-no-wrapper">
@@ -95,25 +114,18 @@
         </div>
       </div>
 
-      <!-- 金额信息 -->
       <div class="amount-section">
         <div class="amount-row total">
           <span>订单总额</span>
           <span class="total-amount">¥{{ order.totalAmount?.toFixed(2) }}</span>
         </div>
-        
-        <!-- 退款按钮 - 待使用状态 -->
-        <div class="refund-button-container" v-if="order.status === 1 && orderType === 'ticket'">
-          <button class="refund-button" @click="handleRequestRefund">申请退款</button>
-        </div>
-        
-        <!-- 取消退款按钮 - 退款中状态 -->
-        <div class="refund-button-container" v-if="order.status === 5 && orderType === 'ticket'">
-          <button class="cancel-refund-button" @click="handleCancelRefund">取消退款</button>
+
+        <div class="refund-button-container" v-if="orderType === 'ticket'">
+          <button class="refund-button" @click="handleRequestRefund" :disabled="!selectedRefundIds.length">申请已勾选子票退款</button>
+          <button class="cancel-refund-button" @click="handleCancelRefund" :disabled="!selectedCancelRefundIds.length">取消已勾选子票退款</button>
         </div>
       </div>
 
-      <!-- 操作按钮 -->
       <div class="action-section" v-if="order.status === 0">
         <el-button type="primary" size="large" @click="handlePay">支付宝支付</el-button>
         <el-button type="success" size="large" @click="handleHuifuPay">汇付宝支付</el-button>
@@ -134,6 +146,7 @@ import { mallApi } from '@/api/mall'
 import QrcodeVue from 'qrcode.vue'
 
 interface OrderItem {
+  id: number
   name?: string
   exhibitionName?: string
   productName?: string
@@ -142,6 +155,9 @@ interface OrderItem {
   price: number
   quantity: number
   coverImage?: string
+  buyerName?: string
+  buyerIdCard?: string
+  ticketStatus?: number
 }
 
 interface OrderDetail {
@@ -163,7 +179,6 @@ const router = useRouter()
 const route = useRoute()
 const loading = ref(false)
 
-// 路由参数可能为空或非数字，这里兜底为 0 并避免 NaN 传到后端导致转换异常
 const orderId = computed(() => {
   const id = Number(route.params.id)
   return Number.isFinite(id) ? id : 0
@@ -178,42 +193,48 @@ const order = ref<OrderDetail>({
   items: []
 })
 
-// 二维码数据：包含订单号和基本信息的JSON
+const selectedRefundIds = ref<number[]>([])
+const selectedCancelRefundIds = ref<number[]>([])
+
 const qrcodeData = computed(() => {
   if (!order.value.orderNo) return ''
-  return JSON.stringify({
-    orderNo: order.value.orderNo,
-    orderId: order.value.id,
-    type: 'ticket',
-    timestamp: Date.now()
-  })
+  return JSON.stringify({ orderNo: order.value.orderNo, orderId: order.value.id, type: 'ticket', timestamp: Date.now() })
 })
 
 const statusText = computed(() => {
-  const map: Record<number, string> = {
-    0: '待支付',
-    1: '已支付',
-    2: orderType.value === 'ticket' ? '已使用' : '已发货',
-    3: '已完成',
-    4: '已取消',
-    5: '退款中',
-    6: '已退款'
-  }
+  const map: Record<number, string> = { 0: '待支付', 1: '待使用', 2: '已使用', 3: '已完成', 4: '已取消', 5: '退款中', 6: '已退款' }
   return map[order.value.status] || '未知'
 })
 
 const statusDesc = computed(() => {
   const map: Record<number, string> = {
     0: '请在30分钟内完成支付',
-    1: orderType.value === 'ticket' ? '门票待使用，请按时到场' : '商家正在备货',
-    2: orderType.value === 'ticket' ? '感谢您的光临' : '商品已发出，请注意查收',
+    1: '门票待使用，请按时到场',
+    2: '感谢您的光临',
     3: '订单已完成',
     4: '订单已取消',
-    5: '退款申请已提交，等待管理员处理',
-    6: '退款已完成，款项已原路返回'
+    5: '存在退款中子票，等待管理员处理',
+    6: '订单子票均已退款'
   }
   return map[order.value.status] || ''
 })
+
+const ticketStatusText = (status?: number) => {
+  const map: Record<number, string> = { 1: '待使用', 2: '已使用', 5: '退款中', 6: '已退款' }
+  return map[status || 1] || '待使用'
+}
+
+const statusClass = (status?: number) => {
+  if (status === 2) return 'used'
+  if (status === 5) return 'refunding'
+  if (status === 6) return 'refunded'
+  return 'waiting'
+}
+
+const resetSelections = () => {
+  selectedRefundIds.value = []
+  selectedCancelRefundIds.value = []
+}
 
 const loadOrderDetail = async () => {
   loading.value = true
@@ -230,6 +251,7 @@ const loadOrderDetail = async () => {
     }
     if (res) {
       order.value = res
+      resetSelections()
     }
   } catch (e) {
     console.error(e)
@@ -239,34 +261,24 @@ const loadOrderDetail = async () => {
   }
 }
 
-const goBack = () => {
-  router.back()
+const toggleSelect = (id: number, checked: boolean, type: 'refund' | 'cancel') => {
+  const list = type === 'refund' ? selectedRefundIds.value : selectedCancelRefundIds.value
+  if (checked) {
+    if (!list.includes(id)) list.push(id)
+  } else {
+    const idx = list.indexOf(id)
+    if (idx >= 0) list.splice(idx, 1)
+  }
 }
 
+const goBack = () => router.back()
+
 const handlePay = () => {
-  // 跳转到支付页面进行真正的支付宝支付
-  router.push({
-    name: 'Payment',
-    params: {
-      orderId: order.value.id
-    },
-    query: {
-      type: orderType.value
-    }
-  })
+  router.push({ name: 'Payment', params: { orderId: order.value.id }, query: { type: orderType.value } })
 }
 
 const handleHuifuPay = () => {
-  // 跳转到汇付宝支付页面
-  router.push({
-    name: 'HuifuPayment',
-    params: {
-      orderId: order.value.id
-    },
-    query: {
-      type: orderType.value
-    }
-  })
+  router.push({ name: 'HuifuPayment', params: { orderId: order.value.id }, query: { type: orderType.value } })
 }
 
 const handleCancel = async () => {
@@ -279,478 +291,102 @@ const handleCancel = async () => {
     }
     ElMessage.success('订单已取消')
     loadOrderDetail()
-  } catch (e) {
-    // 取消操作
+  } catch (_e) {
   }
 }
 
-// 复制订单号
 const copyOrderNo = async () => {
   try {
     await navigator.clipboard.writeText(order.value.orderNo || '')
     ElMessage.success('订单号已复制，可用于核销')
-  } catch (e) {
-    // 降级方案
-    const textarea = document.createElement('textarea')
-    textarea.value = order.value.orderNo || ''
-    textarea.style.position = 'fixed'
-    textarea.style.opacity = '0'
-    document.body.appendChild(textarea)
-    textarea.select()
-    try {
-      document.execCommand('copy')
-      ElMessage.success('订单号已复制，可用于核销')
-    } catch (err) {
-      ElMessage.error('复制失败，请手动复制')
-    }
-    document.body.removeChild(textarea)
+  } catch (_e) {
+    ElMessage.error('复制失败，请手动复制')
   }
 }
 
-// 申请退款
 const handleRequestRefund = async () => {
+  if (!selectedRefundIds.value.length) {
+    ElMessage.warning('请先勾选要退款的子票')
+    return
+  }
   try {
-    await ElMessageBox.confirm(
-      '确定要申请退款吗？提交后需要等待管理员处理。',
-      '申请退款',
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }
-    )
-    
-    await ticketApi.requestRefund(orderId.value)
+    await ElMessageBox.confirm(`确认申请退款所选 ${selectedRefundIds.value.length} 张子票吗？`, '申请退款', { type: 'warning' })
+    await ticketApi.requestRefund(orderId.value, selectedRefundIds.value)
     ElMessage.success('退款申请已提交')
     await loadOrderDetail()
   } catch (e: any) {
-    if (e !== 'cancel') {
-      ElMessage.error(e.message || '申请退款失败')
-    }
+    if (e !== 'cancel') ElMessage.error(e.message || '申请退款失败')
   }
 }
 
-// 取消退款申请
 const handleCancelRefund = async () => {
+  if (!selectedCancelRefundIds.value.length) {
+    ElMessage.warning('请先勾选要取消退款的子票')
+    return
+  }
   try {
-    await ElMessageBox.confirm(
-      '确定要取消退款申请吗？',
-      '取消退款',
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }
-    )
-    
-    await ticketApi.cancelRefund(orderId.value)
+    await ElMessageBox.confirm(`确认取消所选 ${selectedCancelRefundIds.value.length} 张子票退款吗？`, '取消退款', { type: 'warning' })
+    await ticketApi.cancelRefund(orderId.value, selectedCancelRefundIds.value)
     ElMessage.success('已取消退款申请')
     await loadOrderDetail()
   } catch (e: any) {
-    if (e !== 'cancel') {
-      ElMessage.error(e.message || '取消退款失败')
-    }
+    if (e !== 'cancel') ElMessage.error(e.message || '取消退款失败')
   }
 }
 
 onMounted(() => {
   loadOrderDetail()
-  
-  // 如果订单状态为待支付，每隔2秒自动刷新一次，直到状态改变
-  let checkInterval: number | undefined;
-  
-  const startPolling = () => {
-    if (checkInterval) {
-      clearInterval(checkInterval);
-    }
-    
-    checkInterval = setInterval(async () => {
-      if (order.value.status === 0) {
-        try {
-          if (!orderId.value) {
-            if (checkInterval) {
-              clearInterval(checkInterval);
-            }
-            return;
-          }
-          let res: any;
-          if (orderType.value === 'ticket') {
-            res = await ticketApi.getOrderDetail(orderId.value);
-          } else {
-            res = await mallApi.getOrderDetail(orderId.value);
-          }
-          if (res && res.status !== 0) {
-            // 订单状态已改变，更新数据并停止轮询
-            order.value = res;
-            if (checkInterval) {
-              clearInterval(checkInterval);
-            }
-            console.log('订单状态已更新:', res.status);
-            ElMessage.success('订单状态已更新');
-          }
-        } catch (e) {
-          console.error('自动刷新订单失败:', e);
-        }
-      } else {
-        // 订单状态不是待支付，停止轮询
-        if (checkInterval) {
-          clearInterval(checkInterval);
-        }
-      }
-    }, 2000);
-  };
-  
-  // 开始轮询
-  startPolling();
-  
-  // 组件卸载时清除定时器
-  return () => {
-    if (checkInterval) {
-      clearInterval(checkInterval);
-    }
-  };
 })
 </script>
 
 <style scoped>
-.order-detail {
-  min-height: 100vh;
-  background-color: #f5f5f5;
-  padding-bottom: 100px;
-}
+.order-detail { min-height: 100vh; background-color: #f5f5f5; padding-bottom: 100px; }
+.header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; background-color: white; position: sticky; top: 0; z-index: 100; border-bottom: 1px solid #e0e0e0; }
+.back-button { display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; background: none; border: none; cursor: pointer; color: #333; border-radius: 50%; }
+.page-title { font-size: 18px; font-weight: bold; color: #333; margin: 0; }
+.header-placeholder { width: 40px; }
+.detail-content { padding: 16px; }
+.status-section { display: flex; align-items: center; gap: 16px; padding: 24px; background: linear-gradient(135deg, #409eff, #66b1ff); border-radius: 12px; margin-bottom: 12px; color: white; }
+.status-icon { width: 48px; height: 48px; background-color: rgba(255, 255, 255, 0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; }
+.status-info { display: flex; flex-direction: column; gap: 4px; }
+.status-text { font-size: 18px; font-weight: bold; }
+.status-desc { font-size: 14px; opacity: 0.9; }
+.info-section,.items-section,.order-info-section,.amount-section { background-color: white; border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+.section-title { font-size: 16px; font-weight: bold; color: #333; margin: 0 0 16px; }
+.info-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 14px; }
+.info-row .label { color: #999; }
+.info-row .value { color: #333; text-align: right; flex: 1; margin-left: 16px; }
+.order-no-row { background-color: #ecf5ff; padding: 12px; border-radius: 8px; margin-bottom: 8px; }
+.order-no-wrapper { display: flex; align-items: center; gap: 8px; flex: 1; justify-content: flex-end; }
+.order-no { font-weight: 600; color: #409eff; font-family: 'Courier New', monospace; letter-spacing: 0.5px; font-size: 15px; }
+.copy-btn { display: flex; align-items: center; gap: 4px; padding: 6px 12px; background-color: #409eff; border: none; border-radius: 4px; color: white; cursor: pointer; font-size: 13px; white-space: nowrap; }
 
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px;
-  background-color: white;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  border-bottom: 1px solid #e0e0e0;
-}
+.ticket-item-card { border: 1px solid #eee; border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+.ticket-item-header { display: flex; justify-content: space-between; gap: 12px; }
+.ticket-main { display: flex; flex-direction: column; gap: 4px; }
+.ticket-name { font-size: 14px; font-weight: 600; color: #333; }
+.ticket-time { font-size: 12px; color: #666; }
+.ticket-buyer { margin-top: 8px; font-size: 13px; color: #444; line-height: 1.8; }
+.ticket-status { font-size: 12px; padding: 2px 8px; border-radius: 12px; height: fit-content; }
+.ticket-status.waiting { color: #409eff; background: #ecf5ff; }
+.ticket-status.used { color: #67c23a; background: #f0f9eb; }
+.ticket-status.refunding { color: #e6a23c; background: #fdf6ec; }
+.ticket-status.refunded { color: #909399; background: #f4f4f5; }
+.ticket-select { margin-top: 10px; }
 
-.back-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: #333;
-  border-radius: 50%;
-}
+.qrcode-section { display: flex; flex-direction: column; align-items: center; padding: 24px 16px; background: linear-gradient(135deg, #f5f7fa, #e8eef5); border-radius: 12px; margin-bottom: 16px; }
+.qrcode-wrapper { padding: 16px; background-color: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
+.qrcode-tip { margin: 12px 0 0; font-size: 13px; color: #666; text-align: center; }
 
-.page-title {
-  font-size: 18px;
-  font-weight: bold;
-  color: #333;
-  margin: 0;
-}
+.amount-row { display: flex; justify-content: space-between; font-size: 14px; color: #666; }
+.amount-row.total { font-size: 16px; color: #333; }
+.total-amount { font-weight: bold; color: #f56c6c; font-size: 20px; }
+.refund-button-container { display: flex; gap: 12px; justify-content: center; margin-top: 20px; padding-top: 20px; border-top: 1px solid #f0f0f0; }
+.refund-button,.cancel-refund-button { width: 45%; padding: 12px; border-radius: 8px; font-size: 14px; cursor: pointer; }
+.refund-button { background-color: #333; color: white; border: none; }
+.cancel-refund-button { background-color: white; color: #e53327; border: 2px solid #e53327; }
+.refund-button:disabled,.cancel-refund-button:disabled { opacity: 0.4; cursor: not-allowed; }
 
-.header-placeholder {
-  width: 40px;
-}
-
-.detail-content {
-  padding: 16px;
-}
-
-.status-section {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 24px;
-  background: linear-gradient(135deg, #409eff, #66b1ff);
-  border-radius: 12px;
-  margin-bottom: 12px;
-  color: white;
-}
-
-.status-icon {
-  width: 48px;
-  height: 48px;
-  background-color: rgba(255, 255, 255, 0.2);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
-}
-
-.status-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.status-text {
-  font-size: 18px;
-  font-weight: bold;
-}
-
-.status-desc {
-  font-size: 14px;
-  opacity: 0.9;
-}
-
-.info-section,
-.items-section,
-.order-info-section,
-.amount-section {
-  background-color: white;
-  border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 12px;
-}
-
-.section-title {
-  font-size: 16px;
-  font-weight: bold;
-  color: #333;
-  margin: 0 0 16px;
-}
-
-.info-row {
-  display: flex;
-  justify-content: space-between;
-  padding: 8px 0;
-  font-size: 14px;
-}
-
-.info-row .label {
-  color: #999;
-}
-
-.info-row .value {
-  color: #333;
-  text-align: right;
-  flex: 1;
-  margin-left: 16px;
-}
-
-.order-no-row {
-  background-color: #ecf5ff;
-  padding: 12px;
-  border-radius: 8px;
-  margin-bottom: 8px;
-}
-
-.order-no-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-  justify-content: flex-end;
-}
-
-.order-no {
-  font-weight: 600;
-  color: #409eff;
-  font-family: 'Courier New', monospace;
-  letter-spacing: 0.5px;
-  font-size: 15px;
-}
-
-.copy-btn {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 12px;
-  background-color: #409eff;
-  border: none;
-  border-radius: 4px;
-  color: white;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-size: 13px;
-  white-space: nowrap;
-}
-
-.copy-btn:hover {
-  background-color: #66b1ff;
-}
-
-.copy-btn .el-icon {
-  font-size: 14px;
-}
-
-.order-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px;
-  background-color: #f9f9f9;
-  border-radius: 8px;
-  margin-bottom: 8px;
-}
-
-.order-item:last-child {
-  margin-bottom: 0;
-}
-
-.item-image {
-  width: 60px;
-  height: 60px;
-  background-color: #eee;
-  background-size: cover;
-  background-position: center;
-  border-radius: 6px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.no-image {
-  font-size: 10px;
-  color: #999;
-}
-
-.item-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.item-name {
-  font-size: 14px;
-  font-weight: 500;
-  color: #333;
-  margin: 0 0 4px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.item-spec {
-  font-size: 12px;
-  color: #999;
-  margin: 0 0 4px;
-}
-
-.item-price {
-  font-size: 12px;
-  color: #666;
-  margin: 0;
-}
-
-.item-subtotal {
-  font-size: 14px;
-  font-weight: 500;
-  color: #333;
-}
-
-.amount-row {
-  display: flex;
-  justify-content: space-between;
-  font-size: 14px;
-  color: #666;
-}
-
-.amount-row.total {
-  font-size: 16px;
-  color: #333;
-}
-
-.total-amount {
-  font-weight: bold;
-  color: #f56c6c;
-  font-size: 20px;
-}
-
-.action-section {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  display: flex;
-  gap: 12px;
-  padding: 16px;
-  background-color: white;
-  border-top: 1px solid #e0e0e0;
-}
-
-.action-section .el-button {
-  flex: 1;
-}
-
-/* 退款按钮容器 - 在金额信息下方 */
-.refund-button-container {
-  display: flex;
-  justify-content: center;
-  margin-top: 20px;
-  padding-top: 20px;
-  border-top: 1px solid #f0f0f0;
-}
-
-/* 申请退款按钮 - 黑色背景 */
-.refund-button {
-  width: 80%;
-  padding: 16px;
-  background-color: #333;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 16px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
-}
-
-.refund-button:hover {
-  background-color: #555;
-}
-
-.refund-button:active {
-  background-color: #222;
-}
-
-/* 取消退款按钮 - 红色边框 */
-.cancel-refund-button {
-  width: 80%;
-  padding: 16px;
-  background-color: white;
-  color: #e53327;
-  border: 2px solid #e53327;
-  border-radius: 8px;
-  font-size: 16px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.cancel-refund-button:hover {
-  background-color: #fff5f5;
-}
-
-.cancel-refund-button:active {
-  background-color: #ffe5e5;
-}
-
-.qrcode-section {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 24px 16px;
-  background: linear-gradient(135deg, #f5f7fa, #e8eef5);
-  border-radius: 12px;
-  margin-bottom: 16px;
-}
-
-.qrcode-wrapper {
-  padding: 16px;
-  background-color: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.qrcode-tip {
-  margin: 12px 0 0;
-  font-size: 13px;
-  color: #666;
-  text-align: center;
-}
+.action-section { position: fixed; bottom: 0; left: 0; right: 0; display: flex; gap: 12px; padding: 16px; background-color: white; border-top: 1px solid #e0e0e0; }
+.action-section .el-button { flex: 1; }
 </style>
