@@ -14,10 +14,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.servlet.http.HttpServletRequest;
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -48,45 +44,12 @@ public class HuifuPayController {
     private ExhibitionTimeSlotInventoryService inventoryService;
     
     /**
-     * 微信网页授权：用 code 换取 openid
-     * @param code 微信授权 code
-     * @return openid
+     * 已废弃：微信汇付 openid 换取接口。
+     * 微信支付已迁移至直连微信支付 API v3，不再经过汇付微信链路。
      */
     @GetMapping("/wechat-openid")
     public JsonData getWechatOpenId(@RequestParam String code) {
-        try {
-            String appId = com.buyticket.config.HuifuPayConfig.wechatAppId;
-            String appSecret = com.buyticket.config.HuifuPayConfig.wechatAppSecret;
-            String urlStr = "https://api.weixin.qq.com/sns/oauth2/access_token"
-                    + "?appid=" + appId
-                    + "&secret=" + appSecret
-                    + "&code=" + code
-                    + "&grant_type=authorization_code";
-            URL url = new URL(urlStr);
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("GET");
-            conn.setConnectTimeout(5000);
-            conn.setReadTimeout(5000);
-            BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
-            StringBuilder sb = new StringBuilder();
-            String line;
-            while ((line = reader.readLine()) != null) sb.append(line);
-            reader.close();
-            ObjectMapper mapper = new ObjectMapper();
-            Map<String, Object> resp = mapper.readValue(sb.toString(), Map.class);
-            log.info("微信换取openid响应: {}", resp);
-            if (resp.containsKey("errcode")) {
-                return JsonData.buildError("微信授权失败: " + resp.get("errmsg"));
-            }
-            String openId = (String) resp.get("openid");
-            Map<String, String> result = new HashMap<>();
-            result.put("openid", openId);
-            result.put("sub_appid", appId);
-            return JsonData.buildSuccess(result);
-        } catch (Exception e) {
-            log.error("获取微信openid失败", e);
-            return JsonData.buildError("获取openid失败: " + e.getMessage());
-        }
+        return JsonData.buildError("微信汇付通道已废弃，请使用 /api/v1/wechat-pay/create");
     }
 
     /**
@@ -103,9 +66,12 @@ public class HuifuPayController {
         try {
             log.info("创建汇付宝支付: orderNo={}, payType={}", orderNo, payType);
             
-            // 验证支付类型
+            // 微信支付已切换为直连微信支付API v3，支付宝仍走汇付
             if (!payType.equals("WECHAT") && !payType.equals("ALIPAY")) {
                 return JsonData.buildError("不支持的支付类型");
+            }
+            if (payType.equals("WECHAT")) {
+                return JsonData.buildError("微信支付已迁移到独立微信支付接口，请调用 /api/v1/wechat-pay/create");
             }
             
             // 查询订单信息

@@ -42,17 +42,14 @@ public class HuifuPayServiceImpl implements HuifuPayService {
     }
 
     @Override
-    public String createPayment(String orderNo, String amount, String subject, String payType, String subAppId, String subOpenId) {
+    public String createPayment(String orderNo, String amount, String subject, String payType, String ignoredSubAppId, String ignoredSubOpenId) {
         try {
             log.info("Creating payment: orderNo={}, amount={}, payType={}", orderNo, amount, payType);
             String tradeType;
             String productId;
-            if ("WECHAT".equals(payType)) {
-                tradeType = "T_MINIAPP";
-                productId = "PAYUN"; // 微信支付使用PAYUN产品，交易类型T_MINIAPP
-            } else if ("ALIPAY".equals(payType)) {
+            if ("ALIPAY".equals(payType)) {
                 tradeType = "A_NATIVE";
-                productId = "PAYUN"; // 支付宝使用PAYUN产品
+                productId = "PAYUN";
             } else {
                 throw new RuntimeException("Unsupported pay type: " +
                  payType);
@@ -81,16 +78,6 @@ public class HuifuPayServiceImpl implements HuifuPayService {
             request.setTradeType(tradeType);
             request.setTransAmt(formatAmount(amount));
             request.addExtendInfo("notify_url", HuifuPayConfig.notifyUrl);
-
-            // T_MINIAPP requires sub_appid and sub_openid
-            if ("T_MINIAPP".equals(tradeType)) {
-                if (subAppId != null && !subAppId.isEmpty()) {
-                    request.addExtendInfo("sub_appid", subAppId);
-                }
-                if (subOpenId != null && !subOpenId.isEmpty()) {
-                    request.addExtendInfo("sub_openid", subOpenId);
-                }
-            }
 
             log.info("Calling Huifu SDK jspay: reqSeqId={}, tradeType={}, amt={}", reqSeqId, tradeType, amount);
             Map<String, Object> response = BasePayClient.request(request);
@@ -159,15 +146,26 @@ public class HuifuPayServiceImpl implements HuifuPayService {
     public Map<String, Object> refund(String orderNo, String refundAmount, String reason) {
         try {
             String reqDate = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+            String orgReqDate;
+            try {
+                long ts = Long.parseLong(orderNo.substring(1, 14));
+                orgReqDate = new java.text.SimpleDateFormat("yyyyMMdd")
+                        .format(new java.util.Date(ts));
+            } catch (Exception ex) {
+                orgReqDate = reqDate;
+            }
+            String orgReqSeqId = orgReqDate + orderNo;
+
             V2TradePaymentScanpayRefundRequest request = new V2TradePaymentScanpayRefundRequest();
             request.setReqDate(reqDate);
             request.setReqSeqId(reqDate + "REFUND" + orderNo);
             request.setHuifuId(HuifuPayConfig.merchantId);
-            request.setOrgReqDate(reqDate);
+            request.setOrgReqDate(orgReqDate);
+            request.addExtendInfo("org_req_seq_id", orgReqSeqId);
             request.setOrdAmt(formatAmount(refundAmount));
             request.addExtendInfo("remark", reason);
             Map<String, Object> response = BasePayClient.request(request);
-            log.info("Refund response: {}", response);
+            log.info("Refund response for orderNo={}: {}", orderNo, response);
             return response;
         } catch (Exception e) {
             log.error("refund failed", e);

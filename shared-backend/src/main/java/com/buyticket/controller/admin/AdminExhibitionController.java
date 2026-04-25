@@ -17,7 +17,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -46,12 +45,26 @@ public class AdminExhibitionController {
                          @RequestParam(required = false) Integer status) {
         Page<Exhibition> pageInfo = new Page<>(page, size);
         LambdaQueryWrapper<Exhibition> queryWrapper = new LambdaQueryWrapper<>();
-        
+        LocalDate today = LocalDate.now();
+
         if (status != null) {
-            queryWrapper.eq(Exhibition::getStatus, status);
+            if (status == 1) {
+                queryWrapper.le(Exhibition::getStartDate, today)
+                        .ge(Exhibition::getEndDate, today);
+            } else if (status == 0) {
+                queryWrapper.gt(Exhibition::getStartDate, today);
+            } else if (status == 2) {
+                queryWrapper.lt(Exhibition::getEndDate, today);
+            }
+            queryWrapper.orderByAsc(Exhibition::getStartDate)
+                    .orderByAsc(Exhibition::getEndDate);
+        } else {
+            queryWrapper.last("ORDER BY CASE " +
+                    "WHEN start_date <= CURDATE() AND end_date >= CURDATE() THEN 0 " +
+                    "WHEN start_date > CURDATE() THEN 1 " +
+                    "ELSE 2 END ASC, start_date ASC, end_date ASC");
         }
-        queryWrapper.orderByDesc(Exhibition::getStartDate);
-        
+
         Page<Exhibition> exhibitionPage = exhibitionService.page(pageInfo, queryWrapper);
         
         // 转换为DTO并添加统计数据
@@ -63,7 +76,6 @@ public class AdminExhibitionController {
             BeanUtils.copyProperties(exhibition, dto);
             
             // 动态计算展览状态
-            LocalDate today = LocalDate.now();
             int exhibitionStatus;
             if (today.isBefore(exhibition.getStartDate())) {
                 exhibitionStatus = 0; // 待开始

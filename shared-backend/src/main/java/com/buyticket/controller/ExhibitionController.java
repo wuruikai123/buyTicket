@@ -33,7 +33,7 @@ public class ExhibitionController {
             Exhibition::getStatus,
             Exhibition::getPrice,
             Exhibition::getTags,
-            Exhibition::getCoverImage,  // 添加封面图字段
+            Exhibition::getCoverImage,
             Exhibition::getCreateTime
         );
         
@@ -89,18 +89,17 @@ public class ExhibitionController {
             Exhibition::getStatus,
             Exhibition::getPrice,
             Exhibition::getTags,
-            Exhibition::getCoverImage,  // 添加封面图字段
+            Exhibition::getCoverImage,
             Exhibition::getCreateTime
         );
         
-        queryWrapper.orderByDesc(Exhibition::getStartDate);
+        queryWrapper.orderByAsc(Exhibition::getStartDate);
         List<Exhibition> allExhibitions = exhibitionService.list(queryWrapper);
         
-        // 动态计算状态并过滤
+        // 动态计算状态并过滤排序
         java.time.LocalDate today = java.time.LocalDate.now();
         List<Exhibition> filteredList = allExhibitions.stream()
-            .filter(exhibition -> {
-                // 动态计算状态
+            .peek(exhibition -> {
                 int exhibitionStatus;
                 if (today.isBefore(exhibition.getStartDate())) {
                     exhibitionStatus = 0; // 待开始
@@ -109,24 +108,29 @@ public class ExhibitionController {
                 } else {
                     exhibitionStatus = 1; // 进行中
                 }
-                
-                // 更新展览对象的状态（用于返回）
                 exhibition.setStatus(exhibitionStatus);
-                
-                // 过滤掉已结束的展览
-                if (exhibitionStatus == 2) {
-                    return false;
-                }
-                
-                // 根据参数过滤
-                if ("ongoing".equals(status)) {
-                    return exhibitionStatus == 1;
-                } else if ("upcoming".equals(status)) {
-                    return exhibitionStatus == 0;
-                }
-                
-                return true; // 没有指定status参数，返回所有未结束的
             })
+            .filter(exhibition -> {
+                if ("ongoing".equals(status)) {
+                    return exhibition.getStatus() == 1;
+                }
+                if ("upcoming".equals(status)) {
+                    return exhibition.getStatus() == 0;
+                }
+                // 用户端默认展示全部展览：进行中在前，待开始其次，已结束最后
+                return true;
+            })
+            .sorted(java.util.Comparator
+                .comparingInt((Exhibition exhibition) -> {
+                    if (exhibition.getStatus() == 1) {
+                        return 0;
+                    }
+                    if (exhibition.getStatus() == 0) {
+                        return 1;
+                    }
+                    return 2;
+                })
+                .thenComparing(Exhibition::getStartDate))
             .collect(java.util.stream.Collectors.toList());
         
         return JsonData.buildSuccess(filteredList);

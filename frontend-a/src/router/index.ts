@@ -87,18 +87,13 @@ const router = createRouter({
         {
           path: 'huifu-payment/:orderId',
           name: 'HuifuPayment',
-          component: () => import('@/views/HuifuPayment.vue'),
+          redirect: to => ({ name: 'Payment', params: { orderId: to.params.orderId }, query: to.query }),
           meta: { title: '支付订单' }
         },
         {
           path: 'order-success',
           name: 'OrderSuccess',
           component: () => import('@/views/OrderSuccess.vue'),
-        },
-        {
-          path: 'wechat-pay-callback',
-          name: 'WechatPayCallback',
-          component: () => import('@/views/WechatPayCallback.vue'),
         },
         {
           path: 'about',

@@ -41,16 +41,24 @@ alipay:
 
 aliyun:
   sms:
-    enabled: false
-    accessKeyId: ""
-    accessKeySecret: ""
-    signName: "元星河文化"
-    templateCode: "SMS_501865326"
+    enabled: true
+    accessKeyId: "${ALIYUN_SMS_ACCESS_KEY_ID:}"
+    accessKeySecret: "${ALIYUN_SMS_ACCESS_KEY_SECRET:}"
+    signName: "${ALIYUN_SMS_SIGN_NAME:元星河文化}"
+    templateCode: "${ALIYUN_SMS_TEMPLATE_CODE:SMS_501865326}"
 
-# 微信公众号配置
+# 微信支付配置
 wechat:
-  app-id: "wxf5b4629dc8260f04"
-  app-secret: "YOUR_WECHAT_APP_SECRET"  # 请填入微信公众号AppSecret
+  app-id: "wx3a3c4f5703ae7256"
+  app-secret: "8cba1ffdb00d141f38ebc31fd4233cb1"
+  mch-id: "1729932572"
+  api-v3-key: "7fK9pX2tM4qR6vB8nL1dH3gW5yS7zA9cD0eF2hI4jG6k"
+  merchant-serial-number: "6D74FDD357E755F298C49222349A1E0293DAC8B5"
+  private-key-path: "${WECHAT_PRIVATE_KEY_PATH:appkey/apiclient_key.pem}"
+  notify-url: "https://ai-yishuguan.com/api/v1/wechat-pay/notify"
+  platform-certificate-path: "${WECHAT_PLATFORM_CERT_PATH:}"
+  # 生产建议配置 WECHAT_PLATFORM_CERT_PATH 并开启验签
+  verify-notify-signature: ${WECHAT_VERIFY_NOTIFY_SIGNATURE:false}
 
 # 汇付宝支付配置
 huifu:

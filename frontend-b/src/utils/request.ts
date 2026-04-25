@@ -13,7 +13,10 @@ request.interceptors.request.use(
   (config) => {
     const authStore = useAuthStore()
     if (authStore.token) {
-      config.headers.Authorization = authStore.token
+      const token = authStore.token.startsWith('Bearer ')
+        ? authStore.token
+        : `Bearer ${authStore.token}`
+      config.headers.Authorization = token
     }
     return config
   },

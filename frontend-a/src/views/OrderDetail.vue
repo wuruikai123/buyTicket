@@ -127,8 +127,7 @@
       </div>
 
       <div class="action-section" v-if="order.status === 0">
-        <el-button type="primary" size="large" @click="handlePay">支付宝支付</el-button>
-        <el-button type="success" size="large" @click="handleHuifuPay">汇付宝支付</el-button>
+        <el-button type="primary" size="large" @click="handlePay">立即支付</el-button>
         <el-button size="large" @click="handleCancel">取消订单</el-button>
         <el-button size="large" @click="loadOrderDetail">刷新状态</el-button>
       </div>
@@ -277,9 +276,6 @@ const handlePay = () => {
   router.push({ name: 'Payment', params: { orderId: order.value.id }, query: { type: orderType.value } })
 }
 
-const handleHuifuPay = () => {
-  router.push({ name: 'HuifuPayment', params: { orderId: order.value.id }, query: { type: orderType.value } })
-}
 
 const handleCancel = async () => {
   try {

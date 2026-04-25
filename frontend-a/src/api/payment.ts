@@ -5,18 +5,9 @@ export interface AlipayCreateRequest {
   returnUrl?: string
 }
 
-export interface WechatCreateRequest {
+export interface WechatJsapiCreateRequest {
   orderNo: string
-  returnUrl?: string
-}
-
-const WECHAT_APP_ID = 'wxf5b4629dc8260f04'
-
-// 发起微信网页授权，获取 code（会跳转离开当前页）
-export function redirectToWechatAuth(orderNo: string) {
-  const redirectUri = encodeURIComponent(`${window.location.origin}/wechat-pay-callback?orderNo=${orderNo}`)
-  const authUrl = `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${WECHAT_APP_ID}&redirect_uri=${redirectUri}&response_type=code&scope=snsapi_base&state=${orderNo}#wechat_redirect`
-  window.location.href = authUrl
+  code: string
 }
 
 export const paymentApi = {
@@ -42,24 +33,36 @@ export const paymentApi = {
     })
   },
 
-  // 用微信授权 code 换取 openid
-  getWechatOpenId(code: string) {
-    return request.get<any, { openid: string; sub_appid: string }>('/huifu-pay/wechat-openid', { params: { code } })
+  // 获取微信JSAPI授权地址
+  getWechatOauthUrl(params: { orderNo: string; redirectUri: string; state?: string }) {
+    return request.get<any, { oauth_url: string }>('/wechat-pay/oauth-url', { params })
   },
 
-  // 创建微信支付（需先调用 redirectToWechatAuth 获取 code，再换 openid，最后调此接口）
-  createWechatPay(data: WechatCreateRequest & { subOpenId: string }) {
-    return request.post<any, { pay_url: string; order_no: string }>('/huifu-pay/create', null, { 
-      params: { 
-        orderNo: data.orderNo, 
-        payType: 'WECHAT',
-        subAppId: WECHAT_APP_ID,
-        subOpenId: data.subOpenId
-      } 
+  // 创建微信JSAPI支付订单，返回wx.chooseWXPay所需参数
+  createWechatJsapiPay(data: WechatJsapiCreateRequest) {
+    return request.post<any, {
+      appId: string
+      timeStamp: string
+      nonceStr: string
+      package: string
+      signType: string
+      paySign: string
+      prepay_id: string
+      order_no: string
+    }>('/wechat-pay/create-jsapi', null, {
+      params: {
+        orderNo: data.orderNo,
+        code: data.code
+      }
     })
   },
 
-  // 查询支付状态（使用汇付宝）
+  // 查询微信支付状态（直连微信支付）
+  queryWechatPayment(params: { orderNo: string }) {
+    return request.get<any, { paid: boolean; trade_state?: string; transaction_id?: string }>('/wechat-pay/query', { params })
+  },
+
+  // 查询支付状态（支付宝仍使用汇付）
   queryPayment(params: { orderNo: string }) {
     return request.get<any, { status: string; tradeNo?: string }>('/huifu-pay/query', { params })
   }

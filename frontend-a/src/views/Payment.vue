@@ -66,7 +66,7 @@
         </div>
       </div>
 
-      <div class="payment-actions">
+      <div class="payment-actions" v-if="!qrCodeUrl">
         <button class="btn-cancel" @click="handleCancel">取消订单</button>
         <button 
           class="btn-pay" 
@@ -75,6 +75,19 @@
         >
           {{ paying ? '跳转中...' : '立即支付' }}
         </button>
+      </div>
+
+      <div class="qr-section" v-if="qrCodeUrl">
+        <div class="qr-tip">请使用微信扫描下方二维码完成支付</div>
+        <div class="qr-wrapper">
+          <qrcode-vue :value="qrCodeUrl" :size="220" level="H" />
+        </div>
+        <div class="qr-actions">
+          <button class="btn-paid" :disabled="checking" @click="handleCheckPaid">
+            {{ checking ? '查询中...' : '我已完成支付' }}
+          </button>
+          <button class="btn-reselect" @click="resetWechatPay">重新选择</button>
+        </div>
       </div>
 
       <div class="payment-tips">
@@ -87,12 +100,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { paymentApi } from '@/api/payment'
 import { ticketApi } from '@/api/ticket'
 import { mallApi } from '@/api/mall'
+import QrcodeVue from 'qrcode.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -102,8 +116,20 @@ const orderType = ref<'ticket' | 'mall'>('ticket')
 const orderInfo = ref<any>(null)
 const selectedMethod = ref<string>('wechat')
 const paying = ref(false)
+const qrCodeUrl = ref('')
+const checking = ref(false)
+const pollTimer = ref<number | undefined>(undefined)
 
-// 加载订单信息
+const isWechatBrowser = () => /micromessenger/i.test(window.navigator.userAgent)
+
+const parseQueryFromHash = (key: string) => {
+  const hash = window.location.hash || ''
+  const idx = hash.indexOf('?')
+  if (idx < 0) return ''
+  const query = new URLSearchParams(hash.substring(idx + 1))
+  return query.get(key) || ''
+}
+
 const loadOrderInfo = async () => {
   try {
     orderId.value = parseInt(route.params.orderId as string)
@@ -115,9 +141,8 @@ const loadOrderInfo = async () => {
       orderInfo.value = await mallApi.getOrderDetail(orderId.value)
     }
 
-    // 检查订单状态
     if (!orderInfo.value || orderInfo.value.status !== 0) {
-      ElMessage.warning('订单状态异常，无法支付')
+      ElMessage.warning('当前订单已支付或状态已变更，请在“我的”页面查看')
       router.push('/profile')
     }
   } catch (error: any) {
@@ -126,7 +151,118 @@ const loadOrderInfo = async () => {
   }
 }
 
-// 处理支付
+const stopPolling = () => {
+  if (pollTimer.value) {
+    clearInterval(pollTimer.value)
+    pollTimer.value = undefined
+  }
+}
+
+const startPolling = (orderNo: string) => {
+  stopPolling()
+  let attempts = 0
+  const maxAttempts = 30
+  pollTimer.value = setInterval(async () => {
+    attempts++
+    if (attempts > maxAttempts) {
+      stopPolling()
+      return
+    }
+    try {
+      const result = await paymentApi.queryWechatPayment({ orderNo })
+      if (result?.paid) {
+        stopPolling()
+        ElMessage.success('支付成功！订单状态已更新')
+        setTimeout(() => router.push('/profile'), 1200)
+      }
+    } catch (_) {
+      // ignore polling errors
+    }
+  }, 3000) as unknown as number
+}
+
+const resetWechatPay = () => {
+  qrCodeUrl.value = ''
+  stopPolling()
+}
+
+const handleCheckPaid = async () => {
+  const orderNo = orderInfo.value?.orderNo
+  if (!orderNo) return
+  checking.value = true
+  try {
+    const result = await paymentApi.queryWechatPayment({ orderNo })
+    if (result?.paid) {
+      stopPolling()
+      ElMessage.success('支付成功！订单状态已更新')
+      setTimeout(() => router.push('/profile'), 1200)
+    } else {
+      ElMessage.warning('暂未检测到支付成功，请稍后再试')
+    }
+  } catch (error: any) {
+    ElMessage.error(error.message || '查询支付状态失败')
+  } finally {
+    checking.value = false
+  }
+}
+
+const doWechatJsapiPay = async (orderNo: string, code: string) => {
+  const jsapiParams = await paymentApi.createWechatJsapiPay({ orderNo, code })
+  const wx = (window as any).WeixinJSBridge
+  if (!wx || typeof wx.invoke !== 'function') {
+    throw new Error('未检测到微信JSAPI环境，请在微信内打开')
+  }
+
+  wx.invoke(
+    'getBrandWCPayRequest',
+    {
+      appId: jsapiParams.appId,
+      timeStamp: jsapiParams.timeStamp,
+      nonceStr: jsapiParams.nonceStr,
+      package: jsapiParams.package,
+      signType: jsapiParams.signType,
+      paySign: jsapiParams.paySign
+    },
+    (res: any) => {
+      const msg = res?.err_msg || ''
+      if (msg === 'get_brand_wcpay_request:ok') {
+        ElMessage.success('支付成功，正在确认订单状态')
+        startPolling(orderNo)
+      } else if (msg === 'get_brand_wcpay_request:cancel') {
+        ElMessage.warning('已取消支付')
+      } else {
+        ElMessage.error('支付失败：' + msg)
+      }
+    }
+  )
+}
+
+const handleWechatPay = async (orderNo: string) => {
+  if (!isWechatBrowser()) {
+    ElMessage.warning('JSAPI支付仅支持在微信内打开，请使用微信打开当前页面')
+    return
+  }
+
+  const code = parseQueryFromHash('code') || (route.query.code as string) || ''
+  const state = parseQueryFromHash('state') || (route.query.state as string) || ''
+
+  if (!code) {
+    const redirectUri = window.location.href
+    const oauth = await paymentApi.getWechatOauthUrl({ orderNo, redirectUri, state: 'jsapi' })
+    if (!oauth?.oauth_url) {
+      throw new Error('获取微信授权地址失败')
+    }
+    window.location.href = oauth.oauth_url
+    return
+  }
+
+  if (state && !String(state).includes(orderNo)) {
+    throw new Error('微信授权状态校验失败，请返回重试')
+  }
+
+  await doWechatJsapiPay(orderNo, code)
+}
+
 const handlePay = async () => {
   if (!selectedMethod.value || paying.value) return
 
@@ -137,32 +273,28 @@ const handlePay = async () => {
       throw new Error('订单号不存在')
     }
 
-    let payUrl: string | null = null
+    const orderNo = orderInfo.value.orderNo
 
     if (selectedMethod.value === 'wechat') {
-      // 微信支付：先跳转微信授权获取 openid，回调页再下单
-      const { redirectToWechatAuth } = await import('@/api/payment')
-      redirectToWechatAuth(orderInfo.value.orderNo)
-      return // 页面会跳转，不需要继续执行
-    } else if (selectedMethod.value === 'alipay') {
-      // 支付宝支付（使用汇付宝）
-      const response = await paymentApi.createAlipayPc({ orderNo: orderInfo.value.orderNo })
-      payUrl = response?.pay_url
+      await handleWechatPay(orderNo)
+      return
     }
 
+    const response = await paymentApi.createAlipayPc({ orderNo })
+    const payUrl = response?.pay_url
+
     if (payUrl) {
-      // 跳转到汇付宝支付页面
       window.location.href = payUrl
     } else {
       throw new Error('获取支付链接失败')
     }
   } catch (error: any) {
-    paying.value = false
     ElMessage.error(error.message || '发起支付失败')
+  } finally {
+    paying.value = false
   }
 }
 
-// 取消订单
 const handleCancel = async () => {
   try {
     await ElMessageBox.confirm('确定要取消订单吗？', '提示', {
@@ -188,6 +320,10 @@ const handleCancel = async () => {
 
 onMounted(() => {
   loadOrderInfo()
+})
+
+onUnmounted(() => {
+  stopPolling()
 })
 </script>
 
@@ -387,6 +523,60 @@ onMounted(() => {
   font-size: 12px;
   color: #666;
   line-height: 1.6;
+}
+
+.qr-section {
+  text-align: center;
+  padding: 8px 0 16px;
+}
+
+.qr-tip {
+  font-size: 15px;
+  color: #333;
+  margin-bottom: 16px;
+  font-weight: 500;
+}
+
+.qr-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+  padding: 20px;
+  background: #f9f9f9;
+  border-radius: 12px;
+  border: 1px solid #e8e8e8;
+}
+
+.qr-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.btn-paid {
+  padding: 12px 28px;
+  background: #1677ff;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.btn-paid:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-reselect {
+  padding: 12px 20px;
+  background: #f0f0f0;
+  color: #666;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  cursor: pointer;
 }
 
 @media (max-width: 768px) {

@@ -15,7 +15,7 @@
           <el-button type="primary" @click="handleVerifyByOrderNo">核销订单</el-button>
         </el-form-item>
         <el-form-item label="订单状态">
-          <el-select v-model="searchForm.status" placeholder="请选择状态" clearable>
+          <el-select v-model="searchForm.status" placeholder="请选择状态" clearable @change="handleSearch">
             <el-option label="全部" :value="undefined" />
             <el-option label="待使用" :value="1" />
             <el-option label="已使用" :value="2" />
@@ -25,7 +25,7 @@
           </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="fetchData">查询</el-button>
+          <el-button type="primary" @click="handleSearch">查询</el-button>
         </el-form-item>
       </el-form>
 
@@ -171,6 +171,11 @@ const fetchData = async () => {
   }
 }
 
+const handleSearch = () => {
+  currentPage.value = 1
+  fetchData()
+}
+
 const handleVerifyByOrderNo = async () => {
   if (!verifyOrderNo.value.trim()) {
     ElMessage.warning('请输入订单号')
@@ -181,7 +186,6 @@ const handleVerifyByOrderNo = async () => {
     await ElMessageBox.confirm('确定要核销订单 ' + verifyOrderNo.value + ' 吗？', '提示', {
       type: 'warning'
     })
-    // 使用 admin 端点
     await request.post('/admin/order/ticket/verify', { orderNo: verifyOrderNo.value.trim() })
     ElMessage.success('核销成功')
     verifyOrderNo.value = ''

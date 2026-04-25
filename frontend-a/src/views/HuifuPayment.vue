@@ -79,9 +79,9 @@
         </button>
       </div>
 
-      <!-- 支付宝二维码展示区 -->
+      <!-- 扫码支付展示区 -->
       <div class="qr-section" v-if="qrCodeUrl">
-        <div class="qr-tip">请使用支付宝扫描下方二维码完成支付</div>
+        <div class="qr-tip">请使用{{ qrCodePayType === 'WECHAT' ? '微信' : '支付宝' }}扫描下方二维码完成支付</div>
         <div class="qr-wrapper">
           <qrcode-vue :value="qrCodeUrl" :size="220" level="H" />
         </div>
@@ -89,7 +89,7 @@
           <button class="btn-paid" :disabled="checking" @click="handleCheckPaid">
             {{ checking ? '查询中...' : '我已完成支付' }}
           </button>
-          <button class="btn-reselect" @click="qrCodeUrl = ''; stopPolling()">重新选择</button>
+          <button class="btn-reselect" @click="qrCodeUrl = ''; qrCodePayType = ''; stopPolling()">重新选择</button>
         </div>
       </div>
 
@@ -119,8 +119,9 @@ const orderType = ref<'ticket' | 'mall'>('ticket')
 const orderInfo = ref<any>(null)
 const selectedMethod = ref<'WECHAT' | 'ALIPAY' | ''>('')
 const paying = ref(false)
-const qrCodeUrl = ref('')        // 支付宝二维码
-const checking = ref(false)      // 正在查单
+const qrCodeUrl = ref('')
+const qrCodePayType = ref<'WECHAT' | 'ALIPAY' | ''>('')
+const checking = ref(false)
 const pollTimer = ref<number | undefined>(undefined)
 
 // 加载订单信息
@@ -137,7 +138,7 @@ const loadOrderInfo = async () => {
 
     // 检查订单状态
     if (!orderInfo.value || orderInfo.value.status !== 0) {
-      ElMessage.warning('订单状态异常，无法支付')
+      ElMessage.warning('当前订单已支付或状态已变更，请在“我的”页面查看')
       router.push('/profile')
     }
   } catch (error: any) {
@@ -237,16 +238,17 @@ const handlePay = async () => {
 
     const payUrl = response.pay_url
 
-    // 支付宝扫码（qr.alipay.com 或非 http 链接）=> 展示二维码
+    // 微信原生支付、支付宝扫码支付 => 展示二维码
     if (
-      selectedMethod.value === 'ALIPAY' &&
-      (payUrl.startsWith('https://qr.alipay.com') || !payUrl.startsWith('http'))
+      (selectedMethod.value === 'WECHAT' || selectedMethod.value === 'ALIPAY') &&
+      (!payUrl.startsWith('http') || payUrl.startsWith('weixin://') || payUrl.startsWith('https://qr.alipay.com'))
     ) {
       qrCodeUrl.value = payUrl
+      qrCodePayType.value = selectedMethod.value
       startPolling(orderInfo.value.orderNo)
     } else {
-      // H5 跳转
       stopPolling()
+      qrCodePayType.value = ''
       window.location.href = payUrl
     }
   } catch (error: any) {

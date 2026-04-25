@@ -12,9 +12,9 @@ public interface HuifuPayService {
      * @param orderNo 订单号
      * @param amount 支付金额（单位：元）
      * @param subject 商品标题
-     * @param payType 支付类型：WECHAT(微信) 或 ALIPAY(支付宝)
-     * @param subAppId 微信小程序AppID（T_MINIAPP时必填，其他可传null）
-     * @param subOpenId 微信用户OpenID（T_MINIAPP时必填，其他可传null）
+     * @param payType 支付类型：ALIPAY(支付宝)
+     * @param subAppId 预留参数
+     * @param subOpenId 预留参数
      * @return 支付URL或二维码字符串
      */
     String createPayment(String orderNo, String amount, String subject, String payType, String subAppId, String subOpenId);
