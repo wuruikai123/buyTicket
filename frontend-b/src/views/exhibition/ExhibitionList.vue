@@ -22,6 +22,7 @@
         </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="searchForm.status" placeholder="全部" clearable>
+            <el-option label="未上架" :value="-1" />
             <el-option label="待开始" :value="0" />
             <el-option label="进行中" :value="1" />
             <el-option label="已结束" :value="2" />
@@ -59,9 +60,16 @@
         <el-table-column prop="salesAmount" label="销售额" width="100">
           <template #default="{ row }">¥{{ row.salesAmount }}</template>
         </el-table-column>
-        <el-table-column label="操作" fixed="right" width="150">
+        <el-table-column label="操作" fixed="right" width="210">
           <template #default="{ row }">
             <el-button link type="primary" @click="handleView(row)">详情</el-button>
+            <el-button
+              link
+              :type="row.status === -1 ? 'success' : 'warning'"
+              @click="handleToggleStatus(row)"
+            >
+              {{ row.status === -1 ? '上架' : '下架' }}
+            </el-button>
             <!-- 删除编辑按钮 - 点击详情即可查看和编辑 -->
             <!-- <el-button link type="primary" @click="handleEdit(row)">编辑</el-button> -->
             <el-button link type="danger" @click="handleDelete(row)">删除</el-button>
@@ -105,12 +113,12 @@ const pagination = reactive({
 })
 
 const getStatusType = (status: number) => {
-  const types: Record<number, string> = { 0: 'info', 1: 'success', 2: 'danger' }
+  const types: Record<number, string> = { [-1]: 'warning', 0: 'info', 1: 'success', 2: 'danger' }
   return types[status] || 'info'
 }
 
 const getStatusText = (status: number) => {
-  const texts: Record<number, string> = { 0: '待开始', 1: '进行中', 2: '已结束' }
+  const texts: Record<number, string> = { [-1]: '未上架', 0: '待开始', 1: '进行中', 2: '已结束' }
   return texts[status] || '未知'
 }
 
@@ -157,6 +165,25 @@ const handleView = (row: any) => {
 
 const handleEdit = (row: any) => {
   router.push(`/exhibition/edit/${row.id}`)
+}
+
+const handleToggleStatus = async (row: any) => {
+  const targetStatus = row.status === -1 ? 1 : -1
+  const actionText = row.status === -1 ? '上架' : '下架'
+  try {
+    await ElMessageBox.confirm(`确定要${actionText}该展览吗？`, '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    await exhibitionApi.updateStatus(row.id, targetStatus)
+    ElMessage.success(`${actionText}成功`)
+    loadData()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(`${actionText}失败`)
+    }
+  }
 }
 
 const handleDelete = async (row: any) => {

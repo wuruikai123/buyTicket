@@ -45,6 +45,10 @@ public class ExhibitionController {
         Exhibition currentExhibition = null;
         
         for (Exhibition exhibition : allExhibitions) {
+            if (exhibition.getStatus() != null && exhibition.getStatus() == -1) {
+                continue;
+            }
+
             int exhibitionStatus;
             if (today.isBefore(exhibition.getStartDate())) {
                 exhibitionStatus = 0; // 待开始
@@ -101,7 +105,9 @@ public class ExhibitionController {
         List<Exhibition> filteredList = allExhibitions.stream()
             .peek(exhibition -> {
                 int exhibitionStatus;
-                if (today.isBefore(exhibition.getStartDate())) {
+                if (exhibition.getStatus() != null && exhibition.getStatus() == -1) {
+                    exhibitionStatus = -1; // 未上架
+                } else if (today.isBefore(exhibition.getStartDate())) {
                     exhibitionStatus = 0; // 待开始
                 } else if (today.isAfter(exhibition.getEndDate())) {
                     exhibitionStatus = 2; // 已结束
@@ -111,6 +117,10 @@ public class ExhibitionController {
                 exhibition.setStatus(exhibitionStatus);
             })
             .filter(exhibition -> {
+                // 用户端不展示未上架展览
+                if (exhibition.getStatus() != null && exhibition.getStatus() == -1) {
+                    return false;
+                }
                 if ("ongoing".equals(status)) {
                     return exhibition.getStatus() == 1;
                 }

@@ -48,18 +48,24 @@ public class AdminExhibitionController {
         LocalDate today = LocalDate.now();
 
         if (status != null) {
-            if (status == 1) {
-                queryWrapper.le(Exhibition::getStartDate, today)
-                        .ge(Exhibition::getEndDate, today);
-            } else if (status == 0) {
-                queryWrapper.gt(Exhibition::getStartDate, today);
-            } else if (status == 2) {
-                queryWrapper.lt(Exhibition::getEndDate, today);
+            if (status == -1) {
+                queryWrapper.eq(Exhibition::getStatus, -1);
+            } else {
+                queryWrapper.ne(Exhibition::getStatus, -1);
+                if (status == 1) {
+                    queryWrapper.le(Exhibition::getStartDate, today)
+                            .ge(Exhibition::getEndDate, today);
+                } else if (status == 0) {
+                    queryWrapper.gt(Exhibition::getStartDate, today);
+                } else if (status == 2) {
+                    queryWrapper.lt(Exhibition::getEndDate, today);
+                }
             }
             queryWrapper.orderByAsc(Exhibition::getStartDate)
                     .orderByAsc(Exhibition::getEndDate);
         } else {
             queryWrapper.last("ORDER BY CASE " +
+                    "WHEN status = -1 THEN 3 " +
                     "WHEN start_date <= CURDATE() AND end_date >= CURDATE() THEN 0 " +
                     "WHEN start_date > CURDATE() THEN 1 " +
                     "ELSE 2 END ASC, start_date ASC, end_date ASC");
@@ -75,9 +81,11 @@ public class AdminExhibitionController {
             ExhibitionListDTO dto = new ExhibitionListDTO();
             BeanUtils.copyProperties(exhibition, dto);
             
-            // 动态计算展览状态
+            // 动态计算展览状态（支持手动下架：-1）
             int exhibitionStatus;
-            if (today.isBefore(exhibition.getStartDate())) {
+            if (exhibition.getStatus() != null && exhibition.getStatus() == -1) {
+                exhibitionStatus = -1; // 未上架
+            } else if (today.isBefore(exhibition.getStartDate())) {
                 exhibitionStatus = 0; // 待开始
             } else if (today.isAfter(exhibition.getEndDate())) {
                 exhibitionStatus = 2; // 已结束
