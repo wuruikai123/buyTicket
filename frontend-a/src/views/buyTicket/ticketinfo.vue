@@ -12,28 +12,69 @@
         <!-- 联系人信息 -->
         <div class="contact-section">
             <div class="contact-item">
-                <label class="contact-label">持票入场人真实姓名</label>
+                <label class="contact-label">联系人姓名</label>
                 <input 
                     v-model="contactName" 
                     type="text" 
                     class="contact-input" 
-                    placeholder="请输入姓名"
+                    placeholder="请输入联系人姓名"
                 />
             </div>
             <div class="contact-item">
-                <label class="contact-label">持票入场人身份证号</label>
+                <label class="contact-label">联系人手机号</label>
                 <input 
                     v-model="contactPhone" 
-                    type="text" 
+                    type="tel" 
                     class="contact-input" 
-                    placeholder="请输入身份证号"
-                    maxlength="18"
+                    placeholder="请输入联系人手机号"
+                    maxlength="11"
                 />
+            </div>
+        </div>
+
+        <!-- 购票者信息 -->
+        <div class="buyers-section">
+            <div class="section-header">
+                <h3 class="section-title">购票者信息</h3>
+                <span class="section-badge">每张票填写一份，最多6张</span>
+            </div>
+
+            <div class="buyers-summary">
+                <div class="summary-item">
+                    <span class="summary-label">已选票数</span>
+                    <span class="summary-value">{{ totalTicketCount }} 张</span>
+                </div>
+                <div class="summary-divider"></div>
+                <div class="summary-item">
+                    <span class="summary-label">待填写</span>
+                    <span class="summary-value">{{ buyers.length }} 份</span>
+                </div>
+            </div>
+
+            <div v-for="(buyer, index) in buyers" :key="index" class="buyer-card">
+                <div class="buyer-card-header">
+                    <div class="buyer-card-title">购票者 {{ index + 1 }}</div>
+                    <div class="buyer-card-subtitle">第 {{ index + 1 }} 张票对应信息</div>
+                </div>
+                <div class="buyer-form-grid">
+                    <div class="buyer-field">
+                        <label class="buyer-label">姓名</label>
+                        <input v-model="buyer.name" type="text" class="buyer-input" placeholder="请输入购票人姓名" />
+                    </div>
+                    <div class="buyer-field">
+                        <label class="buyer-label">身份证号</label>
+                        <input v-model="buyer.idCard" type="text" class="buyer-input" placeholder="请输入身份证号" maxlength="18" />
+                    </div>
+                </div>
             </div>
         </div>
 
         <!-- 票务选择区域 -->
         <div class="tickets-section">
+            <div class="section-header compact">
+                <h3 class="section-title">票务明细</h3>
+                <span class="section-badge">最多 {{ maxTickets }} 张</span>
+            </div>
             <div 
                 v-for="(ticket, index) in selectedTickets" 
                 :key="index"
@@ -42,11 +83,17 @@
                 <div class="ticket-date">{{ ticket.dateTime }}</div>
                 <div class="ticket-quantity-fixed">
                     <span class="quantity-label">数量：</span>
-                    <span class="quantity-number-fixed">1张</span>
+                    <div class="quantity-stepper">
+                        <button class="stepper-btn" type="button" @click="decreaseTicket(ticket)">-</button>
+                        <span class="quantity-number-fixed">{{ ticket.quantity }}张</span>
+                        <button class="stepper-btn" type="button" @click="increaseTicket(ticket)">+</button>
+                    </div>
                 </div>
                 <div class="ticket-price">¥{{ ticket.totalPrice }}</div>
             </div>
-
+            <div class="ticket-actions">
+                <button class="ticket-action-btn add" type="button" @click="addTicketSlot">添加一张票</button>
+            </div>
         </div>
 
         <!-- 服务协议 -->
@@ -71,7 +118,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
-import { ArrowLeft, Plus, Minus } from '@element-plus/icons-vue';
+import { ArrowLeft } from '@element-plus/icons-vue';
 import { ticketApi } from '@/api/ticket';
 import { exhibitionApi } from '@/api/exhibition';
 
@@ -82,6 +129,11 @@ interface Ticket {
     quantity: number;
     unitPrice: number;
     totalPrice: number;
+}
+
+interface BuyerInfo {
+    name: string;
+    idCard: string;
 }
 
 const router = useRouter();
@@ -100,6 +152,8 @@ const contactPhone = ref('');
 
 // 选中的票务列表
 const selectedTickets = ref<Ticket[]>([]);
+const buyers = ref<BuyerInfo[]>([]);
+const maxTickets = 6;
 
 // 服务协议内容
 const agreementLines = ref([
@@ -114,7 +168,61 @@ const totalAmount = computed(() => {
     return selectedTickets.value.reduce((sum, ticket) => sum + ticket.totalPrice, 0);
 });
 
-// 注意：数量固定为1，不再提供增减功能
+const totalTicketCount = computed(() => selectedTickets.value.reduce((sum, ticket) => sum + ticket.quantity, 0));
+
+const syncBuyerRows = () => {
+    const count = totalTicketCount.value;
+    const next = Array.from({ length: count }, (_, index) => buyers.value[index] || { name: '', idCard: '' });
+    buyers.value = next;
+};
+
+const addTicketSlot = () => {
+    if (totalTicketCount.value >= maxTickets) {
+        alert(`单笔订单最多支持${maxTickets}张票`);
+        return;
+    }
+    if (selectedTickets.value.length === 0) {
+        alert('请先选择日期和场次');
+        return;
+    }
+    const firstTicket = selectedTickets.value[0];
+    selectedTickets.value[0] = {
+        ...firstTicket,
+        quantity: firstTicket.quantity + 1,
+        totalPrice: (firstTicket.quantity + 1) * firstTicket.unitPrice
+    };
+    syncBuyerRows();
+};
+
+const increaseTicket = (ticket: Ticket) => {
+    if (totalTicketCount.value >= maxTickets) {
+        alert(`单笔订单最多支持${maxTickets}张票`);
+        return;
+    }
+    ticket.quantity += 1;
+    ticket.totalPrice = ticket.quantity * ticket.unitPrice;
+    syncBuyerRows();
+};
+
+const decreaseTicket = (ticket: Ticket) => {
+    if (ticket.quantity <= 1) {
+        if (selectedTickets.value.length <= 1) {
+            alert('至少保留1张票');
+            return;
+        }
+        const index = selectedTickets.value.indexOf(ticket);
+        if (index >= 0) {
+            selectedTickets.value.splice(index, 1);
+            syncBuyerRows();
+        }
+        return;
+    }
+    ticket.quantity -= 1;
+    ticket.totalPrice = ticket.quantity * ticket.unitPrice;
+    syncBuyerRows();
+};
+
+// 注意：每张票单独填写购票者信息
 
 // 返回上一页
 const goBack = () => {
@@ -162,21 +270,36 @@ const handlePayment = async () => {
         return;
     }
     
-    // 验证姓名
     if (contactName.value.trim().length < 2) {
         alert('请输入正确的姓名');
         return;
     }
-    
-    // 验证身份证号码
-    if (!validateIdCard(contactPhone.value)) {
-        alert('请输入正确的身份证号码');
+
+    if (!/^1\d{10}$/.test(contactPhone.value.trim())) {
+        alert('请输入正确的联系人手机号');
         return;
     }
 
     if (selectedTickets.value.length === 0) {
         alert('请选择票务');
         return;
+    }
+
+    if (totalTicketCount.value > maxTickets) {
+        alert('单笔订单最多支持6张票');
+        return;
+    }
+
+    if (buyers.value.length !== totalTicketCount.value) {
+        alert('请为每张票填写一份购票者信息');
+        return;
+    }
+
+    for (const buyer of buyers.value) {
+        if (!buyer.name.trim() || !validateIdCard(buyer.idCard)) {
+            alert('请完整填写所有购票者姓名和身份证号');
+            return;
+        }
     }
     
     try {
@@ -207,7 +330,8 @@ const handlePayment = async () => {
             contactName: contactName.value,
             contactPhone: contactPhone.value,
             totalAmount: totalAmount.value,
-            items: items
+            items: items,
+            buyers: buyers.value
         });
 
         if (createRes && createRes.orderId) {
@@ -246,6 +370,10 @@ const loadExhibition = async (id: number) => {
                     unitPrice: price,
                     totalPrice: price
                 }];
+                syncBuyerRows();
+            }
+            if (selectedTickets.value.length > 0) {
+                syncBuyerRows();
             }
         }
     } catch (e) {
@@ -365,6 +493,136 @@ onMounted(() => {
     margin-bottom: 12px;
 }
 
+.section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.section-header.compact {
+    margin-bottom: 12px;
+}
+
+.section-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0;
+}
+
+.section-badge {
+    font-size: 12px;
+    color: #213d7c;
+    background: #eef3ff;
+    padding: 6px 10px;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
+.buyers-summary {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    background: linear-gradient(135deg, #f7f9fc 0%, #eef3ff 100%);
+    border: 1px solid #e5ebf5;
+    border-radius: 12px;
+    margin-bottom: 16px;
+}
+
+.summary-item {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.summary-label {
+    font-size: 13px;
+    color: #6b7280;
+}
+
+.summary-value {
+    font-size: 14px;
+    font-weight: 700;
+    color: #111827;
+}
+
+.summary-divider {
+    width: 1px;
+    height: 24px;
+    background: #d8e1ee;
+}
+
+.buyer-card {
+    padding: 16px;
+    border: 1px solid #e7edf6;
+    border-radius: 14px;
+    background: #fafcff;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 10px rgba(33, 61, 124, 0.04);
+}
+
+.buyer-card-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.buyer-card-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #213d7c;
+}
+
+.buyer-card-subtitle {
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.buyer-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.buyer-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.buyer-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #4b5563;
+}
+
+.buyer-input {
+    height: 44px;
+    padding: 0 14px;
+    border: 1px solid #dce5f2;
+    border-radius: 10px;
+    font-size: 14px;
+    color: #111827;
+    background-color: white;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.buyer-input::placeholder {
+    color: #9ca3af;
+}
+
+.buyer-input:focus {
+    border-color: #213d7c;
+    box-shadow: 0 0 0 3px rgba(33, 61, 124, 0.12);
+}
+
 .ticket-item {
     display: flex;
     align-items: center;
@@ -388,6 +646,44 @@ onMounted(() => {
     display: flex;
     align-items: center;
     gap: 8px;
+}
+
+.quantity-stepper {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.stepper-btn {
+    width: 28px;
+    height: 28px;
+    border: 1px solid #dcdfe6;
+    background: #fff;
+    color: #213d7c;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+}
+
+.stepper-btn:hover {
+    background: #ecf5ff;
+    border-color: #213d7c;
+}
+
+.ticket-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 12px;
+}
+
+.ticket-action-btn {
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid #213d7c;
+    background: #213d7c;
+    color: #fff;
+    cursor: pointer;
 }
 
 .quantity-label {
@@ -502,8 +798,34 @@ onMounted(() => {
         padding: 16px;
     }
 
-    .tickets-section {
+    .tickets-section,
+    .buyers-section,
+    .agreement-section {
         padding: 16px;
+    }
+
+    .section-header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .buyers-summary {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .summary-divider {
+        width: 100%;
+        height: 1px;
+    }
+
+    .buyer-form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .buyer-card-header {
+        flex-direction: column;
+        align-items: flex-start;
     }
 
     .ticket-item {
@@ -513,10 +835,6 @@ onMounted(() => {
 
     .ticket-date {
         width: 100%;
-    }
-
-    .agreement-section {
-        padding: 16px;
     }
 
     .payment-bar {

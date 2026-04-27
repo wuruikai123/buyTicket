@@ -5,7 +5,7 @@
       <button class="back-button" @click="goBack">
         <el-icon><ArrowLeft /></el-icon>
       </button>
-      <h1 class="page-title">修改信息</h1>
+      <h1 class="page-title">修改头像</h1>
       <div class="header-placeholder"></div>
     </div>
 
@@ -13,15 +13,15 @@
       <!-- 头像 -->
       <div class="avatar-section">
         <div class="avatar" :style="{ backgroundImage: form.avatar ? `url(${form.avatar})` : '' }">
-          <span v-if="!form.avatar" class="avatar-placeholder">{{ form.username?.charAt(0) || '?' }}</span>
+          <span v-if="!form.avatar" class="avatar-placeholder">{{ (form.username || '?').charAt(0) }}</span>
         </div>
-        <el-button link type="primary" @click="handleChangeAvatar">更换头像</el-button>
+        <el-button link type="primary" @click="handleChangeAvatar">修改头像</el-button>
       </div>
 
       <!-- 表单 -->
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top" class="profile-form">
-        <el-form-item label="用户名">
-          <el-input v-model="form.username" disabled placeholder="用户名不可修改" />
+        <el-form-item label="用户名" prop="username">
+          <el-input v-model="form.username" placeholder="请输入用户名" maxlength="20" />
         </el-form-item>
 
         <el-form-item label="手机号" prop="phone">
@@ -66,6 +66,7 @@ import { ArrowLeft } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { userApi, type User } from '@/api/user'
+import request from '@/utils/request'
 
 const router = useRouter()
 const formRef = ref<FormInstance>()
@@ -87,6 +88,10 @@ const pwdForm = reactive({
 })
 
 const rules: FormRules = {
+  username: [
+    { required: true, message: '请输入用户名', trigger: 'blur' },
+    { max: 20, message: '用户名不能超过20个字符', trigger: 'blur' }
+  ],
   phone: [
     { pattern: /^1[3-9]\d{9}$/, message: '手机号格式不正确', trigger: 'blur' }
   ]
@@ -119,6 +124,7 @@ const loadUserInfo = async () => {
     const user = await userApi.getUserInfo()
     if (user) {
       form.username = user.username
+      form.name = user.name || user.username
       form.phone = user.phone || ''
       form.avatar = user.avatar || ''
     }
@@ -133,8 +139,40 @@ const goBack = () => {
   router.back()
 }
 
-const handleChangeAvatar = () => {
-  ElMessage.info('头像上传功能开发中')
+const handleChangeAvatar = async () => {
+  try {
+    const result = await new Promise<string | null>((resolve) => {
+      const input = document.createElement('input')
+      input.type = 'file'
+      input.accept = 'image/*'
+      input.onchange = async () => {
+        const file = input.files?.[0]
+        if (!file) {
+          resolve(null)
+          return
+        }
+        const formData = new FormData()
+        formData.append('file', file)
+        try {
+          const uploadResult: any = await request.post('/admin/file/upload', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          })
+          resolve(uploadResult?.url || null)
+        } catch (error: any) {
+          ElMessage.error(error.message || '头像上传失败')
+          resolve(null)
+        }
+      }
+      input.click()
+    })
+
+    if (!result) return
+    form.avatar = result
+    await userApi.updateProfile({ avatar: result })
+    ElMessage.success('头像修改成功')
+  } catch (error: any) {
+    ElMessage.error(error.message || '头像修改失败')
+  }
 }
 
 const handleSubmit = async () => {
@@ -144,7 +182,9 @@ const handleSubmit = async () => {
   submitting.value = true
   try {
     await userApi.updateUserInfo({
-      phone: form.phone
+      username: form.username,
+      phone: form.phone,
+      avatar: form.avatar
     })
     ElMessage.success('修改成功')
     // 更新localStorage中的用户信息

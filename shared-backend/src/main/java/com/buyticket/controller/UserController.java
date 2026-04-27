@@ -207,16 +207,35 @@ public class UserController {
     @PutMapping("/update")
     public JsonData updateUserInfo(@RequestBody SysUser updateReq) {
         Long userId = getCurrentUserId();
-        SysUser user = new SysUser();
-        user.setId(userId);
-        if (updateReq.getPhone() != null) {
-            user.setPhone(updateReq.getPhone());
+        if (userId == null) {
+            return JsonData.buildError("未登录");
         }
-        if (updateReq.getAvatar() != null) {
-            user.setAvatar(updateReq.getAvatar());
+        SysUser user = sysUserService.getById(userId);
+        if (user == null) {
+            return JsonData.buildError("用户不存在");
         }
-        sysUserService.updateById(user);
-        return JsonData.buildSuccess("更新成功");
+
+        if (updateReq.getUsername() != null && !updateReq.getUsername().trim().isEmpty()) {
+            String newUsername = updateReq.getUsername().trim();
+            LambdaQueryWrapper<SysUser> existsQuery = new LambdaQueryWrapper<>();
+            existsQuery.eq(SysUser::getUsername, newUsername).ne(SysUser::getId, userId);
+            if (sysUserService.count(existsQuery) > 0) {
+                return JsonData.buildError("用户名已存在");
+            }
+            user.setUsername(newUsername);
+        }
+        if (updateReq.getPhone() != null && !updateReq.getPhone().trim().isEmpty()) {
+            user.setPhone(updateReq.getPhone().trim());
+        }
+        if (updateReq.getAvatar() != null && !updateReq.getAvatar().trim().isEmpty()) {
+            user.setAvatar(updateReq.getAvatar().trim());
+        }
+
+        boolean success = sysUserService.updateById(user);
+        if (success) {
+            return JsonData.buildSuccess(user);
+        }
+        return JsonData.buildError("更新失败");
     }
 
     /**

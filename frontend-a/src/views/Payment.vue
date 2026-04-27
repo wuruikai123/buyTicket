@@ -237,6 +237,12 @@ const doWechatJsapiPay = async (orderNo: string, code: string) => {
   )
 }
 
+const getOauthRedirectUri = () => {
+  const url = new URL(window.location.href)
+  url.hash = url.hash.replace(/([?&])(code|state)=[^&]*/g, '$1').replace(/[?&]$/, '')
+  return url.toString()
+}
+
 const handleWechatPay = async (orderNo: string) => {
   if (!isWechatBrowser()) {
     ElMessage.warning('JSAPI支付仅支持在微信内打开，请使用微信打开当前页面')
@@ -247,7 +253,7 @@ const handleWechatPay = async (orderNo: string) => {
   const state = parseQueryFromHash('state') || (route.query.state as string) || ''
 
   if (!code) {
-    const redirectUri = window.location.href
+    const redirectUri = getOauthRedirectUri()
     const oauth = await paymentApi.getWechatOauthUrl({ orderNo, redirectUri, state: 'jsapi' })
     if (!oauth?.oauth_url) {
       throw new Error('获取微信授权地址失败')

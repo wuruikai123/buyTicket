@@ -191,6 +191,44 @@ public class WechatPayServiceImpl implements WechatPayService {
     }
 
     @Override
+    public Map<String, Object> refund(String orderNo, String refundAmount, String refundReason) {
+        ensureInitialized();
+        if (isBlank(orderNo)) {
+            throw new IllegalArgumentException("orderNo不能为空");
+        }
+        if (isBlank(refundAmount)) {
+            throw new IllegalArgumentException("refundAmount不能为空");
+        }
+        try {
+            Map<String, Object> requestBody = new HashMap<>();
+            requestBody.put("out_trade_no", orderNo);
+            requestBody.put("out_refund_no", "RF" + orderNo + System.currentTimeMillis());
+            requestBody.put("reason", isBlank(refundReason) ? "用户申请退款" : refundReason);
+
+            Map<String, Object> amountMap = new HashMap<>();
+            amountMap.put("refund", toFen(refundAmount));
+            amountMap.put("total", toFen(refundAmount));
+            amountMap.put("currency", "CNY");
+            requestBody.put("amount", amountMap);
+
+            String body = objectMapper.writeValueAsString(requestBody);
+            String path = "/v3/refund/domestic/refunds";
+            String responseText = doRequest(HttpMethod.POST, path, body);
+            Map<String, Object> responseMap = objectMapper.readValue(responseText, new TypeReference<Map<String, Object>>() {});
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("out_refund_no", stringValue(responseMap.get("out_refund_no")));
+            result.put("refund_id", stringValue(responseMap.get("refund_id")));
+            result.put("status", stringValue(responseMap.get("status")));
+            result.put("raw", responseMap);
+            return result;
+        } catch (Exception e) {
+            log.error("微信退款失败: orderNo={}", orderNo, e);
+            throw new RuntimeException("微信退款失败: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
     public void verifyNotifySignature(String timestamp, String nonce, String body, String signature, String serial) {
         ensureInitialized();
         if (Boolean.FALSE.equals(WechatPayConfig.verifyNotifySignature)) {

@@ -12,6 +12,8 @@ public interface WechatPayService {
 
     Map<String, Object> queryPaymentStatus(String orderNo);
 
+    Map<String, Object> refund(String orderNo, String refundAmount, String refundReason);
+
     void verifyNotifySignature(String timestamp, String nonce, String body, String signature, String serial);
 
     Map<String, Object> parseNotify(String requestBody, String nonce, String associatedData, String cipherText);

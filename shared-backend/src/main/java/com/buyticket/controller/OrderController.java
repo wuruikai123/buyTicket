@@ -387,9 +387,15 @@ public class OrderController {
             return JsonData.buildError("只有待支付的订单才能取消");
         }
         
-        // 恢复库存
-        restoreInventory(id);
-        
+        // 待支付订单未扣库存，无需恢复库存；同步取消子票状态
+        java.util.List<OrderItem> orderItems = orderItemService.list(
+            new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderId, id)
+        );
+        for (OrderItem item : orderItems) {
+            item.setTicketStatus(3);
+            orderItemMapper.updateById(item);
+        }
+
         // 更新订单状态
         order.setStatus(3); // 已取消
         ticketOrderService.updateById(order);

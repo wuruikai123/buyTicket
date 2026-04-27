@@ -17,7 +17,7 @@
                         <button class="header-btn" @click="goToLogin">登录</button>
                     </template>
                     <template v-else>
-                        <button class="header-btn" @click="showAvatarUpload = true">修改头像</button>
+                        <button class="header-btn" @click="openEditInfoDialog">修改信息</button>
                         <button class="header-btn" @click="handleLogout">退出登录</button>
                     </template>
                 </div>
@@ -91,45 +91,51 @@
             </template>
         </div>
 
-        <!-- 头像上传对话框 -->
+        <!-- 修改信息对话框 -->
         <el-dialog 
-            v-model="showAvatarUpload" 
-            title="修改头像" 
+            v-model="showEditInfoDialog" 
+            title="修改信息" 
             width="90%"
-            :style="{ maxWidth: '400px' }"
+            :style="{ maxWidth: '420px' }"
         >
-            <div class="avatar-upload-container">
-                <el-upload
-                    class="avatar-uploader"
-                    action="#"
-                    :show-file-list="false"
-                    :before-upload="beforeAvatarUpload"
-                    accept="image/*"
-                >
-                    <img v-if="avatarPreview" :src="avatarPreview" class="avatar-preview" />
-                    <div v-else class="avatar-upload-placeholder">
-                        <el-icon class="avatar-uploader-icon"><Plus /></el-icon>
-                        <div class="upload-text">点击上传头像</div>
-                    </div>
-                </el-upload>
+            <div class="edit-info-container">
+                <el-form :model="editForm" label-width="70px">
+                    <el-form-item label="用户名">
+                        <el-input v-model="editForm.username" placeholder="请输入用户名" maxlength="30" />
+                    </el-form-item>
+                    <el-form-item label="头像">
+                        <div class="avatar-edit-row">
+                            <div class="avatar-edit-preview" :style="{ backgroundImage: editAvatarPreview ? `url(${editAvatarPreview})` : '' }">
+                                <span v-if="!editAvatarPreview" class="avatar-placeholder">?</span>
+                            </div>
+                            <el-upload
+                                action="#"
+                                :show-file-list="false"
+                                :before-upload="beforeAvatarUpload"
+                                accept="image/*"
+                            >
+                                <el-button>修改头像</el-button>
+                            </el-upload>
+                        </div>
+                    </el-form-item>
+                </el-form>
                 <div class="upload-tips">
-                    <p>• 支持 JPG、PNG 格式</p>
-                    <p>• 图片大小不超过 10MB</p>
+                    <p>• 用户名会同步到后台用户列表</p>
+                    <p>• 头像支持 JPG、PNG 格式，大小不超过 10MB</p>
                 </div>
             </div>
             <template #footer>
-                <el-button @click="showAvatarUpload = false">取消</el-button>
-                <el-button type="primary" @click="confirmAvatarUpload" :loading="uploading">确定</el-button>
+                <el-button @click="showEditInfoDialog = false">取消</el-button>
+                <el-button type="primary" @click="confirmEditInfo" :loading="uploading">确定</el-button>
             </template>
         </el-dialog>
     </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onBeforeMount, onActivated, nextTick, computed } from 'vue';
+import { ref, reactive, onMounted, onBeforeMount, onActivated, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Plus } from '@element-plus/icons-vue';
 import { userApi, type User } from '@/api/user';
 import { ticketApi } from '@/api/ticket';
 import request from '@/utils/request';
@@ -149,10 +155,13 @@ const router = useRouter();
 const isLoggedIn = ref(false);
 
 // 头像上传相关
-const showAvatarUpload = ref(false);
-const avatarPreview = ref('');
+const showEditInfoDialog = ref(false);
 const uploading = ref(false);
+const editAvatarPreview = ref('');
 const uploadedAvatarUrl = ref('');
+const editForm = reactive({
+    username: ''
+});
 
 const checkLoginStatus = () => {
     const token = localStorage.getItem('token');
@@ -210,6 +219,13 @@ const goToEditProfile = () => {
     router.push('/edit-profile');
 };
 
+const openEditInfoDialog = () => {
+    editForm.username = userInfo.username || '';
+    editAvatarPreview.value = userInfo.avatar || '';
+    uploadedAvatarUrl.value = '';
+    showEditInfoDialog.value = true;
+};
+
 // 头像上传前的验证
 const beforeAvatarUpload = async (file: File) => {
     const isImage = file.type.startsWith('image/');
@@ -223,64 +239,69 @@ const beforeAvatarUpload = async (file: File) => {
         ElMessage.error('图片大小不能超过 10MB!');
         return false;
     }
-    
-    // 预览图片
+
     const reader = new FileReader();
     reader.onload = (e) => {
-        avatarPreview.value = e.target?.result as string;
+        editAvatarPreview.value = e.target?.result as string;
     };
     reader.readAsDataURL(file);
-    
-    // 上传图片
+
     const formData = new FormData();
     formData.append('file', file);
-    
+
     try {
         uploading.value = true;
         const result: any = await request.post('/admin/file/upload', formData, {
             headers: { 'Content-Type': 'multipart/form-data' }
         });
-        
+
         if (result && result.url) {
             uploadedAvatarUrl.value = result.url;
             ElMessage.success('图片上传成功');
         }
     } catch (error: any) {
         ElMessage.error(error.message || '上传失败');
-        avatarPreview.value = '';
+        editAvatarPreview.value = '';
     } finally {
         uploading.value = false;
     }
-    
+
     return false;
 };
 
-// 确认上传头像
-const confirmAvatarUpload = async () => {
-    if (!uploadedAvatarUrl.value) {
-        ElMessage.warning('请先上传头像');
-        return;
-    }
-    
+// 确认修改信息
+const confirmEditInfo = async () => {
     try {
         uploading.value = true;
-        await userApi.updateAvatar(uploadedAvatarUrl.value);
-        ElMessage.success('头像修改成功');
-        
-        // 更新本地用户信息
-        userInfo.avatar = uploadedAvatarUrl.value;
+        const username = editForm.username?.trim() || '';
+        if (!username) {
+            ElMessage.error('请输入用户名');
+            return;
+        }
+        const payload: any = { username };
+        if (uploadedAvatarUrl.value) {
+            payload.avatar = uploadedAvatarUrl.value;
+        } else if (editAvatarPreview.value && editAvatarPreview.value.startsWith('http')) {
+            payload.avatar = editAvatarPreview.value;
+        }
+        await userApi.updateUserInfo(payload);
+        ElMessage.success('信息修改成功');
+
+        userInfo.username = username;
+        if (payload.avatar) userInfo.avatar = payload.avatar;
         const storedUserInfo = localStorage.getItem('userInfo');
         if (storedUserInfo) {
             const parsed = JSON.parse(storedUserInfo);
-            parsed.avatar = uploadedAvatarUrl.value;
+            parsed.username = username;
+            if (payload.avatar) parsed.avatar = payload.avatar;
             localStorage.setItem('userInfo', JSON.stringify(parsed));
         }
-        
-        showAvatarUpload.value = false;
-        avatarPreview.value = '';
+
+        showEditInfoDialog.value = false;
+        editAvatarPreview.value = '';
         uploadedAvatarUrl.value = '';
     } catch (error: any) {
-        ElMessage.error(error.message || '修改头像失败');
+        ElMessage.error(error.message || '修改信息失败');
     } finally {
         uploading.value = false;
     }
@@ -299,6 +320,7 @@ const loadUserData = async () => {
         const user = await userApi.getUserInfo();
         if (user) {
             Object.assign(userInfo, user);
+            editForm.username = user.username || '';
         }
 
         const tOrders = await ticketApi.getOrderList();
@@ -809,59 +831,11 @@ const handleCancelRefund = async (order: Order) => {
     }
 }
 
-/* 头像上传对话框 */
-.avatar-upload-container {
+/* 编辑用户名对话框 */
+.edit-info-container {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 20px;
-}
-
-.avatar-uploader {
-    width: 200px;
-    height: 200px;
-}
-
-.avatar-uploader :deep(.el-upload) {
-    width: 100%;
-    height: 100%;
-    border: 2px dashed #d9d9d9;
-    border-radius: 50%;
-    cursor: pointer;
-    position: relative;
-    overflow: hidden;
-    transition: border-color 0.3s;
-}
-
-.avatar-uploader :deep(.el-upload:hover) {
-    border-color: #409eff;
-}
-
-.avatar-preview {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-}
-
-.avatar-upload-placeholder {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    color: #8c939d;
-}
-
-.avatar-uploader-icon {
-    font-size: 48px;
-    color: #8c939d;
-}
-
-.upload-text {
-    margin-top: 10px;
-    font-size: 14px;
+    gap: 12px;
 }
 
 .upload-tips {

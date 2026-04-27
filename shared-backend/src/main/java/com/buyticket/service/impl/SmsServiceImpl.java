@@ -100,27 +100,32 @@ public class SmsServiceImpl implements SmsService {
                 .setAccessKeyId(accessKeyId)
                 .setAccessKeySecret(accessKeySecret)
                 .setEndpoint("dysmsapi.aliyuncs.com");
-        
+
         Client client = new Client(config);
-        
-        // 构建请求
+
+        // 构建请求，发送短信时需要明确包含签名和模板参数 JSON
         SendSmsRequest request = new SendSmsRequest()
                 .setPhoneNumbers(phone)
                 .setSignName(signName)
                 .setTemplateCode(templateCode)
                 .setTemplateParam("{\"code\":\"" + code + "\"}");
-        
-        // 发送短信
-        SendSmsResponse response = client.sendSms(request);
-        
-        // 检查发送结果
-        if (!"OK".equals(response.getBody().getCode())) {
-            log.error("阿里云短信发送失败: phone={}, code={}, message={}", 
-                    phone, response.getBody().getCode(), response.getBody().getMessage());
-            throw new RuntimeException("短信发送失败: " + response.getBody().getMessage());
+
+        try {
+            // 发送短信
+            SendSmsResponse response = client.sendSms(request);
+
+            // 检查发送结果
+            if (!"OK".equals(response.getBody().getCode())) {
+                log.error("阿里云短信发送失败: phone={}, code={}, message={}",
+                        phone, response.getBody().getCode(), response.getBody().getMessage());
+                throw new RuntimeException("短信发送失败: " + response.getBody().getMessage());
+            }
+
+            log.info("阿里云短信发送成功: phone={}, requestId={}", phone, response.getBody().getRequestId());
+        } catch (com.aliyun.tea.TeaException e) {
+            log.error("阿里云短信签名/请求失败: phone={}, errorCode={}, message={}", phone, e.getCode(), e.getMessage(), e);
+            throw new RuntimeException("短信签名或请求参数错误: " + e.getMessage(), e);
         }
-        
-        log.info("阿里云短信发送成功: phone={}, requestId={}", phone, response.getBody().getRequestId());
     }
     
     @Override

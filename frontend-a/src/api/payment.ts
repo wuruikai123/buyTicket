@@ -38,6 +38,11 @@ export const paymentApi = {
     return request.get<any, { oauth_url: string }>('/wechat-pay/oauth-url', { params })
   },
 
+  // 获取微信授权地址（前端兼容别名）
+  getWechatOAuthUrl(params: { orderNo: string; redirectUri: string; state?: string }) {
+    return paymentApi.getWechatOauthUrl(params)
+  },
+
   // 创建微信JSAPI支付订单，返回wx.chooseWXPay所需参数
   createWechatJsapiPay(data: WechatJsapiCreateRequest) {
     return request.post<any, {

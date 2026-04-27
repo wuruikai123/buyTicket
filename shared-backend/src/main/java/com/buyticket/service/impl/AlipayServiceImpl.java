@@ -118,7 +118,7 @@ public class AlipayServiceImpl implements AlipayService {
         request.setBizModel(model);
         
         try {
-            // 调用SDK生成表单
+            // SDK 版本下 WAP 支付仍通过 pageExecute 发起
             AlipayTradeWapPayResponse response = alipayClient.pageExecute(request);
             
             if (response.isSuccess()) {

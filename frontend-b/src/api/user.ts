@@ -13,6 +13,10 @@ export const userApi = {
     return request.put(`/admin/user/${id}/status?status=${status}`)
   },
 
+  deleteUser(id: number) {
+    return request.delete(`/admin/user/${id}`)
+  },
+
   updateBalance(id: number, amount: number) {
     // return request.put(`/user/${id}/balance`, { amount })
     return Promise.resolve({ success: true })

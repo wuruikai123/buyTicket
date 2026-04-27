@@ -14,6 +14,8 @@
           <el-icon v-if="order.status === 0"><Clock /></el-icon>
           <el-icon v-else-if="order.status === 1"><Check /></el-icon>
           <el-icon v-else-if="order.status === 2"><CircleCheck /></el-icon>
+          <el-icon v-else-if="order.status === 5"><Clock /></el-icon>
+          <el-icon v-else-if="order.status === 6"><CircleCheck /></el-icon>
           <el-icon v-else><Close /></el-icon>
         </div>
         <div class="status-info">
@@ -26,25 +28,21 @@
         <h3 class="section-title">联系人信息</h3>
         <div class="info-row">
           <span class="label">联系人</span>
-          <span class="value">{{ order.contactName || order.receiverName }}</span>
+          <span class="value">{{ order.contactName }}</span>
         </div>
-        <div class="info-row">
+        <div class="info-row" v-if="order.contactPhone">
           <span class="label">联系电话</span>
-          <span class="value">{{ order.contactPhone || order.receiverPhone }}</span>
-        </div>
-        <div class="info-row" v-if="orderType === 'mall'">
-          <span class="label">收货地址</span>
-          <span class="value">{{ order.receiverAddress }}</span>
+          <span class="value">{{ order.contactPhone }}</span>
         </div>
       </div>
 
       <div class="items-section" v-if="orderType === 'ticket'">
-        <h3 class="section-title">门票明细（按子票）</h3>
-        <div v-for="item in order.items" :key="item.id" class="ticket-item-card">
+        <h3 class="section-title">门票明细（子票列表）</h3>
+        <div v-for="item in ticketItems" :key="item.id" class="ticket-item-card">
           <div class="ticket-item-header">
             <div class="ticket-main">
               <span class="ticket-name">{{ item.exhibitionName || '展览门票' }}</span>
-              <span class="ticket-time">{{ item.ticketDate }} {{ item.timeSlot }}</span>
+              <span class="ticket-time">{{ formatTicketTime(item) }}</span>
             </div>
             <span class="ticket-status" :class="statusClass(item.ticketStatus)">{{ ticketStatusText(item.ticketStatus) }}</span>
           </div>
@@ -52,19 +50,7 @@
           <div class="ticket-buyer">
             <div>购票人：{{ item.buyerName || '-' }}</div>
             <div>证件号：{{ item.buyerIdCard || '-' }}</div>
-          </div>
-
-          <div class="ticket-select" v-if="item.ticketStatus === 1 || item.ticketStatus === 5">
-            <el-checkbox
-              v-if="item.ticketStatus === 1"
-              :model-value="selectedRefundIds.includes(item.id)"
-              @change="(val:boolean) => toggleSelect(item.id, val, 'refund')"
-            >勾选申请退款</el-checkbox>
-            <el-checkbox
-              v-if="item.ticketStatus === 5"
-              :model-value="selectedCancelRefundIds.includes(item.id)"
-              @change="(val:boolean) => toggleSelect(item.id, val, 'cancel')"
-            >勾选取消退款</el-checkbox>
+            <div v-if="item.buyerPhone">手机号：{{ item.buyerPhone }}</div>
           </div>
         </div>
       </div>
@@ -74,9 +60,9 @@
         <div v-for="(item, index) in order.items" :key="index" class="order-item">
           <div class="item-info">
             <h4 class="item-name">{{ item.name || item.productName }}</h4>
-            <p class="item-price">¥{{ item.price }} × {{ item.quantity }}</p>
+            <p class="item-price">¥{{ Number(item.price || 0).toFixed(2) }} × {{ item.quantity || 0 }}</p>
           </div>
-          <div class="item-subtotal">¥{{ (item.price * item.quantity).toFixed(2) }}</div>
+          <div class="item-subtotal">¥{{ (Number(item.price || 0) * Number(item.quantity || 0)).toFixed(2) }}</div>
         </div>
       </div>
 
@@ -87,7 +73,7 @@
           <div class="qrcode-wrapper">
             <qrcode-vue :value="qrcodeData" :size="200" level="H" />
           </div>
-          <p class="qrcode-tip">请向工作人员出示此二维码进行核销（每次核销1张子票）</p>
+          <p class="qrcode-tip">请向工作人员出示此二维码进行核销</p>
         </div>
 
         <div class="info-row order-no-row" v-if="order.orderNo">
@@ -121,8 +107,7 @@
         </div>
 
         <div class="refund-button-container" v-if="orderType === 'ticket'">
-          <button class="refund-button" @click="handleRequestRefund" :disabled="!selectedRefundIds.length">申请已勾选子票退款</button>
-          <button class="cancel-refund-button" @click="handleCancelRefund" :disabled="!selectedCancelRefundIds.length">取消已勾选子票退款</button>
+          <button class="refund-button" @click="handleRequestRefund">申请整单退款</button>
         </div>
       </div>
 
@@ -146,31 +131,34 @@ import QrcodeVue from 'qrcode.vue'
 
 interface OrderItem {
   id: number
-  name?: string
+  orderId?: number
+  exhibitionId?: number
   exhibitionName?: string
-  productName?: string
   ticketDate?: string
   timeSlot?: string
-  price: number
-  quantity: number
-  coverImage?: string
+  quantity?: number
+  price?: number
   buyerName?: string
   buyerIdCard?: string
+  buyerPhone?: string
   ticketStatus?: number
+  refundRequestTime?: string
+  refundTime?: string
 }
 
 interface OrderDetail {
   id: number
   orderNo?: string
+  userId?: number
   status: number
   totalAmount: number
   contactName?: string
   contactPhone?: string
-  receiverName?: string
-  receiverPhone?: string
-  receiverAddress?: string
   createTime: string
   payTime?: string
+  verifyTime?: string
+  refundRequestTime?: string
+  refundTime?: string
   items: OrderItem[]
 }
 
@@ -200,12 +188,41 @@ const qrcodeData = computed(() => {
   return JSON.stringify({ orderNo: order.value.orderNo, orderId: order.value.id, type: 'ticket', timestamp: Date.now() })
 })
 
+const ticketSummary = computed(() => {
+  const items = order.value.items || []
+  return {
+    total: items.length,
+    waiting: items.filter(i => (i.ticketStatus || 1) === 1).length,
+    used: items.filter(i => i.ticketStatus === 2).length,
+    refunding: items.filter(i => i.ticketStatus === 5).length,
+    refunded: items.filter(i => i.ticketStatus === 6).length
+  }
+})
+
 const statusText = computed(() => {
+  const s = ticketSummary.value
+  if (orderType.value === 'ticket') {
+    if (s.refunding > 0) return `退款中（${s.refunding}/${s.total}）`
+    if (s.refunded > 0 && s.waiting === 0 && s.used === 0) return `部分/全部已退款（${s.refunded}/${s.total}）`
+    if (s.refunded > 0) return `部分已退款（${s.refunded}/${s.total}）`
+    if (order.value.status === 1) return '待使用'
+    if (order.value.status === 2) return '已使用'
+    if (order.value.status === 0) return '待支付'
+  }
   const map: Record<number, string> = { 0: '待支付', 1: '待使用', 2: '已使用', 3: '已完成', 4: '已取消', 5: '退款中', 6: '已退款' }
   return map[order.value.status] || '未知'
 })
 
 const statusDesc = computed(() => {
+  const s = ticketSummary.value
+  if (orderType.value === 'ticket') {
+    if (s.refunding > 0) return '部分子票退款处理中，完成后可继续处理其他子票'
+    if (s.refunded > 0 && s.waiting > 0) return '部分子票已退款，剩余子票仍可继续退款'
+    if (s.refunded > 0 && s.waiting === 0 && s.used === 0) return '当前订单子票已全部退款'
+    if (order.value.status === 1) return '门票待使用，请按时到场'
+    if (order.value.status === 2) return '感谢您的光临'
+    if (order.value.status === 0) return '请在30分钟内完成支付'
+  }
   const map: Record<number, string> = {
     0: '请在30分钟内完成支付',
     1: '门票待使用，请按时到场',
@@ -218,13 +235,22 @@ const statusDesc = computed(() => {
   return map[order.value.status] || ''
 })
 
+const ticketItems = computed(() => order.value.items || [])
+
+const formatTicketTime = (item: OrderItem) => {
+  const date = item.ticketDate || '-'
+  const slot = item.timeSlot || ''
+  return slot ? `${date} ${slot}` : date
+}
+
 const ticketStatusText = (status?: number) => {
-  const map: Record<number, string> = { 1: '待使用', 2: '已使用', 5: '退款中', 6: '已退款' }
+  const map: Record<number, string> = { 1: '待使用', 2: '已使用', 3: '已取消', 5: '退款中', 6: '已退款' }
   return map[status || 1] || '待使用'
 }
 
 const statusClass = (status?: number) => {
   if (status === 2) return 'used'
+  if (status === 3) return 'cancelled'
   if (status === 5) return 'refunding'
   if (status === 6) return 'refunded'
   return 'waiting'
@@ -260,6 +286,7 @@ const loadOrderDetail = async () => {
   }
 }
 
+// 子票勾选退款逻辑已取消，保留相关状态变量以兼容历史数据
 const toggleSelect = (id: number, checked: boolean, type: 'refund' | 'cancel') => {
   const list = type === 'refund' ? selectedRefundIds.value : selectedCancelRefundIds.value
   if (checked) {
@@ -301,13 +328,9 @@ const copyOrderNo = async () => {
 }
 
 const handleRequestRefund = async () => {
-  if (!selectedRefundIds.value.length) {
-    ElMessage.warning('请先勾选要退款的子票')
-    return
-  }
   try {
-    await ElMessageBox.confirm(`确认申请退款所选 ${selectedRefundIds.value.length} 张子票吗？`, '申请退款', { type: 'warning' })
-    await ticketApi.requestRefund(orderId.value, selectedRefundIds.value)
+    await ElMessageBox.confirm('确认申请整单退款吗？', '申请退款', { type: 'warning' })
+    await ticketApi.requestRefund(orderId.value)
     ElMessage.success('退款申请已提交')
     await loadOrderDetail()
   } catch (e: any) {
@@ -316,18 +339,7 @@ const handleRequestRefund = async () => {
 }
 
 const handleCancelRefund = async () => {
-  if (!selectedCancelRefundIds.value.length) {
-    ElMessage.warning('请先勾选要取消退款的子票')
-    return
-  }
-  try {
-    await ElMessageBox.confirm(`确认取消所选 ${selectedCancelRefundIds.value.length} 张子票退款吗？`, '取消退款', { type: 'warning' })
-    await ticketApi.cancelRefund(orderId.value, selectedCancelRefundIds.value)
-    ElMessage.success('已取消退款申请')
-    await loadOrderDetail()
-  } catch (e: any) {
-    if (e !== 'cancel') ElMessage.error(e.message || '取消退款失败')
-  }
+  ElMessage.info('子票取消退款入口已关闭，请使用整单退款')
 }
 
 onMounted(() => {
@@ -366,6 +378,7 @@ onMounted(() => {
 .ticket-status { font-size: 12px; padding: 2px 8px; border-radius: 12px; height: fit-content; }
 .ticket-status.waiting { color: #409eff; background: #ecf5ff; }
 .ticket-status.used { color: #67c23a; background: #f0f9eb; }
+.ticket-status.cancelled { color: #909399; background: #f4f4f5; }
 .ticket-status.refunding { color: #e6a23c; background: #fdf6ec; }
 .ticket-status.refunded { color: #909399; background: #f4f4f5; }
 .ticket-select { margin-top: 10px; }

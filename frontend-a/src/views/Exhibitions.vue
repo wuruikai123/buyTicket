@@ -1,44 +1,72 @@
 <template>
     <div class="exhibitions">
-        <!-- 展览列表 -->
-        <div class="exhibition-list">
-            <div 
-                v-for="exhibition in exhibitions" 
-                :key="exhibition.id" 
-                class="exhibition-card"
-            >
-                <div class="exhibition-image-wrap">
-                    <div 
-                        class="exhibition-image"
-                        :style="exhibition.coverImage ? { backgroundImage: `url(${exhibition.coverImage})` } : {}"
-                    />
-                </div>
-                <div class="exhibition-content">
-                    <h3 class="exhibition-title">{{ exhibition.name }}</h3>
-                    <p class="exhibition-description">{{ exhibition.shortDesc || exhibition.description || '暂无介绍' }}</p>
-                    <p class="exhibition-price">¥{{ formatPrice(exhibition.price) }}</p>
-                </div>
-                <div class="exhibition-action">
-                    <button class="buy-button" @click="goToTicket(exhibition.id)">购票</button>
-                </div>
+        <div class="hero">
+            <div class="status-tabs status-tabs-centered">
+                <button class="status-tab" :class="{ active: activeTab === 'ongoing' }" @click="activeTab = 'ongoing'">进行中</button>
+                <button class="status-tab" :class="{ active: activeTab === 'upcoming' }" @click="activeTab = 'upcoming'">待开始</button>
             </div>
         </div>
+
+        <section class="section-block">
+            <div class="section-header">
+                <span class="section-count">{{ activeTab === 'ongoing' ? `进行中 ${ongoingExhibitions.length} 场` : `待开始 ${upcomingExhibitions.length} 场` }}</span>
+            </div>
+            <div class="exhibition-list" v-if="activeExhibitions.length">
+                <div
+                    v-for="exhibition in activeExhibitions"
+                    :key="exhibition.id"
+                    class="exhibition-card"
+                    :class="{ 'exhibition-card-upcoming': activeTab === 'upcoming' }"
+                    :role="activeTab === 'upcoming' ? 'button' : undefined"
+                    :tabindex="activeTab === 'upcoming' ? 0 : undefined"
+                    @click="activeTab === 'upcoming' && goToTicket(exhibition.id)"
+                    @keydown.enter.prevent="activeTab === 'upcoming' && goToTicket(exhibition.id)"
+                >
+                    <div class="exhibition-image-wrap">
+                        <div
+                            class="exhibition-image"
+                            :style="exhibition.coverImage ? { backgroundImage: `url(${exhibition.coverImage})` } : {}"
+                        />
+                    </div>
+                    <div class="exhibition-content">
+                        <h3 class="exhibition-title">{{ exhibition.name }}</h3>
+                        <p class="exhibition-description">{{ exhibition.shortDesc || exhibition.description || '暂无介绍' }}</p>
+                        <p v-if="activeTab === 'ongoing'" class="exhibition-price">¥{{ formatPrice(exhibition.price) }}</p>
+                        <div v-else class="exhibition-meta">
+                            <span>开始：{{ formatDate(exhibition.startDate) }}</span>
+                            <span>价格：¥{{ formatPrice(exhibition.price) }}</span>
+                        </div>
+                    </div>
+                    <div class="exhibition-action">
+                        <button class="buy-button" @click.stop="activeTab === 'ongoing' ? goToTicket(exhibition.id) : goToTicket(exhibition.id)">{{ activeTab === 'ongoing' ? '购票' : '查看' }}</button>
+                    </div>
+                </div>
+            </div>
+            <div class="empty-state" v-else>{{ activeTab === 'ongoing' ? '暂无进行中的展览' : '暂无待开始的展览' }}</div>
+        </section>
     </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { exhibitionApi, type Exhibition } from '@/api/exhibition';
 
 const router = useRouter();
+const activeTab = ref<'ongoing' | 'upcoming'>('ongoing');
+const ongoingExhibitions = ref<Exhibition[]>([]);
+const upcomingExhibitions = ref<Exhibition[]>([]);
 
-// 展览列表数据（只显示进行中）
-const exhibitions = ref<Exhibition[]>([]);
+const activeExhibitions = computed(() => activeTab.value === 'ongoing' ? ongoingExhibitions.value : upcomingExhibitions.value);
 
 function formatPrice(price?: number) {
     if (price == null) return '0.00';
     return Number(price).toFixed(2);
+}
+
+function formatDate(date?: string) {
+    if (!date) return '-';
+    return date.replace(/-/g, '.');
 }
 
 function goToTicket(exhibitionId: number) {
@@ -47,11 +75,16 @@ function goToTicket(exhibitionId: number) {
 
 async function loadExhibitions() {
     try {
-        const list = await exhibitionApi.getList('ongoing');
-        exhibitions.value = list ?? [];
+        const [ongoing, upcoming] = await Promise.all([
+            exhibitionApi.getList('ongoing'),
+            exhibitionApi.getList('upcoming')
+        ]);
+        ongoingExhibitions.value = ongoing ?? [];
+        upcomingExhibitions.value = upcoming ?? [];
     } catch (e) {
         console.error(e);
-        exhibitions.value = [];
+        ongoingExhibitions.value = [];
+        upcomingExhibitions.value = [];
     }
 }
 
@@ -68,8 +101,65 @@ onMounted(() => {
 }
 
 /* 展览列表 */
+.hero {
+    padding: 16px 16px 0;
+}
+
+.section-block {
+    margin-top: 16px;
+}
+
+.section-header {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 0 16px 10px;
+    color: #374151;
+}
+
+.status-tabs {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+}
+
+.status-tabs-centered {
+    justify-content: center;
+    width: 100%;
+}
+
+.status-tab {
+    position: relative;
+    border: none;
+    background: transparent;
+    padding: 8px 0;
+    font-size: 16px;
+    color: #9ca3af;
+    font-weight: 600;
+}
+
+.status-tab.active {
+    color: #1f2937;
+}
+
+.status-tab.active::after {
+    content: '';
+    position: absolute;
+    left: 12%;
+    right: 12%;
+    bottom: -8px;
+    height: 2px;
+    background: #3b82f6;
+    border-radius: 2px;
+}
+
+.section-count {
+    font-size: 13px;
+    color: #6b7280;
+}
+
 .exhibition-list {
-    padding: 16px;
+    padding: 0 16px;
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -166,9 +256,18 @@ onMounted(() => {
     white-space: nowrap;
 }
 
+.exhibition-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+    color: #6b7280;
+    margin-top: auto;
+}
+
 .exhibition-action {
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     flex-shrink: 0;
     padding-bottom: 2px;
 }
@@ -195,8 +294,30 @@ onMounted(() => {
     background-color: #1a2f63;
 }
 
+.exhibition-card-upcoming {
+    cursor: pointer;
+}
+
+.empty-state {
+    padding: 18px 16px 0;
+    color: #6b7280;
+    font-size: 14px;
+}
+
 /* 超小屏幕 (iPhone SE, 小型安卓机 ≤375px) */
 @media (max-width: 375px) {
+    .hero {
+        padding: 12px 12px 0;
+    }
+
+    .status-tabs {
+        gap: 18px;
+    }
+
+    .status-tab {
+        font-size: 14px;
+    }
+
     .exhibition-list {
         padding: 12px;
         gap: 10px;

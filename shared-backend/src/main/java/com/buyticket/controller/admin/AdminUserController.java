@@ -141,4 +141,21 @@ public class AdminUserController {
         String action = status == 1 ? "解冻" : "冻结";
         return JsonData.buildSuccess(action + "成功");
     }
+
+    /**
+     * 注销用户，仅删除用户主表信息，不删除关联订单数据
+     */
+    @DeleteMapping("/{id}")
+    public JsonData deleteUser(@PathVariable Long id) {
+        SysUser user = sysUserService.getById(id);
+        if (user == null) {
+            return JsonData.buildError("用户不存在");
+        }
+
+        boolean success = sysUserService.removeById(id);
+        if (success) {
+            return JsonData.buildSuccess("注销成功");
+        }
+        return JsonData.buildError("注销失败");
+    }
 }

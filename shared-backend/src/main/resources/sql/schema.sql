@@ -72,6 +72,12 @@ CREATE TABLE IF NOT EXISTS `order_item` (
     `time_slot` VARCHAR(50) DEFAULT NULL COMMENT '时间段',
     `quantity` INT DEFAULT NULL COMMENT '数量',
     `price` DECIMAL(10, 2) DEFAULT NULL COMMENT '单价',
+    `buyer_name` VARCHAR(64) DEFAULT NULL COMMENT '购票人姓名',
+    `buyer_id_card` VARCHAR(32) DEFAULT NULL COMMENT '购票人证件号',
+    `buyer_phone` VARCHAR(20) DEFAULT NULL COMMENT '购票人手机号',
+    `ticket_status` TINYINT DEFAULT 1 COMMENT '子票状态(1:待使用,2:已使用,5:退款中,6:已退款)',
+    `refund_request_time` DATETIME DEFAULT NULL COMMENT '子票退款申请时间',
+    `refund_time` DATETIME DEFAULT NULL COMMENT '子票退款完成时间',
     PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='门票订单详情表';
 

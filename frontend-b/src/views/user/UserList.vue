@@ -35,6 +35,7 @@
         <el-table-column label="操作" width="100" align="center">
           <template #default="{ row }">
             <el-button link type="primary" @click="handleView(row)">详情</el-button>
+            <el-button link type="danger" @click="handleDelete(row)">注销</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -294,6 +295,32 @@ const handleFreeze = async () => {
   } catch (error: any) {
     if (error !== 'cancel') {
       ElMessage.error(`${action}失败`)
+    }
+  }
+}
+
+const handleDelete = async (row: any) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要注销用户「${row.username || row.uid || row.id}」吗？注销后仅删除用户信息，不删除关联订单。`,
+      '注销用户',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+
+    await userApi.deleteUser(row.id)
+    ElMessage.success('注销成功')
+    if (currentUser.value?.id === row.id) {
+      detailDialogVisible.value = false
+      currentUser.value = null
+    }
+    loadData()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error('注销失败')
     }
   }
 }

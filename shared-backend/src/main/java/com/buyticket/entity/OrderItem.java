@@ -44,7 +44,12 @@ public class OrderItem {
     private String buyerIdCard;
 
     /**
-     * 子票状态(1:待使用,2:已使用,5:退款中,6:已退款)
+     * 单张票购票手机号
+     */
+    private String buyerPhone;
+
+    /**
+     * 子票状态(1:待使用,2:已使用,3:已取消,5:退款中,6:已退款)
      */
     private Integer ticketStatus;
 
