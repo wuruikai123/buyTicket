@@ -86,22 +86,33 @@ public class AdminUserController {
             orderMap.put("contactName", order.getContactName());
             orderMap.put("contactPhone", order.getContactPhone());
             orderMap.put("createTime", order.getCreateTime());
-            
+
+            // 默认展示值，避免前端出现0元和'-'误导
+            orderMap.put("exhibitionName", "-");
+            orderMap.put("ticketDate", null);
+            orderMap.put("timeSlot", null);
+            orderMap.put("quantity", 0);
+            orderMap.put("price", order.getTotalAmount());
+
             // 获取订单项
             LambdaQueryWrapper<OrderItem> itemQuery = new LambdaQueryWrapper<>();
             itemQuery.eq(OrderItem::getOrderId, order.getId());
+            itemQuery.orderByAsc(OrderItem::getId);
             List<OrderItem> items = orderItemService.list(itemQuery);
-            
-            // 如果有订单项，使用第一个订单项的信息（展览名称、日期、时间段等）
+
             if (!items.isEmpty()) {
                 OrderItem firstItem = items.get(0);
-                orderMap.put("exhibitionName", firstItem.getExhibitionName());
+                orderMap.put("exhibitionName", firstItem.getExhibitionName() == null ? "-" : firstItem.getExhibitionName());
                 orderMap.put("ticketDate", firstItem.getTicketDate());
                 orderMap.put("timeSlot", firstItem.getTimeSlot());
-                orderMap.put("price", firstItem.getPrice());
-                orderMap.put("quantity", firstItem.getQuantity());
+                orderMap.put("quantity", items.size());
+
+                // 单价优先取首条，若无则回退为总价，避免出现0元
+                if (firstItem.getPrice() != null) {
+                    orderMap.put("price", firstItem.getPrice());
+                }
             }
-            
+
             ticketOrdersWithItems.add(orderMap);
         }
         

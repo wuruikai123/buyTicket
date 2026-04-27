@@ -10,6 +10,26 @@ export type OrderRecord = {
   status: number
 }
 
+export type PendingTicketItem = {
+  id: number
+  buyerName?: string
+  ticketDate?: string
+  timeSlot?: string
+}
+
+export type VerifyQueryResult = {
+  type: 'normal' | 'special'
+  orderNo?: string
+  status?: number
+  statusText?: string
+  verifyTime?: string
+  contactName?: string
+  waitingCount?: number
+  usedCount?: number
+  totalCount?: number
+  pendingItems?: PendingTicketItem[]
+}
+
 /**
  * 核销订单或特殊票券（统一接口）
  * 自动识别：T开头=普通订单，ST开头=特殊票券
@@ -20,12 +40,8 @@ export async function verifyOrder(code: string): Promise<boolean> {
   if (!code || !code.trim()) {
     throw new Error('请输入订单号或票券编号')
   }
-  
+
   try {
-    // 调用统一核销接口
-    // 后端会自动识别类型并处理：
-    // - ST开头：特殊票券核销
-    // - T开头：普通订单核销
     const adminInfo = getAdminInfo()
     await request.post('/admin/verify/scan', {
       code: code.trim(),
@@ -35,7 +51,6 @@ export async function verifyOrder(code: string): Promise<boolean> {
     return true
   } catch (error: any) {
     console.error('核销失败:', error)
-    // 抛出错误，让调用方处理
     throw error
   }
 }
@@ -61,6 +76,31 @@ function getAdminInfo() {
     adminId: null,
     adminName: '核销员'
   }
+}
+
+export async function queryVerifyCode(code: string): Promise<VerifyQueryResult> {
+  if (!code || !code.trim()) {
+    throw new Error('请输入订单号或票券编号')
+  }
+
+  const data: any = await request.get(`/admin/verify/query?code=${encodeURIComponent(code.trim())}`)
+  return data || {}
+}
+
+export async function verifyTicketItem(orderNo: string, ticketItemId: number): Promise<any> {
+  if (!orderNo || !orderNo.trim()) {
+    throw new Error('订单号不能为空')
+  }
+  if (!ticketItemId) {
+    throw new Error('子票ID不能为空')
+  }
+
+  const adminInfo = getAdminInfo()
+  return await request.post('/admin/verify/scan', {
+    code: `TT|${orderNo.trim()}|${ticketItemId}`,
+    adminId: adminInfo.adminId,
+    adminName: adminInfo.adminName
+  })
 }
 
 // 获取今日核销数量

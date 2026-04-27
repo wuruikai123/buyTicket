@@ -198,7 +198,7 @@ public class OrderController {
     }
 
     /**
-     * 通过订单号核销门票订单（按子票核销：每次核销1张待使用子票）
+     * 通过订单号核销门票订单（一次核销全部可核销子票）
      */
     @PostMapping("/ticket/verify")
     public JsonData verifyTicketOrderByNo(@RequestBody java.util.Map<String, String> request) {
@@ -226,28 +226,29 @@ public class OrderController {
             return JsonData.buildError("订单信息异常，无法核销");
         }
 
-        OrderItem target = null;
+        int verifiedCount = 0;
         for (OrderItem item : orderItems) {
-            if (item.getTicketStatus() != null && item.getTicketStatus() == 1) {
-                target = item;
-                break;
+            Integer ts = item.getTicketStatus() == null ? 1 : item.getTicketStatus();
+            if (ts != 1) {
+                continue;
             }
+
+            String timeValidationError = validateTicketItemVerificationTime(item);
+            if (timeValidationError != null) {
+                return JsonData.buildError(timeValidationError);
+            }
+
+            item.setTicketStatus(2);
+            orderItemMapper.updateById(item);
+            verifiedCount++;
         }
 
-        if (target == null) {
+        if (verifiedCount == 0) {
             return JsonData.buildError("无可核销子票");
         }
 
-        String timeValidationError = validateTicketItemVerificationTime(target);
-        if (timeValidationError != null) {
-            return JsonData.buildError(timeValidationError);
-        }
-
-        target.setTicketStatus(2);
-        orderItemMapper.updateById(target);
-
         refreshOrderStatusByItems(order, orderItems);
-        return JsonData.buildSuccess("核销成功（已核销1张）");
+        return JsonData.buildSuccess("核销成功（本次核销" + verifiedCount + "张）");
     }
 
     /**

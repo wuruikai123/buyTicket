@@ -146,20 +146,49 @@ const fetchData = async () => {
         size: pagination.value.size
       }
     })
-    banners.value = res?.records || []
-    pagination.value.total = res?.total || 0
+
+    const records = res?.records || []
+    const backendTotal = Number(res?.total || 0)
+    const fallbackTotal = backendTotal > 0 ? backendTotal : records.length
+    pagination.value.total = fallbackTotal
+
+    const maxPage = Math.max(1, Math.ceil(fallbackTotal / pagination.value.size))
+    if (pagination.value.page > maxPage) {
+      pagination.value.page = maxPage
+      await fetchData()
+      return
+    }
+
+    const needClientSlice = backendTotal === 0 && records.length > pagination.value.size
+    if (needClientSlice) {
+      const start = (pagination.value.page - 1) * pagination.value.size
+      const end = start + pagination.value.size
+      banners.value = records.slice(start, end)
+    } else {
+      banners.value = records
+    }
+
+    if (fallbackTotal === 0) {
+      pagination.value.page = 1
+    }
   } catch (e: any) {
     ElMessage.error(e.message || '获取数据失败')
+    banners.value = []
+    pagination.value.total = 0
+    pagination.value.page = 1
   } finally {
     loading.value = false
   }
 }
 
-const handleSizeChange = () => {
+const handleSizeChange = (size: number) => {
+  pagination.value.size = size
+  pagination.value.page = 1
   fetchData()
 }
 
-const handlePageChange = () => {
+const handlePageChange = (page: number) => {
+  pagination.value.page = page
   fetchData()
 }
 

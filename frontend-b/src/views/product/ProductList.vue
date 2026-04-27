@@ -107,10 +107,36 @@ const loadData = async () => {
       size: pagination.size,
       ...searchForm
     })
-    tableData.value = data.records
-    pagination.total = data.total
+
+    const records = data?.records || []
+    const backendTotal = Number(data?.total || 0)
+    const fallbackTotal = backendTotal > 0 ? backendTotal : records.length
+    pagination.total = fallbackTotal
+
+    const maxPage = Math.max(1, Math.ceil(fallbackTotal / pagination.size))
+    if (pagination.page > maxPage) {
+      pagination.page = maxPage
+      await loadData()
+      return
+    }
+
+    const needClientSlice = backendTotal === 0 && records.length > pagination.size
+    if (needClientSlice) {
+      const start = (pagination.page - 1) * pagination.size
+      const end = start + pagination.size
+      tableData.value = records.slice(start, end)
+    } else {
+      tableData.value = records
+    }
+
+    if (fallbackTotal === 0) {
+      pagination.page = 1
+    }
   } catch (error) {
     ElMessage.error('加载数据失败')
+    tableData.value = []
+    pagination.total = 0
+    pagination.page = 1
   } finally {
     loading.value = false
   }
@@ -127,11 +153,14 @@ const handleReset = () => {
   handleSearch()
 }
 
-const handleSizeChange = () => {
+const handleSizeChange = (size: number) => {
+  pagination.size = size
+  pagination.page = 1
   loadData()
 }
 
-const handlePageChange = () => {
+const handlePageChange = (page: number) => {
+  pagination.page = page
   loadData()
 }
 

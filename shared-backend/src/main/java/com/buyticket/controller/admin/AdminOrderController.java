@@ -47,7 +47,26 @@ public class AdminOrderController {
             queryWrapper.eq(TicketOrder::getUserId, userId);
         }
         if (status != null) {
-            queryWrapper.eq(TicketOrder::getStatus, status);
+            if (status == 5) {
+                // 兼容子票退款：只要存在子票为退款中，也应在“退款中”列表可见
+                LambdaQueryWrapper<OrderItem> refundingItemQuery = new LambdaQueryWrapper<>();
+                refundingItemQuery.eq(OrderItem::getTicketStatus, 5);
+                java.util.List<OrderItem> refundingItems = orderItemService.list(refundingItemQuery);
+                java.util.Set<Long> refundingOrderIds = new java.util.HashSet<>();
+                for (OrderItem item : refundingItems) {
+                    if (item.getOrderId() != null) {
+                        refundingOrderIds.add(item.getOrderId());
+                    }
+                }
+
+                if (refundingOrderIds.isEmpty()) {
+                    queryWrapper.eq(TicketOrder::getStatus, 5);
+                } else {
+                    queryWrapper.and(w -> w.eq(TicketOrder::getStatus, 5).or().in(TicketOrder::getId, refundingOrderIds));
+                }
+            } else {
+                queryWrapper.eq(TicketOrder::getStatus, status);
+            }
         }
         if (orderNo != null && !orderNo.trim().isEmpty()) {
             queryWrapper.like(TicketOrder::getOrderNo, orderNo.trim());
@@ -86,6 +105,7 @@ public class AdminOrderController {
             map.put("verifyTime", order.getVerifyTime());
             map.put("refundRequestTime", order.getRefundRequestTime());
             map.put("refundTime", order.getRefundTime());
+            map.put("refundRequestTime", order.getRefundRequestTime());
             
             // 查询订单项获取展览名称
             LambdaQueryWrapper<com.buyticket.entity.OrderItem> itemWrapper = new LambdaQueryWrapper<>();
@@ -277,7 +297,7 @@ public class AdminOrderController {
 
 
     /**
-     * 通过订单号核销门票订单（C端核销使用）
+     * 通过订单号核销门票订单（一次核销该订单全部可核销子票）
      */
     @PostMapping("/ticket/verify")
     public JsonData verifyTicketOrderByNo(@RequestBody java.util.Map<String, String> request) {
@@ -286,37 +306,19 @@ public class AdminOrderController {
             if (orderNo == null || orderNo.trim().isEmpty()) {
                 return JsonData.buildError("请输入订单号");
             }
-            
-            LambdaQueryWrapper<TicketOrder> queryWrapper = new LambdaQueryWrapper<>();
-            queryWrapper.eq(TicketOrder::getOrderNo, orderNo.trim());
-            TicketOrder order = ticketOrderService.getOne(queryWrapper);
-            
+
+            TicketOrder order = ticketOrderService.getByOrderNo(orderNo.trim());
             if (order == null) {
                 return JsonData.buildError("订单不存在");
             }
-            
-            // 根据订单状态返回不同的错误信息
-            if (order.getStatus() == 0) {
-                return JsonData.buildError("订单未支付，无法核销");
-            } else if (order.getStatus() == 2) {
-                return JsonData.buildError("该订单已核销过了");
-            } else if (order.getStatus() == 3) {
-                return JsonData.buildError("订单已取消，无法核销");
-            } else if (order.getStatus() != 1) {
-                return JsonData.buildError("订单状态异常，无法核销");
-            }
-            
-            // 验证核销时间是否符合规则
+
             String timeValidationError = validateVerificationTime(order.getId());
             if (timeValidationError != null) {
                 return JsonData.buildError(timeValidationError);
             }
-            
-            // 更新订单状态为已使用
-            order.setStatus(2);
-            order.setVerifyTime(java.time.LocalDateTime.now()); // 设置核销时间
-            ticketOrderService.updateById(order);
-            return JsonData.buildSuccess("核销成功");
+
+            int verifiedCount = ticketOrderService.verifyByOrderNo(orderNo.trim());
+            return JsonData.buildSuccess("核销成功（本次核销" + verifiedCount + "张）");
         } catch (Exception e) {
             e.printStackTrace();
             return JsonData.buildError("核销失败: " + e.getMessage());
@@ -493,7 +495,7 @@ public class AdminOrderController {
 
     /**
      * 管理员完成退款
-     * 调用汇付宝退款接口，原路返回款项
+     * 仅处理“退款中(5)”子票，支持同一订单分批多次退款
      */
     @PostMapping("/ticket/{id}/refund")
     public JsonData refundTicketOrder(@PathVariable Long id) {
@@ -501,52 +503,103 @@ public class AdminOrderController {
         if (order == null) {
             return JsonData.buildError("订单不存在");
         }
-        
-        // 只有待使用或退款中状态的订单可以退款
-        if (order.getStatus() != 1 && order.getStatus() != 5) {
-            return JsonData.buildError("只有待使用或退款中的订单可以退款");
-        }
-        
-        // 检查订单是否已支付
+
         if (order.getPayTime() == null) {
             return JsonData.buildError("订单未支付，无需退款");
         }
-        
+
         try {
-            // 调用汇付宝退款接口
-            String refundAmount = order.getTotalAmount().toString();
-            String refundReason = order.getStatus() == 5 ? "用户申请退款" : "管理员退款";
-            
+            LambdaQueryWrapper<OrderItem> itemQuery = new LambdaQueryWrapper<>();
+            itemQuery.eq(OrderItem::getOrderId, id);
+            java.util.List<OrderItem> allItems = orderItemService.list(itemQuery);
+            if (allItems == null || allItems.isEmpty()) {
+                return JsonData.buildError("订单明细不存在");
+            }
+
+            java.util.List<OrderItem> refundingItems = new java.util.ArrayList<>();
+            for (OrderItem item : allItems) {
+                Integer ts = item.getTicketStatus() == null ? 1 : item.getTicketStatus();
+                if (ts == 5) {
+                    refundingItems.add(item);
+                }
+            }
+
+            if (refundingItems.isEmpty()) {
+                return JsonData.buildError("当前订单没有可处理的退款子票");
+            }
+
+            java.math.BigDecimal refundTotal = java.math.BigDecimal.ZERO;
+            for (OrderItem item : refundingItems) {
+                if (item.getPrice() != null) {
+                    refundTotal = refundTotal.add(item.getPrice());
+                }
+            }
+
+            if (refundTotal.compareTo(java.math.BigDecimal.ZERO) <= 0) {
+                return JsonData.buildError("退款金额异常");
+            }
+
             java.util.Map<String, Object> refundResult = huifuPayService.refund(
-                order.getOrderNo(), 
-                refundAmount, 
-                refundReason
+                order.getOrderNo(),
+                refundTotal.toString(),
+                "用户申请退款"
             );
-            
+
             String respCode = refundResult.get("resp_code") == null ? null : String.valueOf(refundResult.get("resp_code"));
             String respDesc = refundResult.get("resp_desc") == null ? null : String.valueOf(refundResult.get("resp_desc"));
-            
-            // 检查退款是否成功
+
             if (!"00000000".equals(respCode) && !"00000100".equals(respCode)) {
                 return JsonData.buildError("汇付宝退款失败: " + (respDesc == null ? "未知错误" : respDesc));
             }
-            
-            // 退款成功，恢复库存
-            restoreInventory(id);
-            
-            // 更新订单状态为已退款
-            order.setStatus(6);
-            order.setRefundTime(java.time.LocalDateTime.now());
-            // 如果之前没有退款申请时间，设置为当前时间
-            if (order.getRefundRequestTime() == null) {
-                order.setRefundRequestTime(java.time.LocalDateTime.now());
+
+            java.time.LocalDateTime now = java.time.LocalDateTime.now();
+            for (OrderItem item : refundingItems) {
+                try {
+                    inventoryService.increaseInventory(
+                        item.getExhibitionId(),
+                        item.getTicketDate(),
+                        item.getTimeSlot(),
+                        item.getQuantity() == null ? 1 : item.getQuantity()
+                    );
+                } catch (Exception e) {
+                    System.err.println("恢复库存失败: " + e.getMessage());
+                }
+
+                item.setTicketStatus(6);
+                item.setRefundTime(now);
+                orderItemService.updateById(item);
             }
+
+            // 按子票状态回刷母订单状态
+            int waiting = 0;
+            int used = 0;
+            int refunding = 0;
+            int refunded = 0;
+
+            for (OrderItem item : allItems) {
+                Integer ts = item.getTicketStatus() == null ? 1 : item.getTicketStatus();
+                if (ts == 1) waiting++;
+                else if (ts == 2) used++;
+                else if (ts == 5) refunding++;
+                else if (ts == 6) refunded++;
+            }
+
+            if (refunding > 0) {
+                order.setStatus(5);
+            } else if (waiting > 0) {
+                order.setStatus(1);
+                order.setRefundRequestTime(null);
+            } else if (used > 0) {
+                order.setStatus(2);
+            } else if (refunded == allItems.size()) {
+                order.setStatus(6);
+                order.setRefundTime(now);
+            }
+
             ticketOrderService.updateById(order);
-            
-            return JsonData.buildSuccess("退款成功，款项将原路返回");
-            
+            return JsonData.buildSuccess("退款成功（本次退款" + refundingItems.size() + "张）");
+
         } catch (Exception e) {
-            // 记录错误日志
             System.err.println("退款失败: " + e.getMessage());
             e.printStackTrace();
             return JsonData.buildError("退款失败: " + e.getMessage());

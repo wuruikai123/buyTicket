@@ -156,9 +156,12 @@ public class HuifuPayServiceImpl implements HuifuPayService {
             }
             String orgReqSeqId = orgReqDate + orderNo;
 
+            // 退款请求流水号必须全局唯一，否则汇付会返回“重复交易”
+            String uniqueRefundSeqId = reqDate + "R" + System.currentTimeMillis() + new java.util.Random().nextInt(1000);
+
             V2TradePaymentScanpayRefundRequest request = new V2TradePaymentScanpayRefundRequest();
             request.setReqDate(reqDate);
-            request.setReqSeqId(reqDate + "REFUND" + orderNo);
+            request.setReqSeqId(uniqueRefundSeqId);
             request.setHuifuId(HuifuPayConfig.merchantId);
             request.setOrgReqDate(orgReqDate);
             request.addExtendInfo("org_req_seq_id", orgReqSeqId);

@@ -120,29 +120,6 @@ public class WechatPayController {
         }
     }
 
-    @PostMapping("/refund")
-    public JsonData refund(@RequestParam String orderNo,
-                           @RequestParam(required = false) String refundReason,
-                           @RequestBody(required = false) Map<String, Object> body) {
-        try {
-            TicketOrder ticketOrder = ticketOrderService.getByOrderNo(orderNo);
-            if (ticketOrder != null) {
-                // 暂时关闭“部分退款”能力：门票订单退款统一按全额可退款子票处理。
-                return refundTicketOrder(ticketOrder, refundReason, null);
-            }
-
-            MallOrder mallOrder = mallOrderService.getByOrderNo(orderNo);
-            if (mallOrder != null) {
-                return refundMallOrder(mallOrder, refundReason);
-            }
-
-            return JsonData.buildError("订单不存在");
-        } catch (Exception e) {
-            log.error("微信退款失败: orderNo={}", orderNo, e);
-            return JsonData.buildError("微信退款失败: " + e.getMessage());
-        }
-    }
-
     @PostMapping("/notify")
     public Map<String, String> paymentNotify(HttpServletRequest request) {
         try {
@@ -196,109 +173,6 @@ public class WechatPayController {
         }
     }
 
-    private JsonData refundTicketOrder(TicketOrder ticketOrder, String refundReason, List<Long> ticketItemIds) {
-        if (ticketOrder.getStatus() == null || (ticketOrder.getStatus() != 1 && ticketOrder.getStatus() != 5)) {
-            return JsonData.buildError("订单状态不支持退款");
-        }
-
-        List<OrderItem> orderItems = orderItemService.list(
-                new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderId, ticketOrder.getId())
-        );
-        if (orderItems.isEmpty()) {
-            return JsonData.buildError("订单明细不存在");
-        }
-
-        // 暂时注释掉“部分退款”逻辑：只要发起退款，就按整单中仍可退款的子票进行全额退款。
-        List<OrderItem> refundableItems = new java.util.ArrayList<>();
-        for (OrderItem item : orderItems) {
-            if (item.getTicketStatus() == null || item.getTicketStatus() != 1) {
-                continue;
-            }
-            refundableItems.add(item);
-        }
-        if (refundableItems.isEmpty()) {
-            return JsonData.buildError("没有可退款的子票");
-        }
-
-        java.math.BigDecimal refundAmount = java.math.BigDecimal.ZERO;
-        for (OrderItem item : refundableItems) {
-            java.math.BigDecimal price = item.getPrice() == null ? java.math.BigDecimal.ZERO : item.getPrice();
-            int quantity = item.getQuantity() == null ? 1 : item.getQuantity();
-            refundAmount = refundAmount.add(price.multiply(java.math.BigDecimal.valueOf(quantity)));
-        }
-
-        Map<String, Object> refundResult = wechatPayService.refund(
-                ticketOrder.getOrderNo(),
-                refundAmount.toPlainString(),
-                refundReason
-        );
-
-        for (OrderItem item : refundableItems) {
-            inventoryService.increaseInventory(
-                    item.getExhibitionId(),
-                    item.getTicketDate(),
-                    item.getTimeSlot(),
-                    item.getQuantity()
-            );
-            item.setTicketStatus(6);
-            item.setRefundRequestTime(java.time.LocalDateTime.now());
-            item.setRefundTime(java.time.LocalDateTime.now());
-            orderItemService.updateById(item);
-        }
-
-        refreshTicketOrderStatus(ticketOrder.getId());
-
-        Map<String, Object> result = new HashMap<>();
-        result.put("refund", refundResult);
-        result.put("orderNo", ticketOrder.getOrderNo());
-        result.put("refundAmount", refundAmount);
-        result.put("refundedItemCount", refundableItems.size());
-        result.put("refundedItemIds", refundableItems.stream().map(OrderItem::getId).toList());
-        return JsonData.buildSuccess(result);
-    }
-
-    private JsonData refundMallOrder(MallOrder mallOrder, String refundReason) {
-        if (mallOrder.getStatus() == null || mallOrder.getStatus() != 1) {
-            return JsonData.buildError("订单状态不支持退款");
-        }
-
-        Map<String, Object> refundResult = wechatPayService.refund(
-                mallOrder.getOrderNo(),
-                mallOrder.getTotalAmount().toString(),
-                refundReason
-        );
-
-        mallOrder.setStatus(4);
-        mallOrderService.updateById(mallOrder);
-
-        Map<String, Object> result = new HashMap<>();
-        result.put("refund", refundResult);
-        result.put("orderNo", mallOrder.getOrderNo());
-        return JsonData.buildSuccess(result);
-    }
-
-    private List<Long> extractTicketItemIds(Map<String, Object> body) {
-        if (body == null || !body.containsKey("ticketItemIds")) {
-            return java.util.Collections.emptyList();
-        }
-        Object value = body.get("ticketItemIds");
-        if (!(value instanceof List)) {
-            return java.util.Collections.emptyList();
-        }
-        List<?> raw = (List<?>) value;
-        List<Long> ids = new java.util.ArrayList<>();
-        for (Object item : raw) {
-            if (item == null) {
-                continue;
-            }
-            try {
-                ids.add(Long.parseLong(String.valueOf(item)));
-            } catch (Exception ignored) {
-            }
-        }
-        return ids;
-    }
-
     private void handleTicketOrderPayment(TicketOrder order) {
         if (order.getStatus() != 0) {
             return;
@@ -319,53 +193,6 @@ public class WechatPayController {
         }
         order.setStatus(1);
         order.setPayTime(java.time.LocalDateTime.now());
-        ticketOrderService.updateById(order);
-    }
-
-    private void refreshTicketOrderStatus(Long orderId) {
-        List<OrderItem> orderItems = orderItemService.list(
-                new LambdaQueryWrapper<OrderItem>().eq(OrderItem::getOrderId, orderId)
-        );
-        if (orderItems.isEmpty()) {
-            return;
-        }
-        int waiting = 0;
-        int refunding = 0;
-        int refunded = 0;
-        int used = 0;
-        for (OrderItem item : orderItems) {
-            Integer status = item.getTicketStatus();
-            if (status == null || status == 1) {
-                waiting++;
-            } else if (status == 2) {
-                used++;
-            } else if (status == 5) {
-                refunding++;
-            } else if (status == 6) {
-                refunded++;
-            }
-        }
-
-        TicketOrder order = ticketOrderService.getById(orderId);
-        if (order == null) {
-            return;
-        }
-        if (refunding > 0) {
-            order.setStatus(5);
-            order.setRefundRequestTime(java.time.LocalDateTime.now());
-            order.setRefundTime(null);
-        } else if (waiting > 0) {
-            order.setStatus(1);
-            order.setRefundRequestTime(null);
-            order.setRefundTime(null);
-        } else if (used > 0) {
-            order.setStatus(2);
-            order.setRefundRequestTime(null);
-            order.setRefundTime(null);
-        } else if (refunded > 0) {
-            order.setStatus(6);
-            order.setRefundTime(java.time.LocalDateTime.now());
-        }
         ticketOrderService.updateById(order);
     }
 

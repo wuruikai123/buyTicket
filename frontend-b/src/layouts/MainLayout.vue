@@ -69,7 +69,6 @@
             <el-icon><Setting /></el-icon>
             <span>系统设置</span>
           </template>
-          <el-menu-item index="/system/admin-list">管理员列表</el-menu-item>
           <el-menu-item index="/system/profile">个人设置</el-menu-item>
           <el-menu-item index="/system/about">关于展厅</el-menu-item>
           <el-menu-item index="/system/log">操作日志</el-menu-item>

@@ -95,17 +95,18 @@
           <h3 class="section-title">用户门票订单</h3>
           <el-table :data="ticketOrders" v-loading="orderLoading" border style="width: 100%">
             <el-table-column prop="exhibitionName" label="展览名称" min-width="200" />
-            <el-table-column prop="validTime" label="有效时间" width="200">
+            <el-table-column prop="validTime" label="有效时间" width="220">
               <template #default="{ row }">
-                <div class="time-slot">
+                <div class="time-slot" v-if="row.ticketDate && row.timeSlot">
                   <div>{{ formatDate(row.ticketDate) }} {{ row.timeSlot?.split('-')[0] }}</div>
                   <div>{{ formatDate(row.ticketDate) }} {{ row.timeSlot?.split('-')[1] }}</div>
                 </div>
+                <span v-else>-</span>
               </template>
             </el-table-column>
-            <el-table-column prop="price" label="价格" width="100">
+            <el-table-column prop="price" label="价格" width="120">
               <template #default="{ row }">
-                {{ row.price || row.unitPrice || 0 }}元
+                {{ formatAmount(row.totalAmount ?? row.price ?? row.unitPrice) }}元
               </template>
             </el-table-column>
             <el-table-column prop="createTime" label="成交时间" width="180">
@@ -120,9 +121,9 @@
                   link 
                   type="primary" 
                   @click="handleRefund(row)"
-                  :disabled="row.refundStatus === 1"
+                  :disabled="row.status === 6 || row.refundStatus === 1"
                 >
-                  {{ row.refundStatus === 1 ? '已退款' : '退款' }}
+                  {{ row.status === 6 || row.refundStatus === 1 ? '已退款' : '退款' }}
                 </el-button>
               </template>
             </el-table-column>
@@ -166,26 +167,49 @@ const loadData = async () => {
       size: pagination.size,
       ...searchForm
     })
+
+    let records: any[] = []
+    let total = 0
+
     // 处理分页数据，兼容不同的返回格式
     if (data && typeof data === 'object') {
       if (data.records) {
-    tableData.value = data.records
-        pagination.total = data.total || 0
+        records = data.records
+        total = Number(data.total || 0)
       } else if (Array.isArray(data)) {
-        tableData.value = data
-        pagination.total = data.length
-      } else {
-        tableData.value = []
-        pagination.total = 0
+        records = data
+        total = data.length
       }
+    }
+
+    const backendTotal = total
+    const fallbackTotal = backendTotal > 0 ? backendTotal : records.length
+    pagination.total = fallbackTotal
+
+    const maxPage = Math.max(1, Math.ceil(fallbackTotal / pagination.size))
+    if (pagination.page > maxPage) {
+      pagination.page = maxPage
+      await loadData()
+      return
+    }
+
+    const needClientSlice = backendTotal === 0 && records.length > pagination.size
+    if (needClientSlice) {
+      const start = (pagination.page - 1) * pagination.size
+      const end = start + pagination.size
+      tableData.value = records.slice(start, end)
     } else {
-      tableData.value = []
-      pagination.total = 0
+      tableData.value = records
+    }
+
+    if (fallbackTotal === 0) {
+      pagination.page = 1
     }
   } catch (error) {
     ElMessage.error('加载数据失败')
     tableData.value = []
     pagination.total = 0
+    pagination.page = 1
   } finally {
     loading.value = false
   }
@@ -217,11 +241,20 @@ const formatDate = (date: string | undefined) => {
   return `${year}年${month}月${day}日`
 }
 
-const handleSizeChange = () => {
+const formatAmount = (value: any) => {
+  const n = Number(value)
+  if (Number.isNaN(n)) return '0.00'
+  return n.toFixed(2)
+}
+
+const handleSizeChange = (size: number) => {
+  pagination.size = size
+  pagination.page = 1
   loadData()
 }
 
-const handlePageChange = () => {
+const handlePageChange = (page: number) => {
+  pagination.page = page
   loadData()
 }
 
@@ -345,26 +378,30 @@ const handleInvalidateOrder = async (row: any) => {
 }
 
 const handleRefund = async (row: any) => {
-  if (row.refundStatus === 1) {
+  const refunded = row.status === 6 || row.refundStatus === 1
+  if (refunded) {
     ElMessage.info('该订单已退款')
     return
   }
+
   try {
-    await ElMessageBox.confirm('确定要退款该订单吗？', '提示', {
+    await ElMessageBox.confirm('确定要退款该订单吗？系统将调用支付通道原路退款。', '提示', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
       type: 'warning'
     })
-    // TODO: 调用退款接口
+
+    await orderApi.refundTicketOrder(row.id)
     ElMessage.success('退款成功')
+
     if (currentUser.value) {
-      await loadTicketOrders(currentUser.value.id)
+      await handleView(currentUser.value)
     }
   } catch (error: any) {
     if (error !== 'cancel') {
-      ElMessage.error('退款失败')
+      ElMessage.error(error?.message || '退款失败')
+    }
   }
-}
 }
 
 

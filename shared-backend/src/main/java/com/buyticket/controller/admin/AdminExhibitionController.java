@@ -59,13 +59,17 @@ public class AdminExhibitionController {
                     queryWrapper.gt(Exhibition::getStartDate, today);
                 } else if (status == 2) {
                     queryWrapper.lt(Exhibition::getEndDate, today);
-                } else if (status == 3) {
-                    queryWrapper.eq(Exhibition::getStatus, 3);
                 }
             }
+            queryWrapper.orderByAsc(Exhibition::getStartDate)
+                    .orderByAsc(Exhibition::getEndDate);
+        } else {
+            queryWrapper.last("ORDER BY CASE " +
+                    "WHEN status = -1 THEN 3 " +
+                    "WHEN start_date <= CURDATE() AND end_date >= CURDATE() THEN 0 " +
+                    "WHEN start_date > CURDATE() THEN 1 " +
+                    "ELSE 2 END ASC, start_date ASC, end_date ASC");
         }
-        queryWrapper.orderByAsc(Exhibition::getStartDate)
-                .orderByAsc(Exhibition::getEndDate);
 
         Page<Exhibition> exhibitionPage = exhibitionService.page(pageInfo, queryWrapper);
         

@@ -119,6 +119,7 @@ const paying = ref(false)
 const qrCodeUrl = ref('')
 const checking = ref(false)
 const pollTimer = ref<number | undefined>(undefined)
+const creatingJsapi = ref(false)
 
 const isWechatBrowser = () => /micromessenger/i.test(window.navigator.userAgent)
 
@@ -237,10 +238,37 @@ const doWechatJsapiPay = async (orderNo: string, code: string) => {
   )
 }
 
-const getOauthRedirectUri = () => {
-  const url = new URL(window.location.href)
-  url.hash = url.hash.replace(/([?&])(code|state)=[^&]*/g, '$1').replace(/[?&]$/, '')
-  return url.toString()
+const clearWechatAuthQuery = () => {
+  const currentUrl = new URL(window.location.href)
+  let changed = false
+
+  if (currentUrl.searchParams.has('code')) {
+    currentUrl.searchParams.delete('code')
+    changed = true
+  }
+  if (currentUrl.searchParams.has('state')) {
+    currentUrl.searchParams.delete('state')
+    changed = true
+  }
+
+  const hash = currentUrl.hash || ''
+  const hashIdx = hash.indexOf('?')
+  if (hashIdx >= 0) {
+    const hashPath = hash.substring(0, hashIdx)
+    const hashQuery = new URLSearchParams(hash.substring(hashIdx + 1))
+    const before = hashQuery.toString()
+    hashQuery.delete('code')
+    hashQuery.delete('state')
+    const after = hashQuery.toString()
+    if (before !== after) {
+      currentUrl.hash = after ? `${hashPath}?${after}` : hashPath
+      changed = true
+    }
+  }
+
+  if (changed) {
+    window.history.replaceState({}, '', currentUrl.toString())
+  }
 }
 
 const handleWechatPay = async (orderNo: string) => {
@@ -249,11 +277,16 @@ const handleWechatPay = async (orderNo: string) => {
     return
   }
 
+  if (creatingJsapi.value) {
+    ElMessage.warning('正在拉起微信支付，请勿重复点击')
+    return
+  }
+
   const code = parseQueryFromHash('code') || (route.query.code as string) || ''
   const state = parseQueryFromHash('state') || (route.query.state as string) || ''
 
   if (!code) {
-    const redirectUri = getOauthRedirectUri()
+    const redirectUri = `${window.location.origin}${window.location.pathname}${window.location.hash}`
     const oauth = await paymentApi.getWechatOauthUrl({ orderNo, redirectUri, state: 'jsapi' })
     if (!oauth?.oauth_url) {
       throw new Error('获取微信授权地址失败')
@@ -266,7 +299,21 @@ const handleWechatPay = async (orderNo: string) => {
     throw new Error('微信授权状态校验失败，请返回重试')
   }
 
-  await doWechatJsapiPay(orderNo, code)
+  const codeCacheKey = `wechat_jsapi_code_used_${orderNo}`
+  const usedCode = sessionStorage.getItem(codeCacheKey)
+  if (usedCode && usedCode === code) {
+    clearWechatAuthQuery()
+    throw new Error('当前授权码已使用，请重新点击微信支付发起授权')
+  }
+
+  creatingJsapi.value = true
+  try {
+    await doWechatJsapiPay(orderNo, code)
+    sessionStorage.setItem(codeCacheKey, code)
+    clearWechatAuthQuery()
+  } finally {
+    creatingJsapi.value = false
+  }
 }
 
 const handlePay = async () => {

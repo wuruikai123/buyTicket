@@ -26,6 +26,10 @@ export const orderApi = {
     return request.delete(`/admin/order/ticket/${id}`)
   },
 
+  refundTicketOrder(id: number) {
+    return request.post(`/admin/order/ticket/${id}/refund`, {})
+  },
+
   // 商城订单 - 管理端
   getMallOrderList(params: any) {
     return request.get('/admin/order/mall/list', { params })

@@ -1,15 +1,19 @@
 package com.buyticket.controller.admin;
 
+import com.buyticket.entity.OrderItem;
 import com.buyticket.entity.SpecialTicket;
 import com.buyticket.entity.TicketOrder;
 import com.buyticket.service.SpecialTicketService;
 import com.buyticket.service.TicketOrderService;
+import com.buyticket.service.OrderItemService;
 import com.buyticket.utils.JsonData;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.List;
+import java.util.ArrayList;
 
 /**
  * 统一核销Controller
@@ -24,6 +28,9 @@ public class AdminVerifyController {
     
     @Autowired
     private SpecialTicketService specialTicketService;
+
+    @Autowired
+    private OrderItemService orderItemService;
     
     /**
      * 统一核销接口
@@ -34,22 +41,38 @@ public class AdminVerifyController {
         String code = params.get("code");
         Long adminId = params.get("adminId") != null ? Long.parseLong(params.get("adminId")) : null;
         String adminName = params.get("adminName");
-        
+
         if (code == null || code.trim().isEmpty()) {
             return JsonData.buildError("核销码不能为空");
         }
-        
+
         code = code.trim();
-        
+
         try {
             // 判断是特殊票券还是普通订单
             if (code.startsWith("ST")) {
                 // 特殊票券核销
                 return verifySpecialTicket(code, adminId, adminName);
-            } else {
-                // 普通订单核销
-                return verifyNormalOrder(code);
             }
+
+            // 子票二维码格式：TT|{orderNo}|{ticketItemId}
+            if (code.startsWith("TT|")) {
+                String[] parts = code.split("\\|");
+                if (parts.length != 3) {
+                    return JsonData.buildError("无效的子票核销码");
+                }
+                String orderNo = parts[1];
+                Long ticketItemId;
+                try {
+                    ticketItemId = Long.parseLong(parts[2]);
+                } catch (Exception e) {
+                    return JsonData.buildError("无效的子票ID");
+                }
+                return verifyTicketItem(orderNo, ticketItemId);
+            }
+
+            // 兼容旧码：直接订单号
+            return verifyNormalOrder(code);
         } catch (Exception e) {
             return JsonData.buildError("核销失败：" + e.getMessage());
         }
@@ -81,18 +104,42 @@ public class AdminVerifyController {
     }
     
     /**
-     * 核销普通订单
+     * 核销普通订单（按订单号一次核销全部可核销子票）
      */
     private JsonData verifyNormalOrder(String orderNo) {
         try {
-            TicketOrder order = ticketOrderService.verifyByOrderNo(orderNo);
-            
+            int verifiedCount = ticketOrderService.verifyByOrderNo(orderNo);
+            TicketOrder order = ticketOrderService.getByOrderNo(orderNo);
+
             Map<String, Object> result = new HashMap<>();
             result.put("type", "normal");
             result.put("orderNo", orderNo);
-            result.put("verifyTime", order.getVerifyTime());
-            result.put("message", "订单核销成功");
-            
+            result.put("verifiedCount", verifiedCount);
+            result.put("verifyTime", order == null ? null : order.getVerifyTime());
+            result.put("message", "订单核销成功（本次核销" + verifiedCount + "张）");
+
+            return JsonData.buildSuccess(result);
+        } catch (RuntimeException e) {
+            return JsonData.buildError(e.getMessage());
+        }
+    }
+
+    /**
+     * 按子票ID核销指定子票
+     */
+    private JsonData verifyTicketItem(String orderNo, Long ticketItemId) {
+        try {
+            OrderItem verifiedItem = ticketOrderService.verifyByTicketItemId(ticketItemId, orderNo);
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("type", "normal");
+            result.put("orderNo", orderNo);
+            result.put("verifiedItemId", verifiedItem.getId());
+            result.put("verifiedBuyerName", verifiedItem.getBuyerName());
+            result.put("verifiedTicketDate", verifiedItem.getTicketDate());
+            result.put("verifiedTimeSlot", verifiedItem.getTimeSlot());
+            result.put("message", "指定子票核销成功");
+
             return JsonData.buildSuccess(result);
         } catch (RuntimeException e) {
             return JsonData.buildError(e.getMessage());
@@ -131,11 +178,34 @@ public class AdminVerifyController {
             } else {
                 // 查询普通订单
                 TicketOrder order = ticketOrderService.getByOrderNo(code);
-                
+
                 if (order == null) {
                     return JsonData.buildError("订单不存在");
                 }
-                
+
+                List<OrderItem> items = orderItemService.list(
+                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OrderItem>()
+                        .eq(OrderItem::getOrderId, order.getId())
+                );
+
+                int waitingCount = 0;
+                int usedCount = 0;
+                List<Map<String, Object>> pendingItems = new ArrayList<>();
+                for (OrderItem item : items) {
+                    Integer ts = item.getTicketStatus() == null ? 1 : item.getTicketStatus();
+                    if (ts == 1) {
+                        waitingCount++;
+                        Map<String, Object> p = new HashMap<>();
+                        p.put("id", item.getId());
+                        p.put("buyerName", item.getBuyerName());
+                        p.put("ticketDate", item.getTicketDate());
+                        p.put("timeSlot", item.getTimeSlot());
+                        pendingItems.add(p);
+                    } else if (ts == 2) {
+                        usedCount++;
+                    }
+                }
+
                 Map<String, Object> result = new HashMap<>();
                 result.put("type", "normal");
                 result.put("orderNo", order.getOrderNo());
@@ -143,7 +213,11 @@ public class AdminVerifyController {
                 result.put("statusText", getOrderStatusText(order.getStatus()));
                 result.put("verifyTime", order.getVerifyTime());
                 result.put("contactName", order.getContactName());
-                
+                result.put("waitingCount", waitingCount);
+                result.put("usedCount", usedCount);
+                result.put("totalCount", items == null ? 0 : items.size());
+                result.put("pendingItems", pendingItems);
+
                 return JsonData.buildSuccess(result);
             }
         } catch (Exception e) {

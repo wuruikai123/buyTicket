@@ -52,6 +52,25 @@
             <div>证件号：{{ item.buyerIdCard || '-' }}</div>
             <div v-if="item.buyerPhone">手机号：{{ item.buyerPhone }}</div>
           </div>
+
+          <div class="ticket-actions">
+            <el-button
+              v-if="canRequestRefund(item)"
+              size="small"
+              type="danger"
+              plain
+              @click="handleRequestRefundByItem(item)"
+            >
+              单独退款
+            </el-button>
+            <el-button
+              v-if="canCancelRefund(item)"
+              size="small"
+              @click="handleCancelRefundByItem(item)"
+            >
+              取消退款
+            </el-button>
+          </div>
         </div>
       </div>
 
@@ -69,11 +88,20 @@
       <div class="order-info-section">
         <h3 class="section-title">订单信息</h3>
 
-        <div class="qrcode-section" v-if="orderType === 'ticket' && order.status === 1 && order.orderNo">
-          <div class="qrcode-wrapper">
-            <qrcode-vue :value="qrcodeData" :size="200" level="H" />
+        <div class="qrcode-section" v-if="orderType === 'ticket' && canShowTicketQrcodes">
+          <h4 class="qrcode-title">门票二维码（每张票独立核销）</h4>
+          <div class="ticket-qrcode-list">
+            <div class="ticket-qrcode-item" v-for="item in activeTicketItems" :key="item.id">
+              <div class="ticket-qrcode-meta">
+                <div class="ticket-qrcode-name">{{ item.buyerName || '未填写姓名' }}</div>
+                <div class="ticket-qrcode-time">{{ formatTicketTime(item) }}</div>
+              </div>
+              <div class="qrcode-wrapper">
+                <qrcode-vue :value="buildTicketQrcode(item)" :size="160" level="H" />
+              </div>
+              <p class="qrcode-tip">出示此二维码可核销该子票</p>
+            </div>
           </div>
-          <p class="qrcode-tip">请向工作人员出示此二维码进行核销</p>
         </div>
 
         <div class="info-row order-no-row" v-if="order.orderNo">
@@ -183,9 +211,15 @@ const order = ref<OrderDetail>({
 const selectedRefundIds = ref<number[]>([])
 const selectedCancelRefundIds = ref<number[]>([])
 
-const qrcodeData = computed(() => {
-  if (!order.value.orderNo) return ''
-  return JSON.stringify({ orderNo: order.value.orderNo, orderId: order.value.id, type: 'ticket', timestamp: Date.now() })
+const activeTicketItems = computed(() => {
+  return (order.value.items || []).filter(item => {
+    const status = item.ticketStatus || 1
+    return status === 1 || status === 5
+  })
+})
+
+const canShowTicketQrcodes = computed(() => {
+  return orderType.value === 'ticket' && !!order.value.orderNo && activeTicketItems.value.length > 0
 })
 
 const ticketSummary = computed(() => {
@@ -259,6 +293,19 @@ const statusClass = (status?: number) => {
 const resetSelections = () => {
   selectedRefundIds.value = []
   selectedCancelRefundIds.value = []
+}
+
+const buildTicketQrcode = (item: OrderItem) => {
+  if (!order.value.orderNo || !item.id) return ''
+  return `TT|${order.value.orderNo}|${item.id}`
+}
+
+const canRequestRefund = (item: OrderItem) => {
+  return (item.ticketStatus || 1) === 1
+}
+
+const canCancelRefund = (item: OrderItem) => {
+  return item.ticketStatus === 5
 }
 
 const loadOrderDetail = async () => {
@@ -338,8 +385,32 @@ const handleRequestRefund = async () => {
   }
 }
 
+const handleRequestRefundByItem = async (item: OrderItem) => {
+  if (!item.id) return
+  try {
+    await ElMessageBox.confirm('确认只退款这1张票吗？', '单票退款', { type: 'warning' })
+    await ticketApi.requestRefund(orderId.value, [item.id])
+    ElMessage.success('该子票退款申请已提交')
+    await loadOrderDetail()
+  } catch (e: any) {
+    if (e !== 'cancel') ElMessage.error(e.message || '单票退款失败')
+  }
+}
+
+const handleCancelRefundByItem = async (item: OrderItem) => {
+  if (!item.id) return
+  try {
+    await ElMessageBox.confirm('确认取消这1张票的退款申请吗？', '取消退款', { type: 'warning' })
+    await ticketApi.cancelRefund(orderId.value, [item.id])
+    ElMessage.success('已取消该子票退款申请')
+    await loadOrderDetail()
+  } catch (e: any) {
+    if (e !== 'cancel') ElMessage.error(e.message || '取消退款失败')
+  }
+}
+
 const handleCancelRefund = async () => {
-  ElMessage.info('子票取消退款入口已关闭，请使用整单退款')
+  ElMessage.info('请在对应子票上点击“取消退款”')
 }
 
 onMounted(() => {

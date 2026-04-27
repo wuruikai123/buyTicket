@@ -135,15 +135,42 @@ const loadData = async () => {
     if (searchForm.status !== undefined) {
       params.status = searchForm.status
     }
+
     const data: any = await orderApi.getTicketOrderList(params)
-    tableData.value = data.records || []
-    pagination.total = data.total || 0
-    totalCount.value = pagination.total
+    const records = data?.records || []
+    const backendTotal = Number(data?.total || 0)
+    const fallbackTotal = backendTotal > 0 ? backendTotal : records.length
+
+    pagination.total = fallbackTotal
+    totalCount.value = fallbackTotal
+
+    // 当前页超出最大页时，自动回退到最后一页并重拉
+    const maxPage = Math.max(1, Math.ceil(fallbackTotal / pagination.size))
+    if (pagination.page > maxPage) {
+      pagination.page = maxPage
+      await loadData()
+      return
+    }
+
+    // 若后端未分页，前端兜底切片
+    const needClientSlice = backendTotal === 0 && records.length > pagination.size
+    if (needClientSlice) {
+      const start = (pagination.page - 1) * pagination.size
+      const end = start + pagination.size
+      tableData.value = records.slice(start, end)
+    } else {
+      tableData.value = records
+    }
+
+    if (fallbackTotal === 0) {
+      pagination.page = 1
+    }
   } catch (error) {
     ElMessage.error('加载数据失败')
     tableData.value = []
     pagination.total = 0
     totalCount.value = 0
+    pagination.page = 1
   } finally {
     loading.value = false
   }
@@ -154,8 +181,14 @@ const handleSearch = () => {
   loadData()
 }
 
-const handleSizeChange = () => loadData()
-const handlePageChange = () => loadData()
+const handleSizeChange = () => {
+  pagination.page = 1
+  loadData()
+}
+
+const handlePageChange = () => {
+  loadData()
+}
 
 const handleVoid = async (row: any) => {
   try {

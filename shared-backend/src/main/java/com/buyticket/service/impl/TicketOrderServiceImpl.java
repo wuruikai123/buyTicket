@@ -156,14 +156,14 @@ public class TicketOrderServiceImpl extends ServiceImpl<TicketOrderMapper, Ticke
     
     @Override
     @Transactional
-    public TicketOrder verifyByOrderNo(String orderNo) {
+    public int verifyByOrderNo(String orderNo) {
         TicketOrder order = getByOrderNo(orderNo);
-        
+
         if (order == null) {
             throw new RuntimeException("订单不存在");
         }
-        
-        if (order.getStatus() != 1) {
+
+        if (order.getStatus() != 1 && order.getStatus() != 5) {
             String statusText = "";
             switch (order.getStatus()) {
                 case 0: statusText = "待支付"; break;
@@ -176,12 +176,114 @@ public class TicketOrderServiceImpl extends ServiceImpl<TicketOrderMapper, Ticke
             }
             throw new RuntimeException("订单状态不正确，当前状态：" + statusText);
         }
-        
-        // 更新订单状态为已使用
-        order.setStatus(2);
-        order.setVerifyTime(java.time.LocalDateTime.now());
+
+        LambdaQueryWrapper<OrderItem> itemQuery = new LambdaQueryWrapper<>();
+        itemQuery.eq(OrderItem::getOrderId, order.getId());
+        java.util.List<OrderItem> orderItems = orderItemMapper.selectList(itemQuery);
+        if (orderItems == null || orderItems.isEmpty()) {
+            throw new RuntimeException("订单信息异常，无法核销");
+        }
+
+        int verifiedCount = 0;
+        for (OrderItem item : orderItems) {
+            Integer ts = item.getTicketStatus() == null ? 1 : item.getTicketStatus();
+            if (ts == 1) {
+                item.setTicketStatus(2);
+                orderItemMapper.updateById(item);
+                verifiedCount++;
+            }
+        }
+
+        if (verifiedCount <= 0) {
+            throw new RuntimeException("无可核销子票");
+        }
+
+        int waiting = 0;
+        int used = 0;
+        int refunding = 0;
+        int refunded = 0;
+        for (OrderItem item : orderItems) {
+            Integer ts = item.getTicketStatus() == null ? 1 : item.getTicketStatus();
+            if (ts == 1) waiting++;
+            else if (ts == 2) used++;
+            else if (ts == 5) refunding++;
+            else if (ts == 6) refunded++;
+        }
+
+        if (refunding > 0) {
+            order.setStatus(5);
+        } else if (waiting > 0) {
+            order.setStatus(1);
+        } else if (used > 0) {
+            order.setStatus(2);
+            order.setVerifyTime(java.time.LocalDateTime.now());
+        } else if (refunded == orderItems.size()) {
+            order.setStatus(6);
+        }
+
         this.updateById(order);
-        
-        return order;
+        return verifiedCount;
+    }
+
+    @Override
+    @Transactional
+    public OrderItem verifyByTicketItemId(Long ticketItemId, String orderNo) {
+        if (ticketItemId == null) {
+            throw new RuntimeException("子票ID不能为空");
+        }
+
+        OrderItem target = orderItemMapper.selectById(ticketItemId);
+        if (target == null) {
+            throw new RuntimeException("子票不存在");
+        }
+
+        TicketOrder order = this.getById(target.getOrderId());
+        if (order == null) {
+            throw new RuntimeException("订单不存在");
+        }
+        if (orderNo != null && !orderNo.isBlank() && !orderNo.equals(order.getOrderNo())) {
+            throw new RuntimeException("子票与订单不匹配");
+        }
+        if (order.getStatus() != 1 && order.getStatus() != 5) {
+            throw new RuntimeException("当前订单状态不可核销");
+        }
+
+        Integer ts = target.getTicketStatus() == null ? 1 : target.getTicketStatus();
+        if (ts != 1) {
+            throw new RuntimeException("该子票当前不可核销");
+        }
+
+        target.setTicketStatus(2);
+        orderItemMapper.updateById(target);
+
+        LambdaQueryWrapper<OrderItem> itemQuery = new LambdaQueryWrapper<>();
+        itemQuery.eq(OrderItem::getOrderId, order.getId());
+        java.util.List<OrderItem> orderItems = orderItemMapper.selectList(itemQuery);
+
+        int waiting = 0;
+        int used = 0;
+        int refunding = 0;
+        int refunded = 0;
+        for (OrderItem item : orderItems) {
+            Integer status = item.getTicketStatus() == null ? 1 : item.getTicketStatus();
+            if (status == 1) waiting++;
+            else if (status == 2) used++;
+            else if (status == 5) refunding++;
+            else if (status == 6) refunded++;
+        }
+
+        if (refunding > 0) {
+            order.setStatus(5);
+        } else if (waiting > 0) {
+            order.setStatus(1);
+        } else if (used > 0) {
+            order.setStatus(2);
+            order.setVerifyTime(java.time.LocalDateTime.now());
+        } else if (refunded == orderItems.size()) {
+            order.setStatus(6);
+        }
+
+        this.updateById(order);
+        return target;
     }
 }

@@ -34,7 +34,7 @@
         <el-table-column prop="orderNo" label="订单号" width="180" />
         <el-table-column prop="exhibitionName" label="展览名称" />
         <el-table-column prop="contactName" label="真实姓名" width="100" />
-        <el-table-column prop="contactPhone" label="身份证号" width="180" />
+        <el-table-column prop="contactPhone" label="手机号" width="180" />
         <el-table-column prop="totalAmount" label="金额" width="100">
           <template #default="{ row }">
             ¥{{ row.totalAmount }}
@@ -96,8 +96,8 @@
         :total="total"
         :page-sizes="[10, 20, 50, 100]"
         layout="total, sizes, prev, pager, next, jumper"
-        @size-change="fetchData"
-        @current-change="fetchData"
+        @size-change="handleSizeChange"
+        @current-change="handleCurrentChange"
         style="margin-top: 20px; justify-content: flex-end"
       />
     </el-card>
@@ -116,7 +116,7 @@
         </el-descriptions-item>
         <el-descriptions-item label="展览名称">{{ detailData.exhibitionName }}</el-descriptions-item>
         <el-descriptions-item label="真实姓名">{{ detailData.contactName }}</el-descriptions-item>
-        <el-descriptions-item label="身份证号">{{ detailData.contactPhone }}</el-descriptions-item>
+        <el-descriptions-item label="手机号">{{ detailData.contactPhone }}</el-descriptions-item>
         <el-descriptions-item label="订单金额">¥{{ detailData.totalAmount }}</el-descriptions-item>
         <el-descriptions-item label="下单时间">{{ detailData.createTime }}</el-descriptions-item>
         <el-descriptions-item label="核销时间">{{ detailData.verifyTime || '未核销' }}</el-descriptions-item>
@@ -164,15 +164,59 @@ const fetchData = async () => {
       size: pageSize.value,
       status: searchForm.status
     })
-    tableData.value = res.records || []
-    total.value = res.total || 0
+
+    let records = res.records || []
+    // 兜底：当后端状态尚未及时汇总到母订单时，前端也保证“退款中”可见
+    if (searchForm.status === 5) {
+      records = records.filter((row: any) => row.status === 5 || !!row.refundRequestTime)
+    }
+
+    // 兼容后端未正确分页/total返回0的场景
+    const backendTotal = Number(searchForm.status === 5 ? records.length : (res.total || 0))
+    const fallbackTotal = backendTotal > 0 ? backendTotal : records.length
+    total.value = fallbackTotal
+
+    const maxPage = Math.max(1, Math.ceil(fallbackTotal / pageSize.value))
+    if (currentPage.value > maxPage) {
+      currentPage.value = maxPage
+      await fetchData()
+      return
+    }
+
+    // 若后端返回全量数据（未分页），前端按当前分页做切片展示
+    const needClientSlice = backendTotal === 0 && records.length > pageSize.value
+    if (needClientSlice) {
+      const start = (currentPage.value - 1) * pageSize.value
+      const end = start + pageSize.value
+      tableData.value = records.slice(start, end)
+    } else {
+      tableData.value = records
+    }
+
+    if (fallbackTotal === 0) {
+      currentPage.value = 1
+    }
   } catch (e: any) {
     ElMessage.error(e.message || '获取数据失败')
+    tableData.value = []
+    total.value = 0
+    currentPage.value = 1
   }
 }
 
 const handleSearch = () => {
   currentPage.value = 1
+  fetchData()
+}
+
+const handleSizeChange = (size: number) => {
+  pageSize.value = size
+  currentPage.value = 1
+  fetchData()
+}
+
+const handleCurrentChange = (page: number) => {
+  currentPage.value = page
   fetchData()
 }
 
