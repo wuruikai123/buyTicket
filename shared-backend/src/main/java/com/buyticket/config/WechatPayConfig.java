@@ -32,6 +32,12 @@ public class WechatPayConfig {
     @Value("${wechat.platform-certificate-path:}")
     private String platformCertificatePathValue;
 
+    @Value("${wechat.platform-public-key-id:}")
+    private String platformPublicKeyIdValue;
+
+    @Value("${wechat.platform-public-key-path:}")
+    private String platformPublicKeyPathValue;
+
     @Value("${wechat.verify-notify-signature:true}")
     private Boolean verifyNotifySignatureValue;
 
@@ -43,6 +49,8 @@ public class WechatPayConfig {
     public static String privateKeyPath;
     public static String notifyUrl;
     public static String platformCertificatePath;
+    public static String platformPublicKeyId;
+    public static String platformPublicKeyPath;
     public static Boolean verifyNotifySignature;
 
     @PostConstruct
@@ -55,6 +63,8 @@ public class WechatPayConfig {
         privateKeyPath = privateKeyPathValue;
         notifyUrl = notifyUrlValue;
         platformCertificatePath = platformCertificatePathValue;
+        platformPublicKeyId = platformPublicKeyIdValue;
+        platformPublicKeyPath = platformPublicKeyPathValue;
         verifyNotifySignature = verifyNotifySignatureValue;
     }
 }

@@ -65,7 +65,9 @@ public class WechatPayServiceImpl implements WechatPayService {
 
         try {
             this.merchantPrivateKey = loadPrivateKey(WechatPayConfig.privateKeyPath);
-            if (!isBlank(WechatPayConfig.platformCertificatePath)) {
+            if (!isBlank(WechatPayConfig.platformPublicKeyPath)) {
+                this.wechatPlatformPublicKey = loadPlatformPublicKeyFromPem(WechatPayConfig.platformPublicKeyPath);
+            } else if (!isBlank(WechatPayConfig.platformCertificatePath)) {
                 this.wechatPlatformPublicKey = loadPlatformPublicKey(WechatPayConfig.platformCertificatePath);
             }
             this.initialized = true;
@@ -236,10 +238,14 @@ public class WechatPayServiceImpl implements WechatPayService {
             return;
         }
         if (wechatPlatformPublicKey == null) {
-            throw new IllegalStateException("未配置微信平台证书路径，无法校验回调签名");
+            throw new IllegalStateException("未配置微信平台公钥/证书，无法校验回调签名");
         }
-        if (isBlank(timestamp) || isBlank(nonce) || isBlank(body) || isBlank(signature)) {
+        if (isBlank(timestamp) || isBlank(nonce) || isBlank(body) || isBlank(signature) || isBlank(serial)) {
             throw new IllegalArgumentException("微信回调签名参数不完整");
+        }
+        if (!isBlank(WechatPayConfig.platformPublicKeyId)
+                && !WechatPayConfig.platformPublicKeyId.trim().equals(serial.trim())) {
+            throw new IllegalArgumentException("微信回调Wechatpay-Serial与配置的平台公钥ID不一致");
         }
         try {
             String message = timestamp + "\n" + nonce + "\n" + body + "\n";
@@ -278,6 +284,9 @@ public class WechatPayServiceImpl implements WechatPayService {
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setAccept(java.util.List.of(MediaType.APPLICATION_JSON));
         headers.set("Authorization", buildAuthorization(method.name(), path, body));
+        if (!isBlank(WechatPayConfig.platformPublicKeyId)) {
+            headers.set("Wechatpay-Serial", WechatPayConfig.platformPublicKeyId);
+        }
         headers.set("User-Agent", "buyticket-wechatpay-client");
         headers.set("Accept-Charset", StandardCharsets.UTF_8.name());
 
@@ -401,6 +410,17 @@ public class WechatPayServiceImpl implements WechatPayService {
         return certificate.getPublicKey();
     }
 
+    private PublicKey loadPlatformPublicKeyFromPem(String publicKeyPath) throws Exception {
+        String content = Files.readString(Path.of(publicKeyPath), StandardCharsets.UTF_8)
+                .replace("-----BEGIN PUBLIC KEY-----", "")
+                .replace("-----END PUBLIC KEY-----", "")
+                .replaceAll("\\s+", "");
+        byte[] decoded = Base64.getDecoder().decode(content);
+        java.security.spec.X509EncodedKeySpec keySpec = new java.security.spec.X509EncodedKeySpec(decoded);
+        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+        return keyFactory.generatePublic(keySpec);
+    }
+
     private void logWechatConfigDiagnostics() {
         Path privateKey = isBlank(WechatPayConfig.privateKeyPath) ? null : Path.of(WechatPayConfig.privateKeyPath);
         Path platformCert = isBlank(WechatPayConfig.platformCertificatePath) ? null : Path.of(WechatPayConfig.platformCertificatePath);
@@ -410,7 +430,11 @@ public class WechatPayServiceImpl implements WechatPayService {
         boolean platformCertExists = platformCert != null && Files.exists(platformCert);
         boolean platformCertReadable = platformCert != null && Files.isReadable(platformCert);
 
-        log.info("微信支付配置诊断: appIdSet={}, mchIdSet={}, apiV3KeySet={}, serialSet={}, notifyUrlSet={}, verifyNotifySignature={}, privateKeyPath={}, privateKeyExists={}, privateKeyReadable={}, platformCertPath={}, platformCertExists={}, platformCertReadable={}",
+        Path platformPubKey = isBlank(WechatPayConfig.platformPublicKeyPath) ? null : Path.of(WechatPayConfig.platformPublicKeyPath);
+        boolean platformPubKeyExists = platformPubKey != null && Files.exists(platformPubKey);
+        boolean platformPubKeyReadable = platformPubKey != null && Files.isReadable(platformPubKey);
+
+        log.info("微信支付配置诊断: appIdSet={}, mchIdSet={}, apiV3KeySet={}, serialSet={}, notifyUrlSet={}, verifyNotifySignature={}, privateKeyPath={}, privateKeyExists={}, privateKeyReadable={}, platformCertPath={}, platformCertExists={}, platformCertReadable={}, platformPublicKeyId={}, platformPublicKeyPath={}, platformPublicKeyExists={}, platformPublicKeyReadable={}",
                 !isBlank(WechatPayConfig.appId),
                 !isBlank(WechatPayConfig.mchId),
                 !isBlank(WechatPayConfig.apiV3Key),
@@ -422,7 +446,11 @@ public class WechatPayServiceImpl implements WechatPayService {
                 privateKeyReadable,
                 WechatPayConfig.platformCertificatePath,
                 platformCertExists,
-                platformCertReadable);
+                platformCertReadable,
+                mask(WechatPayConfig.platformPublicKeyId),
+                WechatPayConfig.platformPublicKeyPath,
+                platformPubKeyExists,
+                platformPubKeyReadable);
     }
 
     private String buildMissingConfigItems() {

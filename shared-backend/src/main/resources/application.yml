@@ -57,8 +57,10 @@ wechat:
   private-key-path: "${WECHAT_PRIVATE_KEY_PATH:appkey/apiclient_key.pem}"
   notify-url: "https://ai-yishuguan.com/api/v1/wechat-pay/notify"
   platform-certificate-path: "${WECHAT_PLATFORM_CERT_PATH:}"
-  # 生产建议配置 WECHAT_PLATFORM_CERT_PATH 并开启验签
-  verify-notify-signature: ${WECHAT_VERIFY_NOTIFY_SIGNATURE:false}
+  platform-public-key-id: "${WECHAT_PLATFORM_PUBLIC_KEY_ID:PUB_KEY_ID_0117299325722026042300291529002400}"
+  platform-public-key-path: "${WECHAT_PLATFORM_PUBLIC_KEY_PATH:appkey/wechatpay_platform_public_key.pem}"
+  # 生产建议开启验签；可使用平台证书或平台公钥模式
+  verify-notify-signature: ${WECHAT_VERIFY_NOTIFY_SIGNATURE:true}
 
 # 汇付宝支付配置
 huifu:
