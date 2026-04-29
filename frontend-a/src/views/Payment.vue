@@ -286,7 +286,10 @@ const handleWechatPay = async (orderNo: string) => {
   const state = parseQueryFromHash('state') || (route.query.state as string) || ''
 
   if (!code) {
-    const redirectUri = `${window.location.origin}${window.location.pathname}${window.location.hash}`
+    const currentUrl = new URL(window.location.href)
+    const secureOrigin = currentUrl.origin.replace(/^http:/i, 'https:')
+    const redirectUri = `${secureOrigin}${window.location.pathname}${window.location.hash}`
+    console.info('[Wechat OAuth] redirect_uri=', redirectUri)
     const oauth = await paymentApi.getWechatOauthUrl({ orderNo, redirectUri, state: 'jsapi' })
     if (!oauth?.oauth_url) {
       throw new Error('获取微信授权地址失败')

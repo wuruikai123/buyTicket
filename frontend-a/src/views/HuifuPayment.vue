@@ -24,11 +24,11 @@
       <div class="payment-methods">
         <h3>选择支付方式</h3>
         <div class="method-list">
-          <!-- 微信支付 -->
+          <!-- 微信支付（已迁移到微信原生JSAPI，不再走汇付） -->
           <div 
-            class="method-item" 
+            class="method-item disabled" 
             :class="{ active: selectedMethod === 'WECHAT' }"
-            @click="selectedMethod = 'WECHAT'"
+            @click="handleWechatDisabled"
           >
             <div class="method-icon wechat-icon">
               <svg viewBox="0 0 1024 1024" width="40" height="40">
@@ -117,10 +117,10 @@ const router = useRouter()
 const orderId = ref<number>(0)
 const orderType = ref<'ticket' | 'mall'>('ticket')
 const orderInfo = ref<any>(null)
-const selectedMethod = ref<'WECHAT' | 'ALIPAY' | ''>('')
+const selectedMethod = ref<'ALIPAY' | ''>('')
 const paying = ref(false)
 const qrCodeUrl = ref('')
-const qrCodePayType = ref<'WECHAT' | 'ALIPAY' | ''>('')
+const qrCodePayType = ref<'ALIPAY' | ''>('')
 const checking = ref(false)
 const pollTimer = ref<number | undefined>(undefined)
 
@@ -217,6 +217,10 @@ const handleCheckPaid = async () => {
 }
 
 // 处理支付
+const handleWechatDisabled = () => {
+  ElMessage.warning('微信支付已迁移为原生微信JSAPI，请走微信授权拉起支付流程，不再使用汇付页面通道')
+}
+
 const handlePay = async () => {
   if (!selectedMethod.value || paying.value) return
 

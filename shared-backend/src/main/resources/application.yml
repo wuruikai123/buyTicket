@@ -44,8 +44,8 @@ aliyun:
     enabled: true
     accessKeyId: "${ALIYUN_SMS_ACCESS_KEY_ID:}"
     accessKeySecret: "${ALIYUN_SMS_ACCESS_KEY_SECRET:}"
-    signName: "${ALIYUN_SMS_SIGN_NAME:元星河文化}"
-    templateCode: "${ALIYUN_SMS_TEMPLATE_CODE:SMS_501865326}"
+    signName: "元星河文化"
+    templateCode: "SMS_501865326"
 
 # 微信支付配置
 wechat:
@@ -58,7 +58,7 @@ wechat:
   notify-url: "https://ai-yishuguan.com/api/v1/wechat-pay/notify"
   platform-certificate-path: "${WECHAT_PLATFORM_CERT_PATH:}"
   platform-public-key-id: "${WECHAT_PLATFORM_PUBLIC_KEY_ID:PUB_KEY_ID_0117299325722026042300291529002400}"
-  platform-public-key-path: "${WECHAT_PLATFORM_PUBLIC_KEY_PATH:appkey/wechatpay_platform_public_key.pem}"
+  platform-public-key-path: "${WECHAT_PLATFORM_PUBLIC_KEY_PATH:appkey/pub_key.pem}"
   # 生产建议开启验签；可使用平台证书或平台公钥模式
   verify-notify-signature: ${WECHAT_VERIFY_NOTIFY_SIGNATURE:true}
 

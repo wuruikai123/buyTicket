@@ -65,11 +65,10 @@ public class WechatPayServiceImpl implements WechatPayService {
 
         try {
             this.merchantPrivateKey = loadPrivateKey(WechatPayConfig.privateKeyPath);
-            if (!isBlank(WechatPayConfig.platformPublicKeyPath)) {
-                this.wechatPlatformPublicKey = loadPlatformPublicKeyFromPem(WechatPayConfig.platformPublicKeyPath);
-            } else if (!isBlank(WechatPayConfig.platformCertificatePath)) {
-                this.wechatPlatformPublicKey = loadPlatformPublicKey(WechatPayConfig.platformCertificatePath);
+            if (isBlank(WechatPayConfig.platformPublicKeyId) || isBlank(WechatPayConfig.platformPublicKeyPath)) {
+                throw new IllegalStateException("平台公钥模式配置不完整，必须同时配置 wechat.platform-public-key-id 与 wechat.platform-public-key-path");
             }
+            this.wechatPlatformPublicKey = loadPlatformPublicKeyFromPem(WechatPayConfig.platformPublicKeyPath);
             this.initialized = true;
             log.info("微信支付初始化成功: mchId={}, appId={}, privateKeyPath={}",
                     mask(WechatPayConfig.mchId),
